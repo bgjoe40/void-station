@@ -3017,7 +3017,7 @@ function endEvent(h) {
 }
 // 선체에 뚫린 구멍 (벽 면에 맞춰 기울인 들쭉날쭉한 검은 구멍 + 별 + 얼어붙은 테두리)
 function drawBreach(h) {
-  const r = 17 * Math.min(1, (h.max - h.t) / 0.3), n = h.jag.length;
+  const r = (h.r0 || 17) * Math.min(1, (h.max - h.t) / 0.3), n = h.jag.length; // r0: 오프닝 컷신의 큰 구멍
   ctx.save(); ctx.translate(PX(h.x, h.y), PY(h.x, h.y) - 34); ctx.transform(1, h.side * 0.5, 0, 1, 0, 0);
   ctx.beginPath();
   h.jag.forEach((j, k) => { const a = k / n * Math.PI * 2, x = Math.cos(a) * r * j, y = Math.sin(a) * r * 1.25 * j; k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
@@ -5271,6 +5271,7 @@ canvas.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.cli
 canvas.addEventListener('mousedown', e => {
   Snd.init();
   mouse.x = e.clientX; mouse.y = e.clientY;
+  if (state === 'intro') { introSkip(); return; }
   if (state === 'trade') { tradeMouseDown(e.button); return; }
   if (state === 'play' && invOpen && invMouseDown(e.button)) return;
   if (state === 'play' && codexOpen && codexMouseDown(e.button)) return;
@@ -5287,6 +5288,7 @@ canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('wheel', e => { if (state === 'play') cycleWeapon(Math.sign(e.deltaY || e.deltaX)); }, { passive: true });
 
 function onKey(code) {
+  if (state === 'intro') { introSkip(); return; }
   if (code === 'Escape') {
     if (state === 'play' && codexOpen) codexOpen = false;
     else if (state === 'play' && perkOpen) perkOpen = false;
@@ -6937,11 +6939,11 @@ function visibleBounds() {
 function render() {
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
   if (!tiles || !player) return;
-  const scene = state === 'title', vh = scene ? H : H - HUD_H; // 타이틀: 플레이어·HUD 없이 화면 전체에 정거장 풍경
+  const scene = state === 'title', cine = state === 'intro', vh = scene || cine ? H : H - HUD_H; // 타이틀: 플레이어·HUD 없이 화면 전체에 정거장 풍경, 오프닝 컷신: HUD 없이
   if (VH !== vh) { VH = vh; lightC.height = VH; }
   ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, VH); ctx.clip();
   const { i0, i1, j0, j1 } = visibleBounds();
-  if (!inBase) computeVision();
+  if (!inBase && !cine) computeVision();
   drawFloor();
   // 바닥 데칼 / 쓰러진 몬스터 / 장판 효과
   for (const d of decals) { // 핏자국은 그림, 그 밖(그을음·서리·부스러기)은 둥근 자국 — 화면 밖은 건너뜀
@@ -6975,7 +6977,7 @@ function render() {
     else if (t === T.DOOR) list.push({ d: depth, f: drawDoor, a: [i, j] });
     else list.push({ d: depth, f: drawPipe, a: [i, j, t === T.PIPEX] });
   }
-  if (!scene) list.push({ d: pd, f: drawPlayer, a: [] });
+  if (!scene && !(cine && intro.t < INTRO.walk[0])) list.push({ d: pd, f: drawPlayer, a: [] }); // 컷신: 폭파 연기 속에서 나타남
   for (const e of enemies) if (canSee(e.x, e.y)) list.push({ d: e.x + e.y, f: drawEnemy, a: [e] }); // 시야 밖의 적은 그리지 않음
   for (const s of survivors) if (s.state !== 'safe' && survivorShown(s)) list.push({ d: s.x + s.y, f: drawSurvivor, a: [s] });
   for (const h of hazards) if (h.type === 'breach') list.push({ d: h.x + h.y, f: drawBreach, a: [h] }); // 벽 면 바로 앞 깊이
@@ -7088,7 +7090,7 @@ function render() {
     ctx.fillStyle = staminaCol(); ctx.fillRect(bx, by, bw * p.stamina / staminaMax(), bh);
     ctx.globalAlpha = 1;
   }
-  if (!scene) { drawLootLabels(); drawEliteLabels(); drawTerminalLabels(); drawMissionLabels(); }
+  if (!scene && !cine) { drawLootLabels(); drawEliteLabels(); drawTerminalLabels(); drawMissionLabels(); }
 
   // 떠오르는 숫자
   ctx.textAlign = 'center'; ctx.font = 'bold 13px sans-serif';
@@ -7121,6 +7123,7 @@ function render() {
     if (titleCam && titleCam.fade > 0) { ctx.fillStyle = `rgba(0,0,0,${titleCam.fade})`; ctx.fillRect(0, 0, W, VH); }
     ctx.restore(); return;
   }
+  if (cine) { drawIntro(); ctx.restore(); return; }
   drawTopInfo();
   drawMinimap();
   drawTip();
@@ -7254,7 +7257,7 @@ function drawLighting() {
   lctx.globalCompositeOperation = 'source-over';
   lctx.clearRect(0, 0, W, VH);
   const dark = !inBase && isBlackout(); // 정전: 더 어둡고 조명이 꺼짐 (출구 패드 불빛만)
-  lctx.fillStyle = state === 'title' ? 'rgba(0,0,0,0.58)' : inBase ? 'rgba(0,0,0,0.42)' : area ? `rgba(0,0,0,${dark ? 0.94 : 0.88})` : 'rgba(0,0,0,0.72)'; // 타이틀은 조명만, 기지는 밝게, 시야 밖은 어둡게
+  lctx.fillStyle = state === 'title' || state === 'intro' ? 'rgba(0,0,0,0.58)' : inBase ? 'rgba(0,0,0,0.42)' : area ? `rgba(0,0,0,${dark ? 0.94 : 0.88})` : 'rgba(0,0,0,0.72)'; // 타이틀은 조명만, 기지는 밝게, 시야 밖은 어둡게
   lctx.fillRect(0, 0, W, VH);
   lctx.globalCompositeOperation = 'destination-out';
   const punch = (x, y, r, a) => {
@@ -7302,7 +7305,7 @@ function drawLighting() {
     lctx.restore();
     // 이후의 빛(조명·폭발 등)은 보이는 영역 안에서만 — 조명이 비추는 곳은 손전등 밖이어도 포함
     lctx.save(); lctx.clip(vp.all);
-  } else if (state !== 'title') { // 타이틀 풍경에는 플레이어의 빛이 없음
+  } else if (state !== 'title' && state !== 'intro') { // 타이틀 풍경·오프닝 컷신에는 플레이어의 빛이 없음
     punch(psx, psy, 300, 0.95);
     // 손전등: 벽까지 레이캐스트한 부채꼴
     lctx.fillStyle = g; lctx.beginPath(); lctx.moveTo(psx, psy);
@@ -7919,9 +7922,11 @@ function newGame(diff = 'normal') {
   Snd.init(); Snd.play('menu');
   difficulty = diff; kills = 0; playtime = 0; rescued = 0; stash = []; player = newPlayer();
   startField(newSeed());
-  msg('[F] 자판기 · 가운데 패드: 거점 순간이동 · I/Tab: 인벤토리', '#ffd27a');
-  msg(`새 작전 (난이도 ${DIFFICULTY[difficulty].name}) — 정거장 가장 깊은 곳(구역 9 코어)의 오버마인드를 처치하라`, '#9f9');
-  tipQueue = []; tip('controls'); tip('vision'); tip('skills');
+  startIntro(() => { // 오프닝 컷신이 끝나면 (건너뛰어도)
+    msg('[F] 자판기 · 가운데 패드: 거점 순간이동 · I/Tab: 인벤토리', '#ffd27a');
+    msg(`새 작전 (난이도 ${DIFFICULTY[difficulty].name}) — 정거장 가장 깊은 곳(구역 9 코어)의 오버마인드를 처치하라`, '#9f9');
+    tipQueue = []; tip('controls'); tip('vision'); tip('skills');
+  });
 }
 // 쓰러짐: 보통은 마지막으로 들른 보급 거점에서 다시 일어남 (respawn) — 자폭 중이거나 자폭에 휘말리면 임무 실패
 function die(reason) {
@@ -7953,6 +7958,171 @@ function drawEnding() {
   // 멀어지는 탈출정 불빛
   const f = Math.min(1, (endT - 1) / 8), px = W * (0.35 + 0.3 * f), py = H * (0.62 - 0.25 * f);
   circle(px, py, 3 * (1 - f) + 1, '#fff'); circle(px, py, 9 * (1 - f) + 3, 'rgba(120,200,255,0.25)');
+  ctx.globalAlpha = 1;
+}
+// ===== 오프닝 컷신 (INTRO, 새 작전): 착륙 지점 거점의 위·왼쪽 벽(되도록 우주에 맞닿은 바깥벽)을 폭파하고 해병이 걸어 들어와 포효 =====
+// 실제 필드 그대로 (위아래 검은 띠, HUD 없음, 타이틀처럼 조명만) — 가까이 장면만 정면 그림을 크게. 아무 키·클릭이면 건너뜀
+let intro = null; // { t, s: 구멍 자리, dir, sx·sy → ex·ey: 걸어 들어오는 길, hole, white, typed, step, msgs, done }
+function introSpot() {
+  const r = hubs[0] && hubs[0].room, cand = [];
+  if (!r) return null;
+  const face = (wi, wj, fi, fj, di, dj, out, mid) => {
+    if (tileAt(wi, wj) !== T.WALL || tileAt(fi, fj) !== T.FLOOR) return;
+    for (let s = 1; s <= 2; s++) if (!walkable(tileAt(fi + di * s, fj + dj * s))) return; // 걸어 들어올 두 칸
+    const x = (wi + fi) / 2 + 0.5, y = (wj + fj) / 2 + 0.5;
+    if (doors.some(o => Math.hypot(o.x - x, o.y - y) < 2.5) || lamps.some(l => Math.hypot(l.x - x, l.y - y) < 1.2)) return;
+    cand.push({ x, y, fi, fj, di, dj, side: dj ? 1 : -1, score: (tileAt(...out) === T.VOID ? 0 : 20) + mid }); // 바깥벽, 벽 가운데쯤 먼저
+  };
+  for (let i = r.x + 1; i < r.x + r.w - 1; i++) face(i, r.y - 1, i, r.y, 0, 1, [i, r.y - 2], Math.abs(i + 0.5 - r.x - r.w / 2));
+  for (let j = r.y + 1; j < r.y + r.h - 1; j++) face(r.x - 1, j, r.x, j, 1, 0, [r.x - 2, j], Math.abs(j + 0.5 - r.y - r.h / 2));
+  return cand.sort((a, b) => a.score - b.score)[0] || null;
+}
+function startIntro(done) {
+  const s = introSpot();
+  if (!s) { done(); return; }
+  const p = player, dir = Math.atan2(s.dj, s.di), ex = s.x + s.di * 2.7, ey = s.y + s.dj * 2.7;
+  intro = { t: 0, s, dir, sx: s.x + s.di * 0.3, sy: s.y + s.dj * 0.3, ex, ey, hole: null, white: 0, typed: 0, step: 0, msgs, done };
+  msgs = []; state = 'intro'; vis = null; mouse.down = mouse.pressed = false; Music.stop(0.8);
+  placePlayer(ex, ey); p.x = intro.sx; p.y = intro.sy; p.aim = p.look = dir;
+  for (const [a, b] of [[1.5, 0.5], [-1.8, -0.3]]) { // 먼저 당한 경비병 둘과 핏자국
+    const x = ex - s.dj * a + s.di * b, y = ey + s.di * a + s.dj * b;
+    if (collides(x, y, 0.35, false) || tileAt(Math.floor(x), Math.floor(y)) !== T.FLOOR) continue;
+    corpses.push({ x, y, type: 'gunner', face: rnd(0, 6.28), t: 99 }); bloodSplat(x, y, rnd(0.7, 1), 'rgba(120,10,10,0.85)');
+  }
+}
+function introTick(dt) {
+  const I = INTRO, it = intro, p = player, s = it.s, t0 = it.t;
+  gtime += dt; it.t += dt;
+  const at = x => t0 < x && it.t >= x; // 이번 프레임에 지난 시각
+  const n = Math.floor((it.t - 0.5) * 16); // 장소 자막을 치는 소리
+  if (n > it.typed && n <= I.place.length + I.sub.length) { it.typed = n; Snd.play('uiMove'); }
+  I.knock.forEach((k, m) => { if (at(k)) { shake = Math.max(shake, 4 + m * 3); Snd.play('bigHurt', s.x, s.y); spark(s.x, s.y, 4 + m * 4, '#ffd27a', 2.5); smoke(s.x + s.di * 0.2, s.y + s.dj * 0.2, 3 + m * 2, '110,105,100', 0.7); } }); // 벽 너머에서 쾅, 쾅, 쾅
+  if (at(I.boom)) introBoom();
+  if (it.hole) {
+    it.hole.t -= dt;
+    if (Math.random() < dt * 12 && it.t < I.boom + 4) smoke(s.x + s.di * 0.3, s.y + s.dj * 0.3, 1, '80,76,72', 0.6);
+    if (Math.random() < dt * 5) spark(s.x, s.y, 2, pick(['#ffd27a', '#ff9a40']), 2);
+  }
+  it.white = Math.max(0, it.white - dt * 2.5);
+  const [w0, w1] = I.walk; // 연기 속에서 천천히 걸어 들어옴
+  p.moving = it.t >= w0 && it.t < w1;
+  if (p.moving) {
+    const u = (it.t - w0) / (w1 - w0), k = 1 - (1 - u) * (1 - u);
+    p.x = it.sx + (it.ex - it.sx) * k; p.y = it.sy + (it.ey - it.sy) * k; p.walk += dt * 7 * (1 - u * 0.6);
+    if ((it.step -= dt) <= 0) { it.step = 0.4; Snd.play('step'); }
+  }
+  if (it.t >= w1 && it.t < I.turn) p.aim = it.dir + Math.sin((it.t - w1) * 2.4) * 0.8; // 둘러봄
+  else if (it.t >= I.turn) p.aim += angDiff(Math.PI / 4, p.aim) * Math.min(1, dt * 6); // 화면 쪽으로 돌아섬
+  p.look = p.aim;
+  if (at(I.growl)) Snd.sample(['dsbgsit1', 'dsbgsit2'], 0.35, 0.8); // 어딘가에서 들리는 괴성
+  if (at(I.turn)) Snd.play('reload');
+  if (at(I.roarAt)) { Snd.play('berserk'); Snd.sample(['dsplpain'], 1, 0.6); shake = Math.max(shake, 16); Music.play(MUSIC.zones[0]); }
+  if (at(I.line2)) { Snd.play('stomp'); shake = Math.max(shake, 20); }
+  if (at(I.shot)) { Snd.play('dshotgun'); shake = Math.max(shake, 10); }
+  if (at(I.seal)) introSeal();
+  updateMisc(dt);
+  const c = 1.3 + 0.6 * Math.min(1, it.t / I.end), cx = s.x + s.di * c, cy = s.y + s.dj * c; // 카메라: 구멍과 해병 사이, 천천히 안쪽으로
+  cam.x = (cx - cy) * TW / 2; cam.y = (cx + cy) * TH / 2;
+  if (it.t >= I.end) introEnd();
+}
+// 폭파: 벽에 구멍 (선체 파손 그림을 크게), 섬광, 불꽃, 안쪽으로 튀는 파편, 바닥 그을음
+function introBoom() {
+  const it = intro, s = it.s;
+  it.hole = { type: 'breach', x: s.x, y: s.y, side: s.side, r0: 26, t: 99, max: 99, jag: Array.from({ length: 11 }, () => rnd(0.75, 1.15)), stars: Array.from({ length: 7 }, () => [rnd(-0.6, 0.6), rnd(-0.6, 0.6)]) };
+  hazards.push(it.hole);
+  Snd.play('explode'); Snd.play('stomp'); shake = Math.max(shake, 22); it.white = 1;
+  flashes.push({ x: s.x, y: s.y, r: 700, t: 0.6, max: 0.6, col: '255,200,140' });
+  addFx('misl', 'bcd', s.x + s.di * 0.3, s.y + s.dj * 0.3, 30, 0.6, 2.2);
+  fireBurst(s.x, s.y, 30, 4); smoke(s.x + s.di * 0.4, s.y + s.dj * 0.4, 26, '85,80,75', 2.2);
+  for (let k = 0; k < 36; k++) { const a = it.dir + rnd(-1.1, 1.1), v = rnd(2, 7); parts.push({ x: s.x, y: s.y, z: rnd(20, 50), vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: rnd(40, 160), g: 320, life: rnd(0.6, 1.3), max: 1.3, col: pick(['#8a8478', '#6a655c', '#b0a898', '#4a4640']), size: rnd(2, 5) }); }
+  addDecal({ x: s.fi + 0.5, y: s.fj + 0.5, r: 1.1, col: 'rgba(14,12,10,0.85)' });
+}
+// 비상 격벽이 구멍을 막음 (선체 파손이 끝날 때와 같은 모습)
+function introSeal() {
+  const h = intro.hole;
+  if (!h) return;
+  hazards = hazards.filter(o => o !== h); intro.hole = null;
+  Snd.play('doorClose', h.x, h.y); spark(h.x, h.y, 16, '#ffd27a', 3);
+  flashes.push({ x: h.x, y: h.y, r: 200, t: 0.25, max: 0.25, col: '150,200,255' });
+}
+const introSkip = () => { if (intro && intro.t > 0.6) introEnd(); }; // 시작할 때 누르고 있던 키는 무시
+function introEnd() {
+  const it = intro, p = player;
+  intro = null;
+  if (it.hole) hazards = hazards.filter(o => o !== it.hole);
+  placePlayer(it.ex, it.ey); p.moving = false; p.fireT = 0; p.aim = p.look = Math.PI / 4;
+  msgs = it.msgs; state = 'play'; mouse.down = mouse.pressed = false;
+  trackRegion();
+  it.done();
+}
+// 컷신 화면: 검은 띠, 장소 자막 (타자기), 혼잣말, 가까이 장면, 구역 이름, 폭파 섬광, 처음 밝아짐, 건너뛰기 안내
+function drawIntro() {
+  const I = INTRO, it = intro, t = it.t, bar = Math.round(H * 0.11), ease = x => x * x * (3 - 2 * x);
+  const ui = "'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif", disp = `Bahnschrift, ${ui}`;
+  const txt = (s, x, y, col, w = 4) => { ctx.lineWidth = w; ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.strokeText(s, x, y); ctx.fillStyle = col; ctx.fillText(s, x, y); };
+  const typed = (s, t1, cps) => s.slice(0, Math.max(0, Math.floor((t - t1) * cps)));
+  ctx.save(); ctx.lineJoin = 'round';
+  const ck = clamp(Math.min((t - I.close[0]) / 0.25, (I.close[1] - t) / 0.3), 0, 1);
+  if (ck > 0) drawIntroClose(ck, bar, txt, disp);
+  if (it.white > 0) { ctx.fillStyle = `rgba(255,240,220,${it.white * 0.7})`; ctx.fillRect(0, 0, W, H); }
+  const bh = bar * Math.min(ease(clamp(t / 0.6, 0, 1)), ease(clamp((I.end - t) / 0.6, 0, 1)));
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, bh); ctx.fillRect(0, H - bh, W, bh);
+  const ca = clamp(Math.min((t - 0.4) / 0.3, (I.boom + 1.2 - t) / 0.6), 0, 1); // 장소 (폭파 뒤 사라짐)
+  if (ca > 0) {
+    const x = Math.max(28, W * 0.06), y = bar + 60, a = typed(I.place, 0.5, 16), b = typed(I.sub, 0.5 + I.place.length / 16, 16);
+    ctx.globalAlpha = ca; ctx.textAlign = 'left';
+    ctx.fillStyle = '#ff9a3c'; ctx.fillRect(x, y - 28, 3, 52);
+    ctx.font = `bold 26px ${disp}`; txt(a + (a.length < I.place.length && Math.sin(t * 20) > 0 ? '▌' : ''), x + 16, y, '#f2ede4');
+    ctx.font = `15px ${ui}`; txt(b, x + 16, y + 24, '#8fb4c8', 3);
+    ctx.globalAlpha = 1;
+  }
+  const qa = clamp(Math.min((t - I.quietAt) / 0.3, (I.turn + 0.3 - t) / 0.4), 0, 1); // 혼잣말
+  if (qa > 0) { ctx.globalAlpha = qa; ctx.textAlign = 'center'; ctx.font = `22px ${ui}`; txt(I.quiet, W / 2, H - bar - 36, '#e8e2d6'); ctx.globalAlpha = 1; }
+  const ra = clamp(Math.min((t - I.seal) / 0.4, (I.end + 0.2 - t) / 0.5), 0, 1); // 구역 이름 (위쪽 가운데, 양옆에 주황 줄)
+  if (ra > 0) {
+    const y = bar + 70;
+    ctx.globalAlpha = ra; ctx.textAlign = 'center';
+    ctx.font = `bold 14px ${disp}`; txt('구역 1', W / 2, y - 34, '#ff9a3c', 3);
+    ctx.font = `bold 44px ${disp}`; txt(CAMPAIGN[0].name, W / 2, y + 10, '#f2ede4', 5);
+    const half = ctx.measureText(CAMPAIGN[0].name).width / 2 + 24;
+    ctx.fillStyle = '#ff9a3c'; ctx.fillRect(W / 2 - half - 70 * ra, y - 7, 70 * ra, 2); ctx.fillRect(W / 2 + half, y - 7, 70 * ra, 2);
+    ctx.globalAlpha = 1;
+  }
+  if (t < 1.2) { ctx.fillStyle = `rgba(0,0,0,${1 - t / 1.2})`; ctx.fillRect(0, 0, W, H); }
+  if (bh > bar * 0.5) { ctx.globalAlpha = 0.55; ctx.textAlign = 'right'; ctx.font = `12px ${ui}`; ctx.fillStyle = '#9a968c'; ctx.fillText('아무 키나 누르면 건너뜀 ▸', W - 24, H - bh / 2 + 4); ctx.globalAlpha = 1; }
+  ctx.restore();
+}
+// 가까이: 어둡게 덮고 붉은 역광 앞에 해병의 정면 그림을 크게 — 포효할 때 집중선과 흔들림, 하늘에 한 발 (총구 섬광 그림), 옆에 대사
+function drawIntroClose(k, bar, txt, disp) {
+  const I = INTRO, t = intro.t, wide = W >= 760, roar = t >= I.roarAt, pulse = roar ? 0.5 + 0.5 * Math.sin(t * 18) : 0;
+  const fr = t >= I.shot && t < I.shot + 0.14 ? 'f' : t >= I.roarAt - 0.2 ? 'e' : 'a', key = frontKey('play', fr), f = key && META.frames[key];
+  if (!f) return;
+  const base = H - bar + 4, sc = (H - 2 * bar) * 0.84 / f[3] * (0.94 + 0.06 * k), cx = wide ? W * 0.33 : W / 2, top = base - f[3] * sc, hy = top + f[3] * sc * 0.2;
+  ctx.fillStyle = `rgba(6,3,2,${0.8 * k})`; ctx.fillRect(0, 0, W, H);
+  const g = ctx.createRadialGradient(cx, hy + f[3] * sc * 0.15, 0, cx, hy + f[3] * sc * 0.15, H * 0.62);
+  g.addColorStop(0, `rgba(255,${Math.round(90 - 40 * pulse)},40,${(0.42 + 0.28 * pulse) * k})`); g.addColorStop(1, 'rgba(90,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  if (roar && t < I.roarAt + 2.2) { // 집중선
+    const a0 = (1 - (t - I.roarAt) / 2.2) * k;
+    ctx.strokeStyle = `rgba(255,225,205,${0.18 * a0})`; ctx.lineWidth = 2; ctx.beginPath();
+    for (let n = 0; n < 56; n++) { const a = n / 56 * Math.PI * 2 + Math.sin(n * 12.9 + Math.floor(t * 20)) * 0.05, r0 = H * (0.3 + 0.1 * Math.abs(Math.sin(n * 7.3 + Math.floor(t * 20)))); ctx.moveTo(cx + Math.cos(a) * r0, hy + Math.sin(a) * r0); ctx.lineTo(cx + Math.cos(a) * W, hy + Math.sin(a) * W); }
+    ctx.stroke();
+  }
+  const zx = roar ? shx * 1.6 : 0, zy = roar ? shy * 1.6 : 0;
+  ctx.globalAlpha = k; drawFrame(key, cx + zx, base + zy, sc);
+  if (fr === 'f') { const fx = cx + zx, fy = top + f[3] * sc * 0.5, g2 = ctx.createRadialGradient(fx, fy, 0, fx, fy, sc * 26); g2.addColorStop(0, 'rgba(255,240,180,0.55)'); g2.addColorStop(1, 'rgba(255,160,60,0)'); ctx.fillStyle = g2; ctx.fillRect(fx - sc * 26, fy - sc * 26, sc * 52, sc * 52); }
+  if (t >= I.roarAt - 0.1) { // 대사: 첫 줄은 치듯이, 둘째 줄은 쾅 하고 크게
+    const [l1, l2] = I.roar, x = wide ? W * 0.56 : W / 2, y = wide ? H * 0.46 : H - bar - 92, s2 = Math.min(58, (wide ? W * 0.4 : W * 0.9) / (l2.length * 0.95));
+    ctx.textAlign = wide ? 'left' : 'center';
+    ctx.font = `bold 30px ${disp}`; txt(l1.slice(0, Math.max(0, Math.floor((t - I.roarAt + 0.1) * 14))), x + zx * 0.5, y, '#f2ede4');
+    if (t >= I.line2) {
+      const slam = 1 + 0.4 * Math.max(0, 1 - (t - I.line2) / 0.15), y2 = y + s2 + 14;
+      ctx.save(); ctx.translate(x + zx, y2 + zy); ctx.scale(slam, slam);
+      const g3 = ctx.createLinearGradient(0, -s2, 0, 0); g3.addColorStop(0, '#ffe1a0'); g3.addColorStop(1, '#ff5a28');
+      ctx.font = `bold ${Math.round(s2)}px ${disp}`; txt(l2, 0, 0, g3, 7);
+      ctx.restore();
+    }
+  }
   ctx.globalAlpha = 1;
 }
 // ===== 보급 거점의 자판기 · 해킹 단말기 =====
@@ -7987,6 +8157,7 @@ function frame(t) {
   else if (state === 'dead') { updateMisc(dt); player.deathT += dt; }
   else if (state === 'ending') { updateMisc(dt); endT += dt; }
   else if (state === 'title') titleTick(dt); // 타이틀 뒤 풍경 (menu.js)
+  else if (state === 'intro') introTick(dt); // 오프닝 컷신
   updateAmbience();
   render();
   requestAnimationFrame(frame);
