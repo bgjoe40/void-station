@@ -2997,8 +2997,10 @@ function tickEvent(h, dt) {
       const d = pull(e, e.d.boss ? 0.25 : e.r >= 0.5 ? 0.5 : 1);
       if (d < 0.75 && e.r < 0.5 && !e.d.boss) { // 작은 몬스터는 구멍으로 빨려 나감
         e.voided = true; e.hp = 0; killEnemy(e);
-        if (!h.lost) msg('몬스터가 우주로 빨려 나갔다', E.color);
-        h.lost = (h.lost || 0) + 1;
+        h.lost = (h.lost || 0) + 1; // 알림은 구멍 위 표지 바로 위에 (빨려 나갈 때마다 수를 고침)
+        const t = `몬스터 ${h.lost}마리가 우주로 빨려 나갔다`;
+        if (h.lostNote && h.lostNote.until > gtime) { h.lostNote.t = t; h.lostNote.until = gtime + 2.5; }
+        else eventNotes.push(h.lostNote = { x: h.x, y: h.y, z: 138, t, col: E.color, until: gtime + 2.5 });
       }
     }
     if (Math.random() < dt * 40) { // 빨려 들어가는 먼지
@@ -3020,8 +3022,8 @@ function drawHazardLabels() {
     ctx.font = 'bold 14px sans-serif'; const w1 = ctx.measureText(title).width + (frac === undefined ? 0 : 26);
     ctx.font = '11px sans-serif'; const w2 = sub ? ctx.measureText(sub).width : 0;
     const w = Math.max(w1, w2) + 22, h = sub ? 40 : 24, ax = PX(wx, wy), ay = PY(wx, wy) - z + Math.sin(gtime * 3) * 3;
-    const off = ax < 0 || ax > W || ay - h < 0 || ay > VH; // 화면 밖: 가장자리로 (위쪽 목표·메시지, 아래 스킬 칸은 피해서)
-    const x = off ? clamp(ax, w / 2 + 14, W - w / 2 - 14) : ax, y = off ? clamp(ay, h + 170, VH - 96) : ay;
+    const sx0 = PX(wx, wy), sy0 = PY(wx, wy), off = sx0 < 0 || sx0 > W || sy0 < 0 || sy0 > VH; // 그 자리가 화면 밖: 가장자리로 (위쪽 목표·메시지, 아래 스킬 칸은 피해서)
+    const x = off ? clamp(ax, w / 2 + 14, W - w / 2 - 14) : clamp(ax, w / 2 + 8, W - w / 2 - 8), y = off ? clamp(ay, h + 170, VH - 96) : Math.max(ay, h + 8); // 화면 안이면 위로 넘치지만 않게
     ctx.fillStyle = 'rgba(8,10,8,0.8)'; rr(x - w / 2, y - h, w, h, 5); ctx.fill();
     ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.stroke(); ctx.lineWidth = 1;
     ctx.fillStyle = col; ctx.beginPath(); // 아래 꼭지 (화면 밖이면 그쪽을 가리키는 화살표)
@@ -6616,16 +6618,14 @@ function drawPickup(it) {
   if (it.kind === 'log') { // 데이터 기록: 화면이 깜박이는 휴대 단말기 + 하늘색 고리
     ctx.strokeStyle = `rgba(90,210,255,${0.45 + 0.45 * Math.sin(gtime * 4 + it.bob)})`; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.ellipse(sx, sy, 14, 7, 0, 0, Math.PI * 2); ctx.stroke();
-    drawBottom(Math.floor(gtime * 3 + it.bob) % 2 ? 'pmapb0' : 'pmapa0', sx, sy - z, 1.2);
-    if (Math.hypot(it.x - player.x, it.y - player.y) < 4) { ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#7fe0ff'; ctx.fillText('데이터 기록', sx, sy - z - 30); }
+    drawBottom(Math.floor(gtime * 3 + it.bob) % 2 ? 'pmapb0' : 'pmapa0', sx, sy - z, 1.2); // 이름은 커서를 올렸을 때 (drawLootLabels)
     return;
   }
   if (it.kind === 'key') { // 키카드: 깜박이는 카드 + 바닥의 색 고리
     const K = KEYCARDS[it.id];
     ctx.strokeStyle = `rgba(${K.rgb},${0.5 + 0.5 * Math.sin(gtime * 5)})`; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.ellipse(sx, sy, 16, 8, 0, 0, Math.PI * 2); ctx.stroke();
-    drawBottom(K.spr + (!K.still && Math.floor(gtime * 2.5 + it.bob) % 2 ? 'b0' : 'a0'), sx, sy - z, 1.6);
-    if (Math.hypot(it.x - player.x, it.y - player.y) < 4) { ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = K.color; ctx.fillText(K.name, sx, sy - z - 40); }
+    drawBottom(K.spr + (!K.still && Math.floor(gtime * 2.5 + it.bob) % 2 ? 'b0' : 'a0'), sx, sy - z, 1.6); // 이름은 커서를 올렸을 때
     return;
   }
   if (it.kind === 'weapon') { // 무기·스킬 쉘 (이름표는 조명 뒤 drawLootLabels에서)
@@ -6636,13 +6636,7 @@ function drawPickup(it) {
     return;
   }
   const [key, sc] = it.kind === 'item' ? ITEM_ART[it.id] : it.kind === 'ammo' ? AMMO_ART[it.id] : ['icon_gren_' + it.id, 0.8];
-  drawBottom(key, sx, sy - z, sc);
-  if (Math.hypot(it.x - player.x, it.y - player.y) < 3) { // 근처면 이름 표시
-    const label = it.kind === 'item' ? ITEMS[it.id].short : it.kind === 'ammo' ? AMMO[it.id].name : GRENADES[it.id].short;
-    ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillStyle = it.kind === 'item' ? ITEMS[it.id].color : it.kind === 'ammo' ? '#c9a040' : GRENADES[it.id].color;
-    ctx.fillText(label, sx, sy - z - 28);
-  }
+  drawBottom(key, sx, sy - z, sc); // 이름은 커서를 올렸을 때
 }
 
 // --- 핏자국: 흰 핏자국 그림을 체액 색으로 칠한 것 (그림·색마다 한 번 만들어 둠) ---
@@ -6843,20 +6837,33 @@ function fitText(t, maxW) {
   while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1);
   return t + '…';
 }
-// 바닥 무기 이름표 (등급색) + 가장 가까운 무기의 [F] 안내와 성능
-function drawLootLabels() {
-  const cand = nearestWeaponPickup();
-  ctx.textAlign = 'center'; ctx.font = '11px sans-serif';
+// 바닥 아이템의 이름·정보: 가까이(HOVER_R칸 안) 있는 아이템에 커서를 올렸을 때만 (바라보기만 해서는 뜨지 않음 — 화면을 덜 가림)
+// 발밑의 주울 수 있는 무기에는 [F] 줍기 안내만 작게
+const HOVER_R = 4;
+function hoverPickup() {
+  if ((invOpen && invHit(mouse.x, mouse.y)) || codexOpen) return null;
+  let best = null, bd = 28; // 커서와 그림 가운데 사이 (화면 픽셀)
   for (const it of pickups) {
-    if (it.kind !== 'weapon' || Math.hypot(it.x - player.x, it.y - player.y) > 7 || !canSee(it.x, it.y)) continue;
-    const name = (it.inst.uq ? '★ ' : it.inst.set ? '◆ ' : '') + it.inst.name, sx = PX(it.x, it.y), sy = PY(it.x, it.y) - 30, tw = ctx.measureText(name).width;
-    ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(sx - tw / 2 - 4, sy - 11, tw + 8, 15);
-    ctx.fillStyle = itemColor(it.inst); ctx.fillText(name, sx, sy);
+    if (it.dead || it.kind === 'gold' || Math.hypot(it.x - player.x, it.y - player.y) > HOVER_R || !canSee(it.x, it.y)) continue;
+    const d = Math.hypot(PX(it.x, it.y) - mouse.x, PY(it.x, it.y) - 14 - mouse.y);
+    if (d < bd) { bd = d; best = it; }
   }
-  if (!cand) return;
-  const sx = PX(cand.x, cand.y), sy = PY(cand.x, cand.y) - 30;
-  ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = '#ffd27a'; ctx.fillText('[F] 줍기', sx, sy - 16);
-  if (!(invOpen && invHit(mouse.x, mouse.y)) && !codexOpen) drawTooltip(itemLines(cand.inst), sx + 30, sy + 10, VH);
+  return best;
+}
+function drawLootLabels() {
+  const cand = nearestWeaponPickup(), it = hoverPickup();
+  ctx.textAlign = 'center';
+  if (cand && cand !== it) { ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = '#ffd27a'; ctx.fillText('[F] 줍기', PX(cand.x, cand.y), PY(cand.x, cand.y) - 46); }
+  if (!it) return;
+  const sx = PX(it.x, it.y), sy = PY(it.x, it.y) - 30, w = it.kind === 'weapon';
+  const name = w ? (it.inst.uq ? '★ ' : it.inst.set ? '◆ ' : '') + it.inst.name : it.kind === 'key' ? KEYCARDS[it.id].name : it.kind === 'log' ? '데이터 기록'
+    : it.kind === 'item' ? ITEMS[it.id].name : it.kind === 'ammo' ? AMMO[it.id].name : GRENADES[it.id].name;
+  const col = w ? itemColor(it.inst) : it.kind === 'key' ? KEYCARDS[it.id].color : it.kind === 'log' ? '#7fe0ff' : it.kind === 'item' ? ITEMS[it.id].color : it.kind === 'ammo' ? '#c9a040' : GRENADES[it.id].color;
+  ctx.font = '11px sans-serif'; const tw = ctx.measureText(name).width;
+  ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(sx - tw / 2 - 4, sy - 11, tw + 8, 15);
+  ctx.fillStyle = col; ctx.fillText(name, sx, sy);
+  if (it === cand) { ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = '#ffd27a'; ctx.fillText('[F] 줍기', sx, sy - 16); }
+  if (w) drawTooltip(itemLines(it.inst), sx + 30, sy + 10, VH); // 무기·방어구·쉘·보석: 성능
 }
 // 정예 이름표 + 체력 막대 (조명 뒤에 그려서 어두운 곳에서도 읽힘, 지금 보이는 정예만)
 function drawEliteLabels() {
