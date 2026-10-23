@@ -479,7 +479,7 @@ const safeMap = new Uint8Array(MW * MH); // 보급 거점 방 = 안전 지대: �
 const THEMES = [
   { floors: ['aqf001', 'aqf029', 'aqf031', 'floor7_1'], corridor: 'aqf004', walls: ['startan2', 'starbr2'], accents: ['comptall', 'compwerd'] },
   { floors: ['floor0_6', 'aqf051', 'floor0_5', 'flat5_4'], corridor: 'flat4', walls: ['starg3', 'stargr1'], accents: ['compsta1', 'spacew3'] },
-  { floors: ['aqf027', 'aqf026', 'ceil3_5', 'mflr8_1'], corridor: 'aqf072', walls: ['tekwall1', 'metal2'], accents: ['compblue', 'silver2'] },
+  { floors: ['aqf027', 'aqf026', 'ceil3_5', 'mflr8_1'], corridor: 'aqf072', walls: ['tekwall1', 'metal2'], accents: ['comptall', 'silver2'] },
   { floors: ['aqf045', 'floor5_1', 'aqf007', 'floor4_8'], corridor: 'aqf005', walls: ['support3', 'brown96', 'bronze1'], accents: ['pipe4', 'brownpip'] },
 ];
 // 우주 기지: 방 순서대로 바닥·벽 지정 (중앙 홀, 출격실)

@@ -6,7 +6,7 @@
 - 출처: https://github.com/freedoom/freedoom (스프라이트, 벽 패치, 바닥 텍스처, 효과음, 배경음악)
 - 라이선스 전문: `LICENSE-freedoom.txt`, 기여자 목록: `CREDITS-freedoom.txt`, 곡별 작곡자: `CREDITS-freedoom-music.txt`
 - 배경음악은 원본 MIDI 그대로(`music/*.mid`), 게임이 Web Audio 신시사이저로 연주
-- 가공: 스프라이트를 `atlas.png` 한 장으로 묶음, 벽 텍스처는 `textures.cfg` 정의대로 패치를 합성(`tex/wall_*.png`),
+- 가공: 스프라이트를 `atlas.png` 한 장으로 묶음, 벽 텍스처는 `textures.cfg` 정의대로 패치를 합성(`tex/wall_*.png` — 평균 밝기가 낮은 벽은 감마로 밝힘),
   바닥은 원본 그대로(`tex/flat_*.png`), 효과음은 원본 WAV 그대로(`sfx/*.wav`)
 - 색조만 바꾼 몬스터 변종: 질주 크롤러(거미), 방패 해병(좀비맨), 그림자 추적자(데몬), 되살리는 자(아치바일),
   구역 보스 — 파쇄 짐승(데몬), 번식 모체(페인 엘리멘탈), 아르고스(카코데몬), 역병 거인(맨큐버스), 공허 사제(아치바일), 처형자(레버넌트)

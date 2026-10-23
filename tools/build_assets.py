@@ -29,7 +29,7 @@ import sys
 import urllib.request
 import zipfile
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageStat
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE = os.path.join(ROOT, 'tools', '.cache')
@@ -99,7 +99,7 @@ DERIVED = {'bspr': ('bspi', 0.9),   # 질주 크롤러 (붉은 크롤러)
 
 # 벽 텍스처(패치 합성)와 바닥 텍스처(flat)
 WALL_TEX = ['STARTAN2', 'STARBR2', 'STARG3', 'STARGR1', 'TEKWALL1', 'METAL2', 'SUPPORT3', 'BROWN96', 'BRONZE1',
-            'COMPTALL', 'COMPWERD', 'COMPSTA1', 'SPACEW3', 'COMPBLUE', 'SILVER2', 'PIPE4', 'BROWNPIP', 'CRATE2', 'BIGDOOR2',
+            'COMPTALL', 'COMPWERD', 'COMPSTA1', 'SPACEW3', 'SILVER2', 'PIPE4', 'BROWNPIP', 'CRATE2', 'BIGDOOR2',
             'DOORBLU', 'DOORYEL', 'DOORRED']  # 보안문 양 끝 색 표시등
 FLATS = ['aqf001', 'aqf029', 'aqf031', 'floor7_1', 'aqf004', 'floor0_6', 'aqf051', 'floor0_5', 'flat5_4', 'flat4',
          'aqf027', 'aqf026', 'ceil3_5', 'mflr8_1', 'aqf072', 'aqf045', 'floor5_1', 'aqf007', 'floor4_8', 'aqf005',
@@ -188,7 +188,7 @@ README = """# assets/ — 그래픽 출처와 라이선스
 - 출처: https://github.com/freedoom/freedoom (스프라이트, 벽 패치, 바닥 텍스처, 효과음, 배경음악)
 - 라이선스 전문: `LICENSE-freedoom.txt`, 기여자 목록: `CREDITS-freedoom.txt`, 곡별 작곡자: `CREDITS-freedoom-music.txt`
 - 배경음악은 원본 MIDI 그대로(`music/*.mid`), 게임이 Web Audio 신시사이저로 연주
-- 가공: 스프라이트를 `atlas.png` 한 장으로 묶음, 벽 텍스처는 `textures.cfg` 정의대로 패치를 합성(`tex/wall_*.png`),
+- 가공: 스프라이트를 `atlas.png` 한 장으로 묶음, 벽 텍스처는 `textures.cfg` 정의대로 패치를 합성(`tex/wall_*.png` — 평균 밝기가 낮은 벽은 감마로 밝힘),
   바닥은 원본 그대로(`tex/flat_*.png`), 효과음은 원본 WAV 그대로(`sfx/*.wav`)
 - 색조만 바꾼 몬스터 변종: 질주 크롤러(거미), 방패 해병(좀비맨), 그림자 추적자(데몬), 되살리는 자(아치바일),
   구역 보스 — 파쇄 짐승(데몬), 번식 모체(페인 엘리멘탈), 아르고스(카코데몬), 역병 거인(맨큐버스), 공허 사제(아치바일), 처형자(레버넌트)
@@ -363,6 +363,24 @@ def tint(im, mul):
             r, g, b, a = px[x, y]
             px[x, y] = (min(255, int(r * mul[0])), min(255, int(g * mul[1])), min(255, int(b * mul[2])), a)
     return im
+
+
+WALL_MIN = 70   # 벽 텍스처 평균 밝기(0~255)가 이보다 낮으면
+WALL_LIFT = 78  # 감마로 어두운 곳을 들어 올려 이 밝기 근처로 (밝은 곳은 덜 바뀜 — 게임 화면에서 너무 어두운 벽이 없게)
+
+
+def lift_dark(im):
+    mean = lambda q: ImageStat.Stat(q.convert('L')).mean[0]
+    if mean(im) >= WALL_MIN:
+        return im
+    lo, hi = 0.2, 1.0
+    for _ in range(20):  # 평균이 WALL_LIFT가 되는 감마를 이분 탐색
+        g = (lo + hi) / 2
+        if mean(im.point([round(255 * (v / 255) ** g) for v in range(256)] * 3)) < WALL_LIFT:
+            hi = g
+        else:
+            lo = g
+    return im.point([round(255 * (v / 255) ** g) for v in range(256)] * 3)
 
 
 def trim(im):
@@ -583,7 +601,10 @@ def main():
             p = Image.open(fetch(FD_RAW + patch_files[pn], 'pt_' + pn + '.png')).convert('RGBA')
             im.paste(p, (x, y), p)
         key = 'wall_' + name.lower()
-        im.convert('RGB').save(os.path.join(OUT, 'tex', key + '.png'))
+        im = im.convert('RGB')
+        if 'DOOR' not in name:  # 어두운 벽은 밝힘 (문 색 표시는 그대로)
+            im = lift_dark(im)
+        im.save(os.path.join(OUT, 'tex', key + '.png'))
         textures[key] = [t['w'], t['h']]
     for name in FLATS:
         im = Image.open(fetch(FD_RAW + 'flats/' + name + '.png', 'fl_' + name + '.png')).convert('RGB')
