@@ -263,6 +263,7 @@ function titleScreen() {
     ['load', '불러오기', 'LOAD GAME', '저장 슬롯 · 작전 기록'],
     ['set', '설정', 'SETTINGS', '소리 · 화면 · 게임'],
     ['man', '조작법 · 가이드', 'MANUAL', '키 안내와 정거장 생존 지침'],
+    ['dbg', '디버그', 'DEBUG', '캐릭터 동작 · 무기 · 효과 · 소리 확인'],
     ['cred', '제작진', 'CREDITS', ''],
   ];
   screen(`<div class="shade"></div><div class="shade2"></div><div class="fx-scan"></div><div class="fx-sweep"></div>
@@ -293,6 +294,7 @@ function titleScreen() {
   go('m_load', () => loadScreen(titleScreen));
   go('m_set', () => settingsScreen(titleScreen));
   go('m_man', () => helpScreen(titleScreen));
+  go('m_dbg', () => debugScreen(titleScreen)); // debug.js
   go('m_cred', () => creditsScreen(titleScreen));
 }
 function toTitle() { UI.lastTitle = null; fadeThen(() => { titleBackground(); titleScreen(); }); }
@@ -476,7 +478,7 @@ function pauseGame(from) {
   state = 'pause'; mouse.down = false; closeInventory();
   const p = player, box = !inBase && objectiveBox(), xpF = p.xp / xpNeed(p.clv);
   const where = rift ? `차원 균열 ${rift.tier}단계` : `구역 ${level} · ${regName(level)}`;
-  const items = [['res', '계속하기', 'RESUME'], ['set', '설정', 'SETTINGS'], ['man', '조작법 · 가이드', 'MANUAL'], ['title', '메인 메뉴로', 'QUIT TO TITLE']];
+  const items = [['res', '계속하기', 'RESUME'], ['set', '설정', 'SETTINGS'], ['man', '조작법 · 가이드', 'MANUAL'], ['dbg', '디버그', 'DEBUG'], ['title', '메인 메뉴로', 'QUIT TO TITLE']];
   screen(`<div class="pz"><div class="eye">PAUSED · 작전 중지</div><div class="h1">일시정지</div>
       <nav class="mm">${items.map(([id, t, e], n) => `<button class="mi" data-nav id="p_${id}" style="--i:${n}"><span class="n">${z2(n + 1)}</span><span class="t">${t}</span><span class="e">${e}</span></button>`).join('')}</nav></div>
     <aside class="pz-side frm" style="padding:22px 24px">
@@ -496,6 +498,7 @@ function pauseGame(from) {
   on('p_res', resumeGame);
   on('p_set', () => settingsScreen(() => pauseGame('#p_set')));
   on('p_man', () => helpScreen(() => pauseGame('#p_man')));
+  on('p_dbg', () => debugScreen(() => pauseGame('#p_dbg'))); // debug.js
   on('p_title', () => confirmBox({ title: '메인 메뉴로 나갈까요?', text: '마지막으로 저장한 뒤의 진행은 사라집니다.', ok: '나가기', danger: true, eye: 'QUIT TO TITLE', onOk: toTitle }));
 }
 function resumeGame() { hideOverlay(); state = 'play'; mouse.down = false; }
