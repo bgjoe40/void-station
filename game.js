@@ -111,6 +111,9 @@ const ENEMY_SFX = {
   voidpriest:  { sight: 'dsvilsit', death: 'dsvildth', pain: 'dsvipain', attack: 'dsvilatk', idle: 'dsvilact' },
   executioner: { sight: 'dsskesit', death: 'dsskedth', pain: 'dspopain', attack: 'dsskeatk', idle: 'dsskeact' },
   thief:       { sight: 'dsposact', death: 'dsssdth', pain: 'dspopain', attack: 'dspunch', idle: 'dsposact' }, // 보물 약탈자
+  lurker:   { sight: 'dsbspsit', death: 'dsbspdth', pain: 'dsdmpain', attack: 'dsclaw', idle: 'dsbspact', vol: 0.8, rate: 0.85 }, // 매복자: 떨어질 때 낮은 거미 비명
+  burrower: { sight: 'dsbgsit2', death: 'dsbgdth2', pain: 'dspopain', attack: 'dsclaw', idle: 'dsbgact', rate: 0.85 },        // 굴착자
+  warden:   { sight: 'dsswtchx', death: 'dsbarexp', pain: 'dsmetal', attack: 'dsswtchx', idle: 'dsposact', vol: 0.6 },        // 수호 드론: 기계음, 터지며 사라짐
 };
 const Snd = {
   ctx: null, last: {}, buf: {},
@@ -1141,6 +1144,7 @@ function startField(seed, fl = {}, hubN = 0, seen = null) {
   placePlayer(h.pad.i + 0.5, h.pad.j + 1.5);
   player.onPad = false; invOpen = false; held = null; trade = null; msgs = [];
   hideOverlay(); state = 'play'; mouse.down = false;
+  hubIn = h; // 시작·불러온 거점에서는 자동 저장하지 않음 (나갔다 들어오면)
   trackRegion();
 }
 // 무기고 단말기 (ARMORIES): 그 구역의 방(거점·입구·출구·보스·금고·고유 정예 방 제외)의 위·왼쪽 벽 앞 — 해제한 것은 '해제됨'으로
@@ -1248,11 +1252,85 @@ function seedLoot() {
   }
 }
 // 지금 서 있는 구역·거점 확인: 구역이 바뀌면 안내, 거점에 들어오면 찾은 것으로 (순간이동 등록). 음악: 거점은 잔잔한 기지 곡, 밖은 그 구역 곡
+let hubIn = null; // 지금 들어와 있는 거점 (자동 저장: 밖에서 거점에 들어올 때마다)
 function trackRegion() {
   const p = player, n = regionAt(p.x, p.y), r = roomAt(p.x, p.y);
   if (n && n !== level) enterRegion(n);
   if (r && r.hub) { if (!r.hub.found) discoverHub(r.hub); lastHub = r.hub.n; }
-  if (level && !escape) Music.play(r && r.hub ? MUSIC.base : MUSIC.zones[level - 1]);
+  const h = r && r.hub ? r.hub : null;
+  if (h !== hubIn) { hubIn = h; if (h && state === 'play' && !escape && !rift) { autoSave(); maybeAssault(h); } }
+  if (level && !escape) Music.play(r && r.hub && !contested() ? MUSIC.base : combatT > 0 ? MUSIC.combat[Math.min(2, Math.floor((level - 1) / 3))] : MUSIC.zones[level - 1]); // 거점은 잔잔한 곡, 싸우는 중이면 전투 곡
+}
+// 전투 음악 (COMBAT_MUSIC): 플레이어를 알아챈 적이 가까이 있는 동안 + 그 뒤 hold초
+let combatT = 0;
+function combatTick(dt) {
+  const p = player, R = COMBAT_MUSIC.r;
+  combatT = enemies.some(e => e.aggro && !e.dead && Math.abs(e.x - p.x) < R && Math.abs(e.y - p.y) < R && Math.hypot(e.x - p.x, e.y - p.y) < R) ? COMBAT_MUSIC.hold : Math.max(0, combatT - dt);
+}
+// ===== 거점 습격 (ASSAULT): 몬스터 무리가 보급 거점의 안전막을 두드림 — 습격 중에는 거점 안에서도 싸울 수 있고, 다 처치하면 보상 =====
+// phase: wait (들어온 뒤 잠깐) → warn (경보, 카운트다운) → fight (무리가 몰려옴). 안전막이 다 깎이면 그 방의 안전 지대가 꺼짐 (끝나면 복구)
+let assault = null, assaultCd = 0; // { hub, ri: 방 번호, phase, t, hp, max, wave, next, foes, broke, hitT }
+const contested = () => !!assault && assault.phase !== 'wait' && roomOf[Math.floor(player.y) * MW + Math.floor(player.x)] === assault.ri; // 습격받는 거점 안 (싸울 수 있음)
+function maybeAssault(h) {
+  if (assault || assaultCd > 0 || h.reg < ASSAULT.from || hazards.length || Math.random() >= ASSAULT.chance) return;
+  const max = ASSAULT.hp + ASSAULT.lvHp * h.reg;
+  assault = { hub: h, ri: rooms.indexOf(h.room), phase: 'wait', t: rnd(...ASSAULT.delay), hp: max, max, wave: 0, next: 0, foes: new Set(), broke: false, hitT: 0 };
+}
+function updateAssault(dt) {
+  if (assaultCd > 0) assaultCd -= dt;
+  const A = assault;
+  if (!A) return;
+  const p = player, h = A.hub, far = Math.hypot(p.x - h.pad.i - 0.5, p.y - h.pad.j - 0.5) > ASSAULT.far;
+  if (A.phase === 'wait') { // 들어왔다가 바로 떠나면 없던 일로
+    if (far) assault = null;
+    else if ((A.t -= dt) <= 0) { A.phase = 'warn'; A.t = ASSAULT.warn; Snd.play('alarm'); tip('assault'); }
+    return;
+  }
+  if (far || escape) { endAssault(false, '거점 습격이 흩어졌다 — 거점에서 너무 멀어졌다'); return; }
+  if (A.phase === 'warn') { const s0 = Math.ceil(A.t); A.t -= dt; if (A.t <= 0) A.phase = 'fight'; else if (Math.ceil(A.t) < s0) Snd.play('alarm'); return; } // 1초마다 경보
+  if (A.wave < ASSAULT.waves && (A.next -= dt) <= 0) { // 다음 무리 (거점에서 길로 9~20칸 떨어진, 보이지 않는 곳에서)
+    const before = new Set(enemies);
+    spawnWave(h.pad.i, h.pad.j, h.reg, ASSAULT.wave, A.wave === ASSAULT.waves - 1);
+    for (const e of enemies) if (!before.has(e)) { A.foes.add(e); e.aggro = true; }
+    A.wave++; A.next = ASSAULT.gap; Snd.play('alarm');
+  }
+  if (!A.broke) { // 안전막에 붙은 적이 막을 깎음
+    const r = h.room;
+    for (const e of A.foes) {
+      if (e.dead || !e.aggro || e.stun > 0 || e.freeze > 0) continue;
+      const cx = clamp(e.x, r.x, r.x + r.w), cy = clamp(e.y, r.y, r.y + r.h);
+      if (Math.hypot(e.x - cx, e.y - cy) > e.r + 0.55) continue;
+      A.hp -= (e.d.dmg || 8) * (1 + 0.1 * (e.lv - 1)) * ASSAULT.atk * dt; A.hitT = 0.15;
+      if (Math.random() < dt * 5) spark(cx, cy, 3, '#9df', 2.5);
+    }
+    if (A.hp <= 0) breakBarrier(A);
+  }
+  A.hitT -= dt; A.ft = (A.ft || 0) + dt;
+  for (const e of A.foes) if (e.dead) A.foes.delete(e);
+  if (A.wave >= ASSAULT.waves && (!A.foes.size || A.ft > ASSAULT.gap * ASSAULT.waves + 60)) endAssault(true); // 다 처치 (길을 잃고 오지 않는 적이 남아도 너무 오래 끌지 않게)
+}
+// 안전막 붕괴: 그 방의 안전 지대를 끔 (적이 들어오고, 안에서도 다침) — 습격이 끝나면 복구
+function breakBarrier(A) {
+  const h = A.hub, r = h.room;
+  A.broke = true; A.hp = 0; h.broken = true;
+  for (let j = r.y; j < r.y + r.h; j++) for (let i = r.x; i < r.x + r.w; i++) safeMap[j * MW + i] = 0;
+  for (const b of h.edges) { const x = (b.x0 + b.x1) / 2, y = (b.y0 + b.y1) / 2; spark(x, y, 24, pick(['#9cf', '#cdf', '#fff']), 5); flashes.push({ x, y, r: 260, t: 0.3, max: 0.3, col: '120,180,255' }); }
+  shake = Math.max(shake, 10); Snd.play('shieldBreak'); Snd.play('alarm');
+  eventNotes.push({ x: h.pad.i + 0.5, y: h.pad.j + 0.5, z: 170, t: '안전막 붕괴 — 적이 들어온다!', col: '#ff8a5a', until: gtime + 3 });
+}
+// 습격 끝: 이겼으면 보상 (막이 버텼으면 hold배) — 안전막은 언제나 복구, 다음 습격까지 cd초
+function endAssault(won, why) {
+  const A = assault, h = A.hub, r = h.room, x = h.pad.i + 0.5, y = h.pad.j + 0.5;
+  assault = null; assaultCd = ASSAULT.cd;
+  if (A.broke) { h.broken = false; for (let j = r.y; j < r.y + r.h; j++) for (let i = r.x; i < r.x + r.w; i++) safeMap[j * MW + i] = 1; } // 안에 들어온 적은 밖으로 밀려남 (evict)
+  if (!won) { eventNotes.push({ x, y, z: 130, t: why || '거점 습격이 끝났다', col: '#b9b4a8', until: gtime + 3 }); return; }
+  const k = A.broke ? 1 : ASSAULT.hold, n = h.reg, gold = Math.round(irnd(...ASSAULT.gold) * n * k), xp = Math.round(ASSAULT.xp * n * k);
+  for (let m = 0; m < 4; m++) addPickup(x + rnd(-1, 1), y + 1 + rnd(-0.5, 0.8), 'gold', 'gold', Math.round(gold / 4));
+  for (let m = 0; m < 2; m++) { const a = randomAmmoType(); addPickup(x + rnd(-1, 1), y + 1 + rnd(-0.5, 0.8), 'ammo', a, AMMO[a].pack); }
+  dropWeapon(x + rnd(-0.6, 0.6), y + 1.2, atLeastMagic(randomLoot(A.broke ? 1 : 2, 0.3)));
+  gainXp(xp); addText(x, y, `+${xp} XP`, '#c9a0ff', 56);
+  eventNotes.push({ x, y, z: 130, t: A.broke ? `습격을 막아냈다 — 안전막 복구 (+${gold}G)` : `완벽한 방어! 안전막이 버텼다 (+${gold}G)`, col: '#9f9', until: gtime + 4 });
+  flashes.push({ x, y, r: 420, t: 0.4, max: 0.4, col: '140,255,170' }); Snd.play('hackDone');
 }
 function enterRegion(n) {
   const C = CAMPAIGN[n - 1], R = regions[n], first = !flags.visited.includes(n);
@@ -1426,6 +1504,7 @@ function teleportTo(h) {
 // ===== 차원 균열 (RIFT_TIERS, RIFT): 거점 패드에서 들어가는 무작위 전투 구역 — 필드는 씨앗·진행 기록으로 저장했다가 나올 때 다시 만듦 =====
 let rift = null; // 균열 안이면 { tier, T, lv, prog, need, guardian, done, start, saved: { seed, hub, seen } }
 function enterRift(t) {
+  if (assault) endAssault(false); // 거점 습격은 끝 (안전막 복구)
   const T = RIFT_TIERS[t - 1], p = player, saved = { seed: fieldSeed, hub: lastHub, seen: packSeen() };
   hideOverlay(); state = 'play'; mouse.down = false; closeInventory();
   inBase = false; resetWorld();
@@ -1519,6 +1598,7 @@ function riftBox() {
 // --- 쓰러지면: 마지막으로 들른 거점에서 다시 일어남 (골드 일부를 잃음) ---
 function respawn() {
   if (state !== 'dead') return;
+  if (assault) endAssault(false, '쓰러져서 거점 습격이 끝났다'); // 안전막 복구
   const p = player, inRift = !!rift, h = inRift ? null : hubs[lastHub] || hubs[0], lost = inRift ? 0 : Math.round(p.gold * DEATH_GOLD);
   p.gold -= lost; p.hp = p.maxhp; p.stamina = staminaMax(); p.exhausted = false; p.deathT = 0; p.stagger = 0;
   p.fx = { poison: 0, burn: 0, shock: 0, regen: 0, adren: 0, immP: 0, immS: 0, curse: 0 };
@@ -1685,7 +1765,8 @@ function fillRoom(r, budget, pool, lv = level) {
     spawnEnemy(type, p.x, p.y, lv); placed.push({ x: p.x, y: p.y, r: rad }); budget -= ENEMIES[type].cost;
   }
 }
-function spawnEnemy(type, x, y, lv) { const e = makeEnemy(type, x, y, lv); enemies.push(e); return e; }
+function spawnEnemy(type, x, y, lv) { const e = makeEnemy(type, x, y, lv); if (e.d.ceiling) e.ceil = true; enemies.push(e); return e; } // 매복자는 천장에 붙은 채로
+const hiddenE = e => !!(e.ceil || e.under || e.riseT > 0); // 천장의 매복자·땅속의 굴착자: 보이지 않고 맞지 않음 (자동 조준·폭발·근접 모두)
 function makeEnemy(type, x, y, lv = level) { // lv: 강함의 기준 구역
   const d = ENEMIES[type], m = (1 + 0.18 * (lv - 1)) * DIFFICULTY[difficulty].hp * (rift ? rift.T.hp : 1); // 차원 균열: 단계 배율
   return {
@@ -1761,7 +1842,7 @@ function findTarget(range) {
   const p = player, aimA = screenAng(Math.cos(p.aim), Math.sin(p.aim));
   let best = null, bd = range;
   for (const e of enemies) {
-    if (e.dead || (e.leapT > 0 && e.leapKind === 'dodge') || (ghost(e) && Math.hypot(e.x - p.x, e.y - p.y) > 2.5)) continue; // 옆으로 피하는 중인 적, 드러나지 않은 그림자 추적자는 자동 조준이 놓침
+    if (e.dead || hiddenE(e) || (e.leapT > 0 && e.leapKind === 'dodge') || (ghost(e) && Math.hypot(e.x - p.x, e.y - p.y) > 2.5)) continue; // 옆으로 피하는 중인 적, 드러나지 않은 그림자 추적자는 자동 조준이 놓침
     const dx = e.x - p.x, dy = e.y - p.y, d = Math.hypot(dx, dy);
     if (d >= bd || Math.abs(angDiff(screenAng(dx, dy), aimA)) > AUTO_AIM_CONE || !canSee(e.x, e.y)) continue;
     if (!los(p.x, p.y, e.x, e.y)) continue;
@@ -1877,8 +1958,9 @@ function rebirth() {
   return true;
 }
 function hitEnemy(e, dmg, kx = 0, ky = 0, silent = false, crit = false, guard = false) { // guard: 방패에 막힘 (회색 숫자 + 방패의 푸른 불꽃)
-  if (e.dead) return;
+  if (e.dead || hiddenE(e)) return; // 천장·땅속: 맞지 않음
   dmg *= e.dr || 1; // 강철의 정예: 받는 피해 감소
+  if (e.wardT > gtime && !silent && e.wardBy && !e.wardBy.dead) { dmg *= 1 - e.wardBy.d.ward.cut; if (Math.random() < 0.5) spark(e.x, e.y, 3, '#7df', 2.5); } // 수호 드론의 보호막 (지속 피해는 그대로)
   if (e.d.vuln && e.stun > 0) dmg *= e.d.vuln; // 파쇄 짐승: 벽에 박혀 기절한 동안 더 아픔
   const raw = dmg;
   if (e.d.armor && !silent && !meleeNow) dmg = Math.max(raw * 0.2, raw - e.d.armor); // 장갑: 직접 맞은 한 발마다 덜 받음 (화상·중독 같은 지속 피해는 그대로, 근접은 무시)
@@ -1987,7 +2069,7 @@ function chainBolt(e, dmg, n, skip = []) {
   let from = e, jumps = 0;
   for (let k = 0; k < n; k++) {
     let nx = null, nd = 5;
-    for (const o of enemies) { if (o.dead || hit.includes(o)) continue; const d = Math.hypot(o.x - from.x, o.y - from.y); if (d < nd && los(from.x, from.y, o.x, o.y)) { nx = o; nd = d; } }
+    for (const o of enemies) { if (o.dead || hiddenE(o) || hit.includes(o)) continue; const d = Math.hypot(o.x - from.x, o.y - from.y); if (d < nd && los(from.x, from.y, o.x, o.y)) { nx = o; nd = d; } }
     if (!nx) break;
     beams.push({ x0: from.x, y0: from.y, x1: nx.x, y1: nx.y, t: 0.25, col: '150,200,255' });
     hitEnemy(nx, dmg); if (!nx.dead) nx.stun = Math.max(nx.stun, 0.25 * ccScale(nx));
@@ -1997,7 +2079,7 @@ function chainBolt(e, dmg, n, skip = []) {
 }
 function alertNear(x, y, r) { for (const o of enemies) if (!o.aggro && Math.hypot(o.x - x, o.y - y) < r) aggro(o); }
 // 몬스터가 플레이어를 알아챔 (발견 소리)
-function aggro(e) { if (!e.aggro) { e.aggro = true; Snd.mon(e, 'sight'); } }
+function aggro(e) { if (!e.aggro && !e.ceil) { e.aggro = true; Snd.mon(e, 'sight'); } } // 천장의 매복자는 떨어질 때 깨어남
 function killEnemy(e) {
   e.dead = true; kills++; codexKill(e);
   if (rift && !e.rift) riftKill(e);
@@ -2011,7 +2093,8 @@ function killEnemy(e) {
   if (B) { heal(player, B.heal); if (B.ext > 0) { const add = Math.min(1, B.ext); B.ext -= add; B.t += add; B.max = Math.max(B.max, B.t); } }
   if (e.shatter && e.freeze > 0) frostShatter(e); // 영원한 겨울: 얼어 있던 적은 산산조각
   blood(e.x, e.y, 16, e.d.blood); bloodSplat(e.x, e.y, e.r * 1.6 + 0.3, e.d.blood); // 쓰러진 자리의 체액
-  if ((!e.d.fixed || e.d.corpse) && !e.voided && !e.d.bomb) corpses.push({ x: e.x, y: e.y, type: e.type, face: e.face, t: 0 }); // 오버마인드는 터져 사라짐, 우주로 빨려 나간 적도 남지 않음
+  if ((!e.d.fixed || e.d.corpse) && !e.voided && !e.d.bomb && !e.d.nocorpse) corpses.push({ x: e.x, y: e.y, type: e.type, face: e.face, t: 0 }); // 오버마인드는 터져 사라짐, 우주로 빨려 나간 적도 남지 않음
+  if (e.d.ward) { addFx('misl', 'bcd', e.x, e.y, 30, 0.4, 0.7); spark(e.x, e.y, 14, '#7df', 4); } // 수호 드론: 터지며 사라짐 (보호막도 꺼짐)
   if (e.venom && !e.d.fixed) areas.push({ type: 'gas', x: e.x, y: e.y, r: 1.8, t: 3, max: 3, safe: true }); // 맹독 살포기: 플레이어는 안전한 독가스
   if (e.d.bomb) bombBlast(e, e.d.bomb.early); // 폭주 해골: 쏘아 떨어뜨리면 그 자리에서 약하게 터짐
   for (let k = 0, n = 0; n < (e.d.deathSpawn || 0) && k < 8; k++) { // 브루더: 터지면서 품고 있던 크롤러가 쏟아짐 (벽 쪽은 피해서)
@@ -2109,6 +2192,71 @@ function updateFleeMap() {
     if (c > fleeMap[k]) continue;
     for (const [dx, dy] of DIR4) { const nk = k + dy * MW + dx; if (flow[nk] >= 0 && c + 1 < fleeMap[nk]) { fleeMap[nk] = c + 1; push(c + 1, nk); } }
   }
+}
+// ===== 매복자 · 굴착자 · 수호 드론 =====
+// 숨은 동안 (맞지 않음): 매복자는 천장에서 기다리다 플레이어 바로 위로 기어가 그림자를 드리운 뒤 떨어짐, 굴착자는 땅속으로 다가가 흙더미를 흔든 뒤 솟아오름
+function hiddenThink(e, dt) {
+  const p = player, d = Math.hypot(p.x - e.x, p.y - e.y), safe = inHub() && !contested();
+  e.stun = e.freeze = e.burn = e.poison = 0; e.kx = e.ky = 0; e.anim += dt; e.moving = false;
+  if (e.ceil) {
+    const C = e.d.ceiling;
+    if (e.wave || e.minion) { e.ceil = false; aggro(e); return; } // 무리로 몰려오는 매복자는 걸어서 옴
+    if (e.dropT > 0) { if ((e.dropT -= dt) <= 0) { e.ceil = false; e.dropT = 0; e.fallT = C.fall; e.z = 150; Snd.mon(e, 'sight'); } return; }
+    if (!safe && d < C.drop && los(e.x, e.y, p.x, p.y)) { // 플레이어 바로 위 천장으로 — 여기서부터 warn초 뒤 떨어짐 (그 사이에 비키면 됨)
+      if (!collides(p.x, p.y, e.r, false)) { e.x = p.x; e.y = p.y; }
+      e.dropT = C.warn; Snd.play('skitter', e.x, e.y); tip('lurker', frontKey(ENEMY_ART.lurker.spr, 'a'));
+    } else if (Math.random() < dt * 0.4) parts.push({ x: e.x + rnd(-0.2, 0.2), y: e.y + rnd(-0.2, 0.2), z: 70, vx: 0, vy: 0, vz: -20, g: 300, life: 0.4, max: 0.4, col: '#a5c', size: 2 }); // 천장에서 떨어지는 점액
+    return;
+  }
+  const B = e.d.burrow, dirt = (n, s) => { for (let k = 0; k < n; k++) parts.push({ x: e.x + rnd(-s, s), y: e.y + rnd(-s, s), z: 2, vx: rnd(-1, 1), vy: rnd(-1, 1), vz: rnd(30, 80), g: 300, life: 0.4, max: 0.4, col: pick(['#6b5434', '#8a6d44', '#4a3a24']), size: rnd(2, 4) }); };
+  if (e.riseT > 0) { if (Math.random() < dt * 30) dirt(1, 0.45); if ((e.riseT -= dt) <= 0) burrowErupt(e); return; } // 흙더미가 흔들림 → 솟아오름
+  e.ut = (e.ut || 0) + dt;
+  if (!e.aggro || safe) { e.under = false; e.emergeT = 0.3; e.sink = 1; e.upT = B.up; return; } // 놓치면 그 자리로 올라옴
+  if (d < B.near || e.ut > B.max) { e.under = false; e.riseT = B.warn; Snd.play('stomp', e.x, e.y); tip('burrower', frontKey(ENEMY_ART.burrower.spr, 'a')); return; }
+  const s = flowStep(e), tx = s ? s[0] : p.x, ty = s ? s[1] : p.y, l = Math.hypot(tx - e.x, ty - e.y) || 1; // 땅속으로 길을 따라 다가옴
+  moveEntity(e, (tx - e.x) / l * B.spd * dt, (ty - e.y) / l * B.spd * dt); e.moving = true;
+  if (Math.random() < dt * 14) dirt(1, 0.25);
+  if ((e.stepT = (e.stepT || 0) - dt) <= 0 && d < 10) { e.stepT = 0.45; Snd.play('skitter', e.x, e.y); }
+}
+// 굴착자: 솟아오르며 r칸 안을 쳐 올림 (바로 위면 피해 + 밀려남), 땅 위에서 up초
+function burrowErupt(e) {
+  const B = e.d.burrow, p = player, d = Math.hypot(p.x - e.x, p.y - e.y) || 0.01;
+  e.riseT = 0; e.emergeT = 0.3; e.sink = 1; e.upT = B.up; e.atkT = ATK_ANIM; e.acd = 0.6;
+  if (d < B.r + p.r && hurtPlayer(B.hit * e.dmg / e.d.dmg, e.x, e.y)) { p.kx += (p.x - e.x) / d * B.knock; p.ky += (p.y - e.y) / d * B.knock; }
+  for (let k = 0; k < 26; k++) { const a = rnd(0, 6.28), v = rnd(1, 4); parts.push({ x: e.x, y: e.y, z: 4, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: rnd(60, 160), g: 320, life: rnd(0.4, 0.8), max: 0.8, col: pick(['#6b5434', '#8a6d44', '#4a3a24', '#9a8060']), size: rnd(2, 5) }); }
+  rings.push({ x: e.x, y: e.y, R: B.r, t: 0, max: 0.3, col: '170,130,80' }); addDecal({ x: e.x, y: e.y, r: 0.7, col: 'rgba(40,30,18,0.7)' }); // 파인 자국
+  shake = Math.max(shake, 6); Snd.play('stomp', e.x, e.y); Snd.mon(e, 'attack');
+}
+// 굴착자: 파고드는 중 (sink 0→1, 다 들어가면 땅속으로) · 솟아오르는 중 (1→0)
+function startDig(e) { e.digT = e.d.burrow.dig; e.sink = 0; Snd.play('skitter', e.x, e.y); }
+function burrowAnim(e, dt) {
+  e.anim += dt;
+  if (e.digT > 0) {
+    if (Math.random() < dt * 20) parts.push({ x: e.x + rnd(-0.3, 0.3), y: e.y + rnd(-0.3, 0.3), z: 2, vx: rnd(-1, 1), vy: rnd(-1, 1), vz: rnd(30, 70), g: 300, life: 0.4, max: 0.4, col: pick(['#6b5434', '#8a6d44']), size: 3 });
+    e.digT -= dt; e.sink = 1 - Math.max(0, e.digT) / e.d.burrow.dig;
+    if (e.digT <= 0) { e.digT = 0; e.under = true; e.ut = 0; e.sink = 1; }
+    return;
+  }
+  e.emergeT -= dt; e.sink = Math.max(0, e.emergeT / 0.3);
+}
+// 매복자: 떨어지는 중 — 바닥에 닿으면 r칸 안을 덮침 (피해 + 밀려남)
+function lurkerFall(e, dt) {
+  const C = e.d.ceiling, p = player;
+  e.anim += dt; e.fallT -= dt; e.z = 150 * Math.max(0, e.fallT / C.fall) ** 2;
+  if (e.fallT > 0) return;
+  const d = Math.hypot(p.x - e.x, p.y - e.y) || 0.01;
+  e.fallT = 0; e.z = 0; e.atkT = ATK_ANIM; e.acd = 0.5;
+  if (d < C.r && hurtPlayer(C.hit * e.dmg / e.d.dmg, e.x, e.y)) { p.kx += (p.x - e.x) / d * C.knock; p.ky += (p.y - e.y) / d * C.knock; }
+  rings.push({ x: e.x, y: e.y, R: C.r, t: 0, max: 0.3, col: '170,90,200' }); smoke(e.x, e.y, 8, '90,70,100', 1.2); shake = Math.max(shake, 7);
+  Snd.play('stomp', e.x, e.y); Snd.mon(e, 'attack'); aggro(e); alertNear(e.x, e.y, 5);
+}
+// 수호 드론: range칸 안의 가까운 적 n마리에 보호막 (매 프레임 다시 고름 — 드론이 쓰러지면 바로 꺼짐)
+function wardTick(e) {
+  const W = e.d.ward;
+  e.wards = enemies.filter(o => o !== e && !o.dead && !hiddenE(o) && !o.d.ward && !o.d.boss && Math.abs(o.x - e.x) < W.range && Math.abs(o.y - e.y) < W.range && Math.hypot(o.x - e.x, o.y - e.y) < W.range)
+    .sort((a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y)).slice(0, W.n);
+  for (const o of e.wards) { o.wardT = gtime + 0.25; o.wardBy = e; }
+  if (e.aggro && e.wards.length) tip('warden', frontKey(ENEMY_ART.warden.spr, 'a'));
 }
 function thiefEscape(e) {
   e.dead = true; // 처치가 아님 (보상·시체 없음)
@@ -2665,6 +2813,8 @@ function placeNests(n, R) {
 }
 // 매 프레임 (필드): 지금 구역·거점 확인, 가까운 방의 적 등장, 생존자·해킹, 돌발 상황
 function updateMission(dt) {
+  combatTick(dt);
+  updateAssault(dt);
   trackRegion();
   spawnNear(dt);
   mission.t = (mission.t || 0) + dt;
@@ -3047,6 +3197,13 @@ function drawHazardLabels() {
     const E = EVENTS[h.type], gas = h.type === 'gas', blink = h.t < 4 && Math.sin(gtime * 10) < 0;
     box(gas ? h.sx : h.x, gas ? h.sy : h.y, gas ? 118 : 86, `⚠ ${E.name}`, gas ? '해독제 [8] · 이 방을 벗어나라' : '우주로 빨려 나간다 — 구멍에서 멀어져라', blink ? '#fff' : E.color, h.t / h.max);
   }
+  const A = assault; // 거점 습격: 패드 위에 경보 (카운트다운 고리) → 몇 번째 무리 · 안전막 남은 정도 (고리) · 남은 적
+  if (A && A.phase !== 'wait') {
+    const h = A.hub, warn = A.phase === 'warn';
+    box(h.pad.i + 0.5, h.pad.j + 0.5, 130, warn ? `⚠ 거점 습격 임박 — ${Math.ceil(A.t)}초` : `⚠ 거점 습격 ${A.wave}/${ASSAULT.waves}`,
+      warn ? '몬스터 무리가 몰려온다 — 거점 안에서도 싸울 수 있다' : A.broke ? `안전막 붕괴! 남은 적 ${A.foes.size}` : `안전막 ${Math.max(0, Math.round(A.hp / A.max * 100))}% · 남은 적 ${A.foes.size}`,
+      A.hitT > 0 && Math.sin(gtime * 30) > 0 ? '#fff' : '#ff9a6a', warn ? A.t / ASSAULT.warn : A.broke ? 0 : Math.max(0, A.hp / A.max));
+  }
   eventNotes = eventNotes.filter(n => n.until > gtime);
   for (const n of eventNotes) { ctx.globalAlpha = clamp(n.until - gtime, 0, 1); box(n.x, n.y, n.z, n.t, '', n.col); ctx.globalAlpha = 1; }
 }
@@ -3211,7 +3368,7 @@ function unequipShell(k) {
 function useSkillSlot(n) {
   const p = player, sh = p.shells[n];
   if (inBase) return;
-  if (inHub()) { noFight(); Snd.play('deny'); return; }
+  if (inHub() && !contested()) { noFight(); Snd.play('deny'); return; }
   if (!sh) { msg(`[${SHELL_SLOTS[n]}] 스킬 칸이 비어 있습니다 — 인벤토리(I)에서 스킬 쉘을 끼우세요`, '#a99'); Snd.play('deny'); return; }
   const S = SKILLS[sh.id];
   if (p.scd[sh.id] > 0) { msg(`${S.name} 대기 중 (${Math.ceil(p.scd[sh.id])}초)`, '#a99'); Snd.play('deny'); return; }
@@ -3220,10 +3377,10 @@ function useSkillSlot(n) {
   p.scd[sh.id] = v.cd;
 }
 // 범위 안의 살아 있는 적 (see: 그 자리에서 벽에 가리지 않은 적만)
-const enemiesNear = (x, y, R, see = true) => enemies.filter(e => !e.dead && Math.hypot(e.x - x, e.y - y) < R + e.r && (!see || los(x, y, e.x, e.y)));
+const enemiesNear = (x, y, R, see = true) => enemies.filter(e => !e.dead && !hiddenE(e) && Math.hypot(e.x - x, e.y - y) < R + e.r && (!see || los(x, y, e.x, e.y)));
 function nearestEnemy(x, y, R) {
   let best = null, bd = R;
-  for (const e of enemies) { if (e.dead) continue; const d = Math.hypot(e.x - x, e.y - y); if (d < bd && los(x, y, e.x, e.y)) { best = e; bd = d; } }
+  for (const e of enemies) { if (e.dead || hiddenE(e)) continue; const d = Math.hypot(e.x - x, e.y - y); if (d < bd && los(x, y, e.x, e.y)) { best = e; bd = d; } }
   return best;
 }
 const stunE = (e, t) => { if (!e.dead) e.stun = Math.max(e.stun, t * ccScale(e)); };
@@ -3394,7 +3551,7 @@ const SKILL_CAST = {
     if (!first) { msg('번개를 맞힐 적이 보이지 않습니다', '#a99'); Snd.play('deny'); return false; }
     const hit = [], next = (x0, y0) => { // 아직 안 맞은, r칸 안의 가장 가까운 적
       let nx = null, nd = v.r;
-      for (const o of enemies) { if (o.dead || hit.includes(o)) continue; const d = Math.hypot(o.x - x0, o.y - y0); if (d < nd && los(x0, y0, o.x, o.y)) { nx = o; nd = d; } }
+      for (const o of enemies) { if (o.dead || hiddenE(o) || hit.includes(o)) continue; const d = Math.hypot(o.x - x0, o.y - y0); if (d < nd && los(x0, y0, o.x, o.y)) { nx = o; nd = d; } }
       return nx;
     };
     const bolt = (cur, x0, y0, z0, dmg) => {
@@ -3469,7 +3626,7 @@ function chargeStep(C, dt) {
   for (const b of barrels) if (!b.dead && Math.hypot(b.x - p.x, b.y - p.y) < 0.7) hitBarrel(b, 99);
 }
 function updateSkills(dt) {
-  const p = player, safe = inHub(); // 안전 지대: 드론·톱날은 공격하지 않음
+  const p = player, safe = inHub() && !contested(); // 안전 지대: 드론·톱날은 공격하지 않음 (거점 습격 중은 공격)
   const due = delayed.filter(d => (d.t -= dt) <= 0); // 조금 뒤에 일어날 효과 (여진·두 번째 칼날·집속탄)
   delayed = delayed.filter(d => d.t > 0);
   for (const d of due) d.fn();
@@ -3478,7 +3635,7 @@ function updateSkills(dt) {
   if (ATTR_KEYS.some(k => resTier(k))) tip('resonance');
   for (const t of turrets) { // 포탑: 사거리 안에서 가려지지 않은 가장 가까운 적을 돌아보며 쏨 (0.2초마다 목표를 다시 찾음)
     t.t -= dt; t.cool -= dt; t.scan -= dt; t.hitT -= dt;
-    if (t.tgt && (t.tgt.dead || Math.hypot(t.tgt.x - t.x, t.tgt.y - t.y) > SKILLS.turret.range)) t.tgt = null;
+    if (t.tgt && (t.tgt.dead || hiddenE(t.tgt) || Math.hypot(t.tgt.x - t.x, t.tgt.y - t.y) > SKILLS.turret.range)) t.tgt = null; // 굴착자가 땅속으로 숨으면 놓침
     if (!t.tgt && t.scan <= 0) { t.scan = 0.2; t.tgt = nearestEnemy(t.x, t.y, SKILLS.turret.range); }
     if (!t.tgt) continue;
     const want = Math.atan2(t.tgt.y - t.y, t.tgt.x - t.x);
@@ -3497,7 +3654,7 @@ function updateSkills(dt) {
     if (blocksShot(hx, hy)) { hx = p.x; hy = p.y; }
     const k = Math.min(1, dt * 5);
     d.x += (hx - d.x) * k; d.y += (hy - d.y) * k; d.z = Math.min(36, d.z + dt * 80);
-    if (d.tgt && (d.tgt.dead || Math.hypot(d.tgt.x - d.x, d.tgt.y - d.y) > SKILLS.drone.range)) d.tgt = null;
+    if (d.tgt && (d.tgt.dead || hiddenE(d.tgt) || Math.hypot(d.tgt.x - d.x, d.tgt.y - d.y) > SKILLS.drone.range)) d.tgt = null;
     if (!d.tgt && d.scan <= 0) { d.scan = 0.25; d.tgt = nearestEnemy(d.x, d.y, SKILLS.drone.range); }
     if (!d.tgt || d.cool > 0 || safe) continue;
     d.cool = SKILLS.drone.rate;
@@ -3633,6 +3790,7 @@ function meleeSwing(w) {
   let hit = false, hitN = 0, near = null, nd = 1e9;
   const struck = [];
   for (const e of enemies) {
+    if (e.dead || hiddenE(e)) continue; // 천장·땅속의 적은 휘둘러도 닿지 않음
     const dx = e.x - p.x, dy = e.y - p.y, d = Math.hypot(dx, dy) || 0.01;
     if (d > w.range + e.r) continue;
     if (d > 0.45 && Math.abs(angDiff(Math.atan2(dy, dx), p.aim)) > w.arc / 2) continue;
@@ -3661,7 +3819,7 @@ function meleeSwing(w) {
     let L = 0.5;
     while (L < 6 && !blocksShot(p.x + ca * L, p.y + sa * L)) L += 0.2;
     for (const e of enemies) {
-      if (e.dead) continue;
+      if (e.dead || hiddenE(e)) continue;
       const dx = e.x - p.x, dy = e.y - p.y, along = dx * ca + dy * sa;
       if (along > 0.3 && along < L + e.r && Math.abs(dx * sa - dy * ca) < 0.45 + e.r) { weaponHit(e, w, w.dmg * mul * 0.6, ca * 2, sa * 2); hit = true; }
     }
@@ -4027,7 +4185,7 @@ function addAmmo(a, n) { player.ammo[a] = Math.min(ammoMax(a), player.ammo[a] + 
 function throwGrenade() {
   const p = player;
   if (state !== 'play' || p.gcool > 0 || inBase) return;
-  if (inHub()) { noFight(); return; }
+  if (inHub() && !contested()) { noFight(); return; }
   if (p.gren[p.gsel] <= 0) { msg(`${GRENADES[p.gsel].name} 없음`, '#a99'); return; }
   const m = screenToWorld(mouse.x, mouse.y);
   let dx = m.x - p.x, dy = m.y - p.y, d = Math.hypot(dx, dy) || 0.01;
@@ -5419,12 +5577,13 @@ function updatePlayer(dt) {
   if (p.phoenixT > 0) p.phoenixT -= dt; // 불사조 대기시간
   const RP = buff('repair'); if (RP) heal(p, RP.rate * dt); // 나노 수리
   if (p.reload > 0) { p.reload -= dt * rate; if (p.reload <= 0) finishReload(); }
-  if (safe) p.charging = 0; // 안전 지대에 들어오면 모으던 분쇄포도 멈춤
+  const noAtk = safe && !contested(); // 거점 습격 중에는 거점 안에서도 싸움
+  if (noAtk) p.charging = 0; // 안전 지대에 들어오면 모으던 분쇄포도 멈춤
   if (p.charging > 0 && (p.charging -= dt) <= 0 && w.charge && wi.mag > 0) fireGun(w); // 분쇄포: 다 모이면 발사
   if (w.spin) p.spin = mouse.down ? Math.min(1, p.spin + dt / 0.7) : Math.max(0, p.spin - dt);
   const trig = (w.type === 'melee' || w.auto) ? (mouse.down || mouse.pressed) : mouse.pressed;
   if (inBase) mouse.pressed = false; // 기지 안에서는 공격하지 않음
-  else if (safe) { if (trig) noFight(); mouse.pressed = false; } // 보급 거점(안전 지대)
+  else if (noAtk) { if (trig) noFight(); mouse.pressed = false; } // 보급 거점(안전 지대)
   else if (trig && p.cool <= 0 && p.reload <= 0) {
     mouse.pressed = false;
     if (w.type === 'melee') {
@@ -5643,7 +5802,7 @@ function raiseThink(e, dt, spawned) {
   return true;
 }
 function updateEnemies(dt) {
-  const p = player, spawned = [], cloaked = !!buff('cloak'), safe = inHub();
+  const p = player, spawned = [], cloaked = !!buff('cloak'), safe = inHub() && !contested(); // 거점 습격 중에는 거점 안의 플레이어도 계속 노림
   updateFlow();
   for (const e of enemies) {
     if (e.dead) continue;
@@ -5662,6 +5821,9 @@ function updateEnemies(dt) {
     if (e.burn > 0) { e.burn -= dt; hitEnemy(e, 10 * dt, 0, 0, true); if (Math.random() < dt * 12) fireBurst(e.x, e.y, 1, 0.3); }
     if (e.poison > 0) { e.poison -= dt; hitEnemy(e, 8 * dt, 0, 0, true); }
     if (e.dead) continue;
+    if (hiddenE(e)) { hiddenThink(e, dt); continue; } // 천장의 매복자 · 땅속의 굴착자
+    if (e.fallT > 0) { lurkerFall(e, dt); continue; } // 매복자: 떨어지는 중
+    if (e.digT > 0 || e.emergeT > 0) { burrowAnim(e, dt); continue; } // 굴착자: 파고드는 중 · 솟아오르는 중
     if (e.elite) eliteTick(e, dt);
     e.slow -= dt;
     if (e.dodgeCd > 0) e.dodgeCd -= dt;
@@ -5680,6 +5842,8 @@ function updateEnemies(dt) {
     if (e.d.nest) { nestThink(e, dt, spawned); continue; } // 둥지: 움직이지 않고 몬스터만 낳음
     if (e.d.pillar) { watcherThink(e, dt, d, dx, dy, see); continue; } // 감시자: 제자리에서 불기둥만
     if (e.d.thief) { thiefThink(e, dt, d, dx, dy, see); continue; } // 보물 약탈자: 싸우지 않고 달아남
+    if (e.d.burrow && e.aggro && !hidden && (e.upT = (e.upT ?? 0) - dt) <= 0 && !(e.atkT > 0)) { startDig(e); continue; } // 굴착자: 땅 위 시간이 다 되면 다시 파고듦
+    if (e.d.ward) wardTick(e); // 수호 드론: 주변 적에게 보호막 (움직임은 거리를 두는 적과 같음)
     if (e.d.boss && e.aggro && bossThink(e, dt, d, dx, dy, see, spawned)) continue; // 구역 보스: 돌진·주문·레이저 중에는 따로 움직임
     if (e.d.charge && e.aggro && chargeThink(e, dt, d, dx, dy, see)) continue; // 차저: 웅크림·돌진 중에는 따로 움직임
     if (e.d.spawn && e.aggro && see) broodThink(e, dt, dx, dy, spawned);
@@ -5777,9 +5941,9 @@ function updateEnemies(dt) {
   }
   // 겹침 방지: 2칸 격자로 나눠 이웃 칸끼리만 비교 (적이 수백 마리여도 빠르게)
   const grid = new Map();
-  enemies.forEach((e, i) => { e._i = i; if (e.dead || !e.awake) return; const k = (Math.floor(e.y / 2) << 8) | Math.floor(e.x / 2); let c = grid.get(k); if (!c) grid.set(k, c = []); c.push(e); });
+  enemies.forEach((e, i) => { e._i = i; if (e.dead || !e.awake || hiddenE(e)) return; const k = (Math.floor(e.y / 2) << 8) | Math.floor(e.x / 2); let c = grid.get(k); if (!c) grid.set(k, c = []); c.push(e); });
   for (let i = 0; i < enemies.length; i++) {
-    const a = enemies[i]; if (a.dead || !a.awake) continue;
+    const a = enemies[i]; if (a.dead || !a.awake || hiddenE(a)) continue;
     const gx = Math.floor(a.x / 2), gy = Math.floor(a.y / 2);
     for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
       const cell = gx + ox >= 0 && gy + oy >= 0 && grid.get(((gy + oy) << 8) | (gx + ox));
@@ -5828,7 +5992,7 @@ function updateProjectiles(dt) {
     const steps = Math.max(1, Math.ceil(Math.hypot(b.vx, b.vy) * dt / 0.25)), sdt = dt / steps, blast = b.s.blast || b.blastR;
     for (let s = 0; s < steps && !b.dead; s++) {
       if (b.target) {
-        if (b.target.dead) b.target = b.turn ? nearestEnemy(b.x, b.y, 8) : null; // 미사일은 다음 적을 찾아감
+        if (b.target.dead || hiddenE(b.target)) b.target = b.turn ? nearestEnemy(b.x, b.y, 8) : null; // 미사일은 다음 적을 찾아감 (땅속으로 숨은 적도)
         else if (b.turn) { // 미사일: 초당 turn 라디안까지만 꺾으며 점점 빨라짐
           const cur = Math.atan2(b.vy, b.vx), na = cur + clamp(angDiff(Math.atan2(b.target.y - b.y, b.target.x - b.x), cur), -b.turn * sdt, b.turn * sdt), sp = Math.min(18, Math.hypot(b.vx, b.vy) + 30 * sdt);
           b.vx = Math.cos(na) * sp; b.vy = Math.sin(na) * sp;
@@ -5850,7 +6014,7 @@ function updateProjectiles(dt) {
         b.dead = true; break;
       }
       for (const e of enemies) {
-        if (e.dead || b.hits.includes(e)) continue;
+        if (e.dead || hiddenE(e) || b.hits.includes(e)) continue; // 천장·땅속의 적은 지나침
         if (Math.hypot(e.x - b.x, e.y - b.y) < e.r + 0.1) {
           if (blast) { explodeShot(b, b.x, b.y); b.dead = true; break; } // 터지는 탄: 맞은 적 포함 주변 전체
           const l = Math.hypot(b.vx, b.vy);
@@ -5884,7 +6048,8 @@ function updateProjectiles(dt) {
     if (s.type === 'rocket' && Math.random() < 0.7) smoke(s.x, s.y, 1, '120,110,100', 0.2);
     if (s.type === 'acid' && Math.random() < 0.5) parts.push({ x: s.x, y: s.y, z: 16, vx: 0, vy: 0, vz: -10, g: 0, life: 0.3, max: 0.3, col: '#bd2', size: 2 });
     if (s.type === 'fireball' && Math.random() < 0.6) fireBurst(s.x, s.y, 1, 0.3);
-    if (safeAt(s.x, s.y)) { // 안전 지대 차단막에 막힘 (폭발도 없음)
+    if (safeAt(s.x, s.y)) { // 안전 지대 차단막에 막힘 (폭발도 없음) — 습격받는 거점이면 막이 깎임
+      if (assault && assault.phase === 'fight' && !assault.broke && roomOf[Math.floor(s.y) * MW + Math.floor(s.x)] === assault.ri) { assault.hp -= s.dmg * 0.5; assault.hitT = 0.15; if (assault.hp <= 0) breakBarrier(assault); }
       s.dead = true; spark(s.x, s.y, 6, '#9df', 2.5); flashes.push({ x: s.x, y: s.y, r: 90, t: 0.15, max: 0.15, col: '120,210,255' }); Snd.play('armorHit', s.x, s.y); continue;
     }
     if (blocksShot(s.x, s.y) || s.life <= 0) { s.dead = true; spark(s.x, s.y, 4, s.type === 'acid' || s.type === 'ball' ? '#bd2' : '#9df', 2); shotImpact(s); continue; }
@@ -5949,6 +6114,7 @@ function updateMisc(dt) {
   beams = beams.filter(b => b.t > 0);
   for (const m of msgs) m.life -= dt;
   msgs = msgs.filter(m => m.life > 0);
+  if (autoNote > 0) autoNote -= dt;
   hurtFlash = Math.max(0, hurtFlash - dt * 1.5);
   hitFlash = Math.max(0, hitFlash - dt * 6);
   for (const h of hurtDirs) h.t -= dt;
@@ -6185,23 +6351,26 @@ function drawFloor() {
 }
 // 안전 지대 차단막: 거점 입구에 아른거리는 푸른 막 (아래가 진하고 위로 옅어짐, 옆으로 흐르는 세로 결, 위로 오르는 줄)
 const BARRIER_H = 58;
-function drawBarrier(b) {
+function drawBarrier(b, hub) {
+  if (hub && hub.broken) return; // 거점 습격으로 꺼진 안전막
   const ax = PX(b.x0, b.y0), ay = PY(b.x0, b.y0), bx = PX(b.x1, b.y1), by = PY(b.x1, b.y1);
   if (Math.max(ax, bx) < -20 || Math.min(ax, bx) > W + 20 || Math.max(ay, by) < 0 || Math.min(ay, by) - BARRIER_H > VH) return;
-  const H = BARRIER_H, pulse = 0.5 + 0.5 * Math.sin(gtime * 4 + b.d), g = ctx.createLinearGradient(0, Math.max(ay, by), 0, Math.min(ay, by) - H);
-  g.addColorStop(0, `rgba(120,210,255,${0.34 + 0.1 * pulse})`); g.addColorStop(0.6, 'rgba(120,210,255,0.1)'); g.addColorStop(1, 'rgba(120,210,255,0.02)');
+  const A = hub && assault && assault.hub === hub && assault.phase === 'fight' ? assault : null, hot = A ? 1 - A.hp / A.max : 0, hit = A && A.hitT > 0 && Math.random() < 0.6; // 습격 중: 깎일수록 붉게, 맞을 때 번쩍
+  const C = (r, g2, b2) => `${Math.round(r + (255 - r) * hot)},${Math.round(g2 + (80 - g2) * hot)},${Math.round(b2 + (60 - b2) * hot)}`, c1 = C(120, 210, 255), c2 = C(160, 225, 255), c3 = C(190, 235, 255), c4 = C(150, 225, 255);
+  const H = BARRIER_H, pulse = hit ? 1.6 : 0.5 + 0.5 * Math.sin(gtime * (A ? 9 : 4) + b.d), g = ctx.createLinearGradient(0, Math.max(ay, by), 0, Math.min(ay, by) - H);
+  g.addColorStop(0, `rgba(${c1},${0.34 + 0.1 * pulse})`); g.addColorStop(0.6, `rgba(${c1},0.1)`); g.addColorStop(1, `rgba(${c1},0.02)`);
   ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(bx, by - H); ctx.lineTo(ax, ay - H); ctx.closePath(); ctx.fill();
   const len = Math.hypot(b.x1 - b.x0, b.y1 - b.y0), n = Math.round(len * 5); // 세로 결: 한 칸에 다섯 줄, 옆으로 천천히 흐름
   ctx.lineWidth = 1;
   for (let k = 0; k < n; k++) {
     const t = ((k + gtime * 0.8) % n) / n, x = ax + (bx - ax) * t, y = ay + (by - ay) * t, top = H * (0.55 + 0.45 * Math.abs(Math.sin(k * 1.7 + gtime * 2)));
-    ctx.strokeStyle = `rgba(160,225,255,${0.22 + 0.18 * Math.sin(k * 2.3 + gtime * 5)})`;
+    ctx.strokeStyle = `rgba(${c2},${0.22 + 0.18 * Math.sin(k * 2.3 + gtime * 5)})`;
     ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - top); ctx.stroke();
   }
   const s = (gtime * 0.6 + b.d * 0.37) % 1; // 위로 오르는 줄
-  ctx.strokeStyle = `rgba(190,235,255,${0.6 * (1 - s)})`;
+  ctx.strokeStyle = `rgba(${c3},${0.6 * (1 - s)})`;
   ctx.beginPath(); ctx.moveTo(ax, ay - H * s); ctx.lineTo(bx, by - H * s); ctx.stroke();
-  ctx.strokeStyle = `rgba(150,225,255,${0.8 + 0.2 * pulse})`; ctx.lineWidth = 2;
+  ctx.strokeStyle = `rgba(${c4},${Math.min(1, 0.8 + 0.2 * pulse)})`; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke(); ctx.lineWidth = 1;
 }
 // --- 벽 / 상자: 텍스처를 면 모양대로 기울여 붙임 ---
@@ -6348,6 +6517,9 @@ const ENEMY_ART = {
   voidpriest:  { spr: 'bvil', scale: 1.25, walk: 'abc', attack: 'ghijklmno', pain: 'q', death: 'rstuvwxyz' },
   executioner: { spr: 'bske', scale: 1.45, walk: 'abcdef', attack: 'jk', pain: 'l', death: 'lmnopq' },
   thief:       { spr: 'sthf', scale: 1, walk: 'abcd', attack: 'a', pain: 'h', death: 'ijlm' }, // 금빛 제복의 승무원 (색 변종)
+  lurker:   { spr: 'blrk', scale: 0.8, walk: 'abcdef', attack: 'gh', pain: 'i', death: 'jklmnop' }, // 어두운 보랏빛 크롤러 (색 변종) — 천장에서 떨어짐
+  burrower: { spr: 'tbur', scale: 1, walk: 'abcd', attack: 'efg', pain: 'h', death: 'ijklm' },        // 흙빛 제노이드 (색 변종) — 땅속을 파고 다님
+  warden:   { spr: 'fskw', scale: 0.75, walk: 'abc', attack: 'abc', pain: 'a', death: 'a', z: 34, idle: 8 }, // 푸른 기계 해골 (색 변종) — 보호막을 씌움
 };
 function drawPlayer() {
   const p = player, sx = PX(p.x, p.y), sy = PY(p.x, p.y), w = curW().s;
@@ -6383,6 +6555,22 @@ function drawEnemy(e) {
   const A = ENEMY_ART[e.type], sx = PX(e.x, e.y), sy = PY(e.x, e.y), sc = A.scale * (e.super ? 1.3 : e.elite ? ELITE.scale : e.small ? 0.8 : 1) * (e.fuse > 0 ? 1 + 0.35 * (1 - e.fuse / e.d.bomb.fuse) : 1); // 불붙은 폭주 해골은 부풀어 오름
   const z = (A.z ? A.z + Math.sin(e.anim * 3) * 3 : 0) + (e.z || 0); // 떠다니는 높이 + 뛰어오른 높이
   const gh = ghost(e) ? (Math.hypot(e.x - player.x, e.y - player.y) < 2.2 ? 0.4 : 0.13) + 0.06 * Math.sin(gtime * 7 + e.anim) : 1; // 그림자 추적자: 거의 투명 (곁에 오면 조금 보임)
+  if (e.ceil) { // 매복자: 천장 — 바닥에 옅은 그림자만 (떨어지기 직전에는 짙고 커짐)
+    const k = e.dropT > 0 ? 1 - e.dropT / e.d.ceiling.warn : 0;
+    ctx.fillStyle = `rgba(25,0,35,${0.12 + 0.05 * Math.sin(gtime * 2 + e.anim) + 0.5 * k})`; isoEllipse(e.x, e.y, e.r * (1.3 + 1.3 * k)); ctx.fill();
+    return;
+  }
+  if (e.under || e.riseT > 0) { // 굴착자: 땅속 — 움직이는 흙더미 (솟기 직전에는 커지며 흔들리고 금이 감)
+    const k = e.riseT > 0 ? 1 - e.riseT / e.d.burrow.warn : 0, j = k * Math.sin(gtime * 60) * 0.05;
+    ctx.fillStyle = 'rgba(50,36,20,0.9)'; isoEllipse(e.x + j, e.y - j, 0.34 + 0.45 * k); ctx.fill();
+    ctx.fillStyle = 'rgba(120,92,58,0.92)'; isoEllipse(e.x + j, e.y - j, 0.2 + 0.3 * k); ctx.fill();
+    if (k > 0) { ctx.strokeStyle = `rgba(30,20,10,${0.5 + 0.5 * k})`; ctx.lineWidth = 2; ctx.beginPath(); for (let n = 0; n < 6; n++) { const a = n * 1.05 + 0.4, R = 0.4 + 0.7 * k; ctx.moveTo(sx, sy); ctx.lineTo(PX(e.x + Math.cos(a) * R, e.y + Math.sin(a) * R), PY(e.x + Math.cos(a) * R, e.y + Math.sin(a) * R)); } ctx.stroke(); ctx.lineWidth = 1; }
+    return;
+  }
+  if (e.d.ward && e.wards) for (const o of e.wards) { // 수호 드론: 보호막을 씌운 적에게 이어진 푸른 줄
+    ctx.strokeStyle = `rgba(120,220,255,${0.45 + 0.2 * Math.sin(gtime * 9 + o.anim)})`; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(sx, sy - (A.z || 0) - 20); ctx.lineTo(PX(o.x, o.y), PY(o.x, o.y) - 26); ctx.stroke(); ctx.lineWidth = 1;
+  }
   if (gh === 1) drawShadow(e.x, e.y, e.r * (e.fly ? 0.7 : 1.1) * (e.z ? 0.8 : 1));
   if (e.fuse > 0) { // 폭주 해골: 터질 범위를 깜박이는 붉은 원으로 (터질 때가 가까울수록 진하게)
     const k = 1 - e.fuse / e.d.bomb.fuse, f = 0.5 + 0.5 * Math.sin(gtime * 30);
@@ -6412,9 +6600,17 @@ function drawEnemy(e) {
   else if (e.fuse > 0 && Math.sin(gtime * 45) > 0) ctx.filter = 'brightness(2.4) saturate(2)'; // 곧 터짐: 번쩍번쩍
   else if (e.raised) ctx.filter = 'sepia(0.7) hue-rotate(55deg) saturate(1.8) brightness(0.85)'; // 되살아난 적: 초록빛
   ctx.globalAlpha = gh;
-  const top = drawSprite(A.spr, fr, sx, sy - z, e.face, sc);
+  const sink = e.sink > 0 ? e.sink : 0; // 굴착자: 바닥 밑으로 들어가는 만큼 아래를 잘라 그림
+  if (sink) { ctx.save(); ctx.beginPath(); ctx.rect(sx - 150, sy - 320, 300, 323); ctx.clip(); }
+  const top = drawSprite(A.spr, fr, sx, sy - z + sink * 66 * sc, e.face, sc);
+  if (sink) ctx.restore();
   ctx.filter = 'none'; ctx.globalAlpha = 1;
   if (front) drawShield(e, sc);
+  if (e.wardT > gtime && e.wardBy && !e.wardBy.dead) { // 수호 드론의 보호막: 몸을 감싼 푸른 막
+    const by = sy - z - 26 * sc, pul = 0.5 + 0.5 * Math.sin(gtime * 6 + e.anim);
+    ctx.fillStyle = `rgba(120,220,255,${0.07 + 0.04 * pul})`; ctx.strokeStyle = `rgba(150,230,255,${0.45 + 0.25 * pul})`; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(sx, by, 26 * sc + 6, 34 * sc + 6, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.lineWidth = 1;
+  }
   e.topY = top; // 정예 이름표 자리 (조명 뒤에 따로 그림)
   if (e.burn > 0) drawSprite('fire', 'abcdefgh'[Math.floor(gtime * 12 + e.anim * 5) % 8], sx, sy - z + 2, 0, 0.4);
   if (gh < 1) return; // 그림자 추적자: 체력 막대도 숨김
@@ -6879,7 +7075,7 @@ function drawEliteLabels() {
     ctx.fillStyle = f < 0.3 ? '#ff7a4a' : '#ffd27a'; ctx.fillRect(x - bw / 2, y - 2, bw * f, 5);
   }
   for (const e of enemies) {
-    if (!e.elite || e.dead || e.topY === undefined || !canSee(e.x, e.y) || ghost(e)) continue;
+    if (!e.elite || e.dead || e.topY === undefined || !canSee(e.x, e.y) || ghost(e) || hiddenE(e)) continue;
     const x = PX(e.x, e.y), y = e.topY - 12, bw = 64, f = clamp(e.hp / e.maxhp, 0, 1);
     ctx.fillStyle = '#000'; ctx.fillText(e.name, x + 1, y - 7);
     ctx.fillStyle = e.super ? '#ff9a3a' : '#ffcc55'; ctx.fillText(e.name, x, y - 8);
@@ -7097,7 +7293,7 @@ function render() {
   for (const b of barrels) list.push({ d: b.x + b.y, f: drawBarrel, a: [b] });
   for (const it of pickups) list.push({ d: it.x + it.y - 0.2, f: drawPickup, a: [it] });
   for (const l of lamps) if (!l.exit) list.push({ d: l.x + l.y, f: drawLamp, a: [l] });
-  for (const h of hubs) for (const b of h.edges) list.push({ d: b.d, f: drawBarrier, a: [b] });
+  for (const h of hubs) for (const b of h.edges) list.push({ d: b.d, f: drawBarrier, a: [b, h] });
   list.sort((a, b) => a.d - b.d);
   for (const o of list) o.f(...o.a);
   drawGasFog(true); // 캐릭터 발목까지 덮는 독가스 겹
@@ -7346,7 +7542,7 @@ function visionPath() {
   // (적이 많을 때 영역 모양이 복잡해지면 조명 그리기가 크게 느려짐)
   const inMain = (x, y) => { const dx = x - player.x, dy = y - player.y; let a = Math.atan2(dy, dx); if (a < 0) a += Math.PI * 2; return Math.hypot(dx, dy) <= vis.len[Math.floor(a / (Math.PI * 2) * VIS_RAYS) % VIS_RAYS] - 0.2; };
   for (const e of enemies) {
-    if (!canSee(e.x, e.y)) continue;
+    if (!canSee(e.x, e.y) || hiddenE(e)) continue;
     const A = ENEMY_ART[e.type], s = Math.max(A.scale, 0.6) * (e.d.boss ? 1.8 : A.blob || 1);
     if (!e.d.boss && !A.z && !A.blob && !e.z && inMain(e.x, e.y) && inMain(e.x - 1.2, e.y - 1.2)) continue;
     blob(PX(e.x, e.y), PY(e.x, e.y) - (A.z || 0) - (e.z || 0) - 30 * s, 34 * s, 46 * s);
@@ -7438,7 +7634,7 @@ function drawLighting() {
   for (const s of eshots) punch(PX(s.x, s.y), PY(s.x, s.y) - 16, s.type === 'ball' ? 80 : 50, 0.6);
   for (const d of keyDoorsOnScreen()) punch(PX(d.x, d.y), PY(d.x, d.y) - 40, 80, 0.5);
   for (const it of pickups) if (it.kind === 'key') punch(PX(it.x, it.y), PY(it.x, it.y) - 12, 60, 0.75);
-  for (const e of enemies) if (e.elite && canSee(e.x, e.y)) punch(PX(e.x, e.y), PY(e.x, e.y) - 30, 70, 0.45); // 정예는 눈에 띄게
+  for (const e of enemies) if (e.elite && canSee(e.x, e.y) && !hiddenE(e)) punch(PX(e.x, e.y), PY(e.x, e.y) - 30, 70, 0.45); // 정예는 눈에 띄게
   for (const e of enemies) if (e.d.nest && canSee(e.x, e.y)) punch(PX(e.x, e.y), PY(e.x, e.y) - 30, 80, 0.5);  // 둥지
   for (const s of survivors) if (s.state === 'wait' && canSee(s.x, s.y)) punch(PX(s.x, s.y), PY(s.x, s.y) - 24, 60, 0.6); // 갇힌 생존자의 구조 신호등
   for (const h of hazards) if (h.type === 'breach') punch(PX(h.x, h.y), PY(h.x, h.y) - 34, 120, 0.7); // 선체에 뚫린 구멍 (경보등·불꽃)
@@ -7483,6 +7679,7 @@ function drawLighting() {
   for (const w of wells) glow(PX(w.x, w.y), PY(w.x, w.y) - 18, w.r * 30, '160,90,255', 0.25 + 0.08 * Math.sin(gtime * 9)); // 중력장
   for (const q of pillars) glow(PX(q.x, q.y), PY(q.x, q.y), 60, '255,80,30', 0.15 + 0.25 * (1 - q.t / q.max)); // 불기둥 예고
   for (const e of enemies) if (e.d.thief && !e.dead) glow(PX(e.x, e.y), PY(e.x, e.y) - 24, 60, '255,210,100', 0.22 + 0.08 * Math.sin(gtime * 6)); // 보물 약탈자: 금빛
+  for (const e of enemies) if (e.d.ward && !e.dead && canSee(e.x, e.y)) glow(PX(e.x, e.y), PY(e.x, e.y) - 46, 56, '120,220,255', 0.3 + 0.1 * Math.sin(gtime * 7)); // 수호 드론: 눈에 띄게 (먼저 노릴 것)
   for (const it of pickups) if (it.kind === 'weapon' && it.inst.rarity >= 2) glow(PX(it.x, it.y), PY(it.x, it.y) - 8, 40, RARITY[it.inst.rarity].glow, 0.25 + 0.1 * Math.sin(gtime * 4));
   for (const it of pickups) if (it.kind === 'weapon' && (it.inst.uq || it.inst.set)) { // 고유 전설·세트: 바닥에서 솟는 빛기둥 (세트는 초록)
     const x = PX(it.x, it.y), y = PY(it.x, it.y), g2 = ctx.createLinearGradient(0, y - 230, 0, y), gl = RARITY[it.inst.set ? 5 : 4].glow;
@@ -7493,7 +7690,7 @@ function drawLighting() {
   for (const it of pickups) if (it.kind === 'key') glow(PX(it.x, it.y), PY(it.x, it.y) - 12, 50, KEYCARDS[it.id].rgb, 0.3 + 0.12 * Math.sin(gtime * 5));
   for (const c of chests) if (!c.open) glow(PX(c.x, c.y), PY(c.x, c.y) - 10, 46, '255,200,90', 0.22 + 0.08 * Math.sin(gtime * 3 + c.x)); // 금고 보물함
   for (const sp of spots) if (sp.type === 'beacon' && sp.state !== 'done') glow(PX(sp.x, sp.y), PY(sp.x, sp.y) - 50, 34, sp.state === 'on' ? '255,70,40' : '255,190,60', sp.state === 'on' ? (Math.sin(gtime * 10) > 0 ? 0.6 : 0.15) : 0.3 + 0.15 * Math.sin(gtime * 3)); // 신호기 머리의 불빛 (켜지면 빨갛게 깜박임)
-  for (const e of enemies) if (e.elite && canSee(e.x, e.y)) glow(PX(e.x, e.y), PY(e.x, e.y) - 24, 60, ELITE_AFFIXES[e.elite[0]].rgb, 0.18 + 0.06 * Math.sin(gtime * 5));
+  for (const e of enemies) if (e.elite && canSee(e.x, e.y) && !hiddenE(e)) glow(PX(e.x, e.y), PY(e.x, e.y) - 24, 60, ELITE_AFFIXES[e.elite[0]].rgb, 0.18 + 0.06 * Math.sin(gtime * 5));
   for (const e of enemies) if (e.d.nest && canSee(e.x, e.y)) glow(PX(e.x, e.y), PY(e.x, e.y) - 28, 70, '220,70,160', 0.2 + 0.08 * Math.sin(e.anim * 4));
   for (const s of survivors) if (s.state === 'wait' && canSee(s.x, s.y)) glow(PX(s.x, s.y), PY(s.x, s.y) - 24, 50, '120,190,255', 0.22 + 0.1 * Math.sin(gtime * 5));
   for (const t of terminals) if (t.kind === 'hack') glow(PX(t.i + 0.5, t.j + 0.5), PY(t.i + 0.5, t.j + 0.5) - 30, 90, t.m && t.m.done ? '90,255,140' : '110,240,220', 0.22);
@@ -7645,7 +7842,7 @@ function drawTopInfo() {
   ctx.globalAlpha = 1;
   // 상태이상 칩
   const f = player.fx, chips = hazards.filter(h => h.type === 'blackout').map(h => ['⚠ ' + EVENTS[h.type].name, h.t, EVENTS[h.type].color]); // 정전 남은 시간 먼저 (독가스·선체 파손은 그 자리에 표지 — drawHazardLabels)
-  if (!inBase && inHub()) chips.unshift(['안전 지대', null, '#7fd8ff']); // 보급 거점 안 (시간 없음)
+  if (!inBase && inHub()) chips.unshift(contested() ? ['거점 방어 중 — 싸울 수 있음', null, '#ff9a6a'] : ['안전 지대', null, '#7fd8ff']); // 보급 거점 안 (시간 없음)
   if (f.poison > 0) chips.push(['중독', f.poison, '#9e4']);
   if (f.burn > 0) chips.push(['화상', f.burn, '#f83']);
   if (f.shock > 0) chips.push(['감전', f.shock, '#fd4']);
@@ -7676,7 +7873,7 @@ function drawTopInfo() {
   // 마우스 아래 적 이름 (원작 스타일)
   const m = screenToWorld(mouse.x, mouse.y + 14);
   let best = null, bd = 0.9;
-  for (const e of enemies) { const d = Math.hypot(e.x - m.x, e.y - m.y); if (d < bd && canSee(e.x, e.y) && !ghost(e)) { bd = d; best = e; } }
+  for (const e of enemies) { const d = Math.hypot(e.x - m.x, e.y - m.y); if (d < bd && canSee(e.x, e.y) && !ghost(e) && !hiddenE(e)) { bd = d; best = e; } }
   const mi = Math.floor(m.x), mj = Math.floor(m.y), md = !best && tileAt(mi, mj) === T.DOOR ? doors[doorOf[mj * MW + mi]] : null, K = md && md.key && KEYCARDS[md.key], G = md && md.gate;
   const crate = !best && !inBase && tileAt(mi, mj) === T.CRATE; // 상자: 부술 수 있다는 안내
   const label = best ? `${best.name || best.d.name}  (${Math.ceil(best.hp)})${best.d.armor ? ` — 장갑: 한 발마다 피해 -${best.d.armor}` : ''}${shieldOf(best) ? ` — 정면 방패 ${Math.round(shieldDur(best) * 100)}%: 옆·뒤를 노리거나 부숴라` : best.shieldBroken ? ' — 방패 부서짐' : ''}${best.raised ? ' — 되살아남' : ''}${best.elite ? ' — ' + best.elite.map(k => ELITE_AFFIXES[k].desc).join(' · ') : ''}`
@@ -7687,6 +7884,11 @@ function drawTopInfo() {
     const ly = inBase ? VH - 12 : VH - 70; // 구역에서는 스킬 칸 위에
     ctx.fillStyle = '#000'; ctx.fillText(label, W / 2 + 1, ly + 1);
     ctx.fillStyle = K ? K.color : G ? '#ff9a6a' : '#d8f0c8'; ctx.fillText(label, W / 2, ly);
+  }
+  if (autoNote > 0) { // 거점 자동 저장 (오른쪽 아래)
+    ctx.globalAlpha = clamp(autoNote, 0, 1); ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'right';
+    ctx.fillStyle = '#000'; ctx.fillText('✔ 자동 저장됨', W - 15, VH - 13); ctx.fillStyle = '#9fe0a0'; ctx.fillText('✔ 자동 저장됨', W - 16, VH - 14);
+    ctx.globalAlpha = 1;
   }
 }
 
@@ -7937,7 +8139,16 @@ function unpackWeapon(d) {
   w.mag = d.mag; w.gx = d.gx; w.gy = d.gy;
   return w;
 }
-function saveGame(slot) {
+// 슬롯: 0~2 (직접 저장) 또는 'auto' (거점에 들어올 때 자동 저장 — 따로 한 칸)
+const saveAt = (S, k) => k === 'auto' ? S.auto || null : S.slots[k];
+const slotName = k => k === 'auto' ? '자동 저장' : `슬롯 ${k + 1}`;
+let autoT = 0, autoNote = 0; // 마지막 자동 저장 시각 (너무 자주 쓰지 않게), 화면 오른쪽 아래 '자동 저장' 표시 남은 시간
+function autoSave() {
+  if (performance.now() - autoT < 15000) return;
+  autoT = performance.now();
+  if (saveGame('auto', true)) autoNote = 2.2;
+}
+function saveGame(slot, quiet = false) {
   const p = player, s = readSaves();
   const data = {
     time: Date.now(), stage: level, kills, playtime, diff: difficulty, rescued,
@@ -7947,14 +8158,14 @@ function saveGame(slot) {
       gear: Object.fromEntries(GEAR_KEYS.map(g => [g, packWeapon(p.gear[g])])), parts: p.parts, gemBag: p.gemBag },
     stash: stash.map(packWeapon), // 기지 창고
   };
-  s.slots[slot] = data;
-  s.log = [{ time: data.time, slot, stage: level, gold: p.gold, kills }, ...s.log].slice(0, 20);
+  if (slot === 'auto') s.auto = data; else s.slots[slot] = data;
+  s.log = [{ time: data.time, slot, stage: level, gold: p.gold, kills }, ...s.log.filter(l => !(slot === 'auto' && l.slot === 'auto'))].slice(0, 20); // 자동 저장 기록은 마지막 하나만
   const ok = writeSaves(s);
-  Snd.play(ok ? 'save' : 'deny');
+  if (!quiet) Snd.play(ok ? 'save' : 'deny');
   return ok;
 }
 function loadGame(slot) {
-  const d = readSaves().slots[slot];
+  const d = saveAt(readSaves(), slot);
   if (!d) return;
   const p = newPlayer(), q = d.player;
   Object.assign(p, { hp: q.hp, armor: q.armor, gold: q.gold, ammo: { ...p.ammo, ...q.ammo }, gren: q.gren, items: q.items, gsel: q.gsel, slot: q.slot,
@@ -7998,12 +8209,13 @@ function loadGame(slot) {
   else { startField(newSeed(), legacyFlags(Math.min(d.stage || 1, CAMPAIGN.length))); settleHubs(); } // 예전(구역 방식) 저장: 새 지도에서 그 구역까지 지나온 것으로
   for (const w of moved.floor) dropWeapon(player.x + rnd(-0.8, 0.8), player.y + rnd(0.6, 1.2), w); // 가방·창고가 다 차면 발밑에
   if (extra.length) { msg(`무기 슬롯이 바뀌었다 (지금 ${open}칸 — 구역 2·5의 무기고를 해제하면 늘어남): 남는 무기 ${extra.length}개 → 가방 ${moved.bag} · 창고 ${moved.stash}${moved.floor.length ? ` · 발밑 ${moved.floor.length}` : ''}`, '#ffd27a'); tip('armory'); }
-  msg(`저장 슬롯 ${slot + 1}을(를) 불러왔습니다`, '#9f9');
+  msg(`${slotName(slot)}을(를) 불러왔습니다`, '#9f9');
 }
+// 가장 최근 저장: 슬롯 번호, 'auto', 없으면 -1
 function latestSlot() {
-  const s = readSaves().slots;
-  let best = -1;
-  s.forEach((d, k) => { if (d && (best < 0 || d.time > s[best].time)) best = k; });
+  const S = readSaves();
+  let best = -1, bt = -1;
+  for (const k of [...S.slots.keys(), 'auto']) { const d = saveAt(S, k); if (d && d.time > bt) { best = k; bt = d.time; } }
   return best;
 }
 const z2 = n => String(n).padStart(2, '0');
@@ -8016,6 +8228,7 @@ function resetWorld() {
   escape = null; hurtDirs = []; hitFlash = 0; hitStop = 0; crateHp = new Map(); crateHitT = new Map();
   enemies = []; bullets = []; eshots = []; grenades = []; areas = []; parts = []; decals = []; pickups = []; barrels = [];
   texts = []; flashes = []; beams = []; corpses = []; fxs = [];
+  assault = null; assaultCd = 0; combatT = 0;
   mission = PURGE; hackM = null; armoryOn = null; survivors = []; hazards = []; eventNotes = []; eventClock = 0; nextEvent = 0; lastEvent = null; beaconOn = null;
   turrets = []; mines = []; rings = []; drones = []; coils = []; wells = []; pillars = []; waves = []; decoys = []; delayed = [];
   if (player) { player.scd = {}; player.sk = {}; player.inv = 0; } // 스킬 대기시간·지속 효과는 장소를 옮길 때마다 처음부터

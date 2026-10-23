@@ -148,10 +148,11 @@ function pipsHTML(d) { // 구역 1~9: 들어가 본 곳 · 지금 구역
   const fl = (d.field && d.field.flags) || {}, vis = fl.visited || [];
   return `<div class="pips">${CAMPAIGN.map((_, k) => `<i class="${k + 1 === d.stage ? 'c' : vis.includes(k + 1) ? 'v' : ''}"></i>`).join('')}</div>`;
 }
-function slotHTML(d, k, attrs) {
-  if (!d) return `<button class="sl empty" data-nav ${attrs}><div class="no">${z2(k + 1)}<small>SLOT</small></div><div><div class="t1">빈 슬롯</div><div class="t2">아직 저장한 작전이 없습니다</div></div></button>`;
+function slotHTML(d, k, attrs) { // k: 슬롯 번호 또는 'auto' (거점 자동 저장)
+  const no = k === 'auto' ? `<div class="no" style="font-size:20px">AUTO<small>자동 저장</small></div>` : `<div class="no">${z2(k + 1)}<small>SLOT</small></div>`;
+  if (!d) return `<button class="sl empty" data-nav ${attrs}>${no}<div><div class="t1">빈 슬롯</div><div class="t2">아직 저장한 작전이 없습니다</div></div></button>`;
   const p = d.player || {};
-  return `<button class="sl" data-nav ${attrs}><div class="no">${z2(k + 1)}<small>SLOT</small></div>
+  return `<button class="sl" data-nav ${attrs}>${no}
     <div><div class="t1">구역 ${d.stage} · ${regName(d.stage)}${diffBadge(d.diff || 'normal')}</div>
       <div class="t2"><span>Lv <b>${p.clv || 1}</b></span><span>플레이 <b>${fmtPlay(d.playtime || 0)}</b></span><span>처치 <b>${(d.kills || 0).toLocaleString()}</b></span><span>골드 <b>${(p.gold || 0).toLocaleString()}</b></span></div>
       ${pipsHTML(d)}</div>
@@ -254,11 +255,11 @@ function titleScreen() {
   state = 'title'; overlay.onclick = null;
   if (!titleCam && !tiles) titleBackground();
   Music.play(MUSIC.title);
-  const S = readSaves(), last = latestSlot(), L = last >= 0 ? S.slots[last] : null, clears = S.log.filter(l => l.clear);
+  const S = readSaves(), last = latestSlot(), L = last !== -1 ? saveAt(S, last) : null, clears = S.log.filter(l => l.clear);
   const achN = Object.keys(codex.ach || {}).length, logN = Object.keys(codex.logs || {}).length;
   const all = ['mon', 'boss', 'uq', 'set', 'rw'].map(t => codexCards(t)), got = all.reduce((a, c) => a + c.filter(x => x.known).length, 0), tot = all.reduce((a, c) => a + c.length, 0);
   const items = [
-    ['cont', '이어하기', 'CONTINUE', L ? `슬롯 ${last + 1} · 구역 ${L.stage} ${regName(L.stage)} · Lv ${L.player.clv || 1} · ${timeAgo(L.time)}` : '저장한 작전이 없습니다', !L],
+    ['cont', '이어하기', 'CONTINUE', L ? `${slotName(last)} · 구역 ${L.stage} ${regName(L.stage)} · Lv ${L.player.clv || 1} · ${timeAgo(L.time)}` : '저장한 작전이 없습니다', !L],
     ['new', '새 작전', 'NEW OPERATION', '코어의 오버마인드를 처치하고 탈출하라'],
     ['load', '불러오기', 'LOAD GAME', '저장 슬롯 · 작전 기록'],
     ['set', '설정', 'SETTINGS', '소리 · 화면 · 게임'],
@@ -329,16 +330,17 @@ function loadScreen(back) {
   screen(`<div class="center" style="position:absolute;inset:0"><div class="frm" style="width:min(1040px,94vw)">
       <div class="hd"><div class="grow"><div class="eye">LOAD GAME · 불러오기</div><div class="h1">저장 슬롯</div></div></div>
       <div class="bd" style="display:grid;grid-template-columns:1fr 300px;gap:24px">
-        <div class="slots">${S.slots.map((d, k) => `<div class="sl-wrap">${slotHTML(d, k, `data-load="${k}" ${d ? '' : 'disabled'}`)}${d ? `<button class="del" data-nav data-del="${k}" title="지우기">지우기</button>` : '<span></span>'}</div>`).join('')}</div>
+        <div class="slots">${[...(S.auto ? ['auto'] : []), ...S.slots.keys()].map(k => { const d = saveAt(S, k); return `<div class="sl-wrap">${slotHTML(d, k, `data-load="${k}" ${d ? '' : 'disabled'}`)}${d ? `<button class="del" data-nav data-del="${k}" title="지우기">지우기</button>` : '<span></span>'}</div>`; }).join('')}</div>
         <div><div class="sect">OPERATION LOG · 작전 기록</div><ul class="log">${log.length ? log.map(l => l.clear
           ? `<li class="clear"><b>${fmtTime(l.time).slice(5)}</b>★ 탈출 성공 · ${DIFFICULTY[l.diff] ? DIFFICULTY[l.diff].name : ''} · ${fmtPlay(l.playtime)}</li>`
-          : `<li><b>${fmtTime(l.time).slice(5)}</b>슬롯 ${l.slot + 1} · 구역 ${l.stage} · 처치 ${l.kills}</li>`).join('') : '<li>아직 기록이 없습니다</li>'}</ul></div>
+          : `<li><b>${fmtTime(l.time).slice(5)}</b>${slotName(l.slot)} · 구역 ${l.stage} · 처치 ${l.kills}</li>`).join('') : '<li>아직 기록이 없습니다</li>'}</ul></div>
       </div>
-      <div class="ft"><span class="note">불러오면 저장한 거점에서 다시 시작합니다</span><button class="btn" data-nav id="lBack">뒤로</button></div>
+      <div class="ft"><span class="note">불러오면 저장한 거점에서 다시 시작합니다 · 거점에 들어갈 때마다 자동 저장 칸에 저장됩니다</span><button class="btn" data-nav id="lBack">뒤로</button></div>
     </div></div>`, { cls: 'dim', back, focus: '[data-load]:not(:disabled)' });
-  onAll('[data-load]', b => fadeThen(() => loadGame(+b.dataset.load)));
-  onAll('[data-del]', b => confirmBox({ title: `슬롯 ${+b.dataset.del + 1}을(를) 지울까요?`, text: '지운 저장은 되돌릴 수 없습니다.', ok: '지우기', danger: true, eye: 'DELETE SAVE',
-    onOk: () => { const s2 = readSaves(); s2.slots[+b.dataset.del] = null; writeSaves(s2); Snd.play('crate'); loadScreen(back); } }), 'uiMove');
+  const slotOf = v => v === 'auto' ? 'auto' : +v;
+  onAll('[data-load]', b => fadeThen(() => loadGame(slotOf(b.dataset.load))));
+  onAll('[data-del]', b => confirmBox({ title: `${slotName(slotOf(b.dataset.del))}을(를) 지울까요?`, text: '지운 저장은 되돌릴 수 없습니다.', ok: '지우기', danger: true, eye: 'DELETE SAVE',
+    onOk: () => { const s2 = readSaves(), k = slotOf(b.dataset.del); if (k === 'auto') s2.auto = null; else s2.slots[k] = null; writeSaves(s2); Snd.play('crate'); loadScreen(back); } }), 'uiMove');
   on('lBack', back, 'uiBack');
 }
 
@@ -427,6 +429,7 @@ const GUIDE = [
   ['grow', '성장', 'pstra0', `레벨이 오를 때마다 <b>[K]</b> 성장 창에서 특성 1점 · 능력치 3점. 능력치(근력·민첩·기술·정신)는 스킬마다 다른 수치를 키운다.`],
   ['super', '고유 정예 · 금고', 'yskua0', `구역마다 이름 붙은 <b>고유 정예</b>가 부하와 함께 있다. 처치하면 금고 열쇠 — 금빛 금고 문 뒤의 보물함을 [F]로 연다.`],
   ['spot', '필드 사건', 'tlp2a0', `<b>보급 캐시</b>: 열면 보급품, 대신 적이 몰려온다. <b>조난 신호기</b>: 켜고 곁을 지키면 보상.`],
+  ['assault', '거점 습격', 'icon_case_white', `구역 ${ASSAULT.from}부터 가끔, 보급 거점에 들어가면 경보가 울리고 몬스터 무리가 ${ASSAULT.waves}번 몰려와 <b>안전막</b>을 두드린다. 습격 중에는 거점 안에서도 싸울 수 있다.<br>모두 처치하면 골드·경험치·장비 — <b>안전막이 버티면 보상이 더 크다</b>. 막이 다 깎이면 꺼져서 적이 안으로 들어온다.`],
   ['boss', '구역 보스', 'cybra1', `구역마다 깊숙한 큰 방에 보스가 있다 (구역 3·6은 길목, 9는 코어). 패턴이 다 다르고 체력이 절반 밑이면 <b>격노</b>한다.`],
   ['thief', '보물 약탈자', 'sthfa1', `금빛 제복의 약탈자. 들키면 달아나다 몇 초 뒤 차원 틈으로 사라진다 — 맞을 때마다 골드를 흘리고, 잡으면 보물이 쏟아진다.`],
   ['rift', '차원 균열', 'pinsa0', `보급 거점의 순간이동 패드에서 (보스를 하나 처치하면 열림). 적을 쓰러뜨려 균열을 채우면 <b>균열 수호자</b>가 나타나고, 처치하면 단계 돌파 보상. 몇 번이든 다시 할 수 있다.`],
@@ -510,9 +513,9 @@ function gameOverScreen(reason) {
       <div class="eye" style="color:var(--bad)">MISSION FAILED · 신호 끊김</div><div class="big-t">작전 실패</div>
       <div class="lead">${escHtml(reason)}</div>
       <div class="stats"><div><small>도달 구역</small><b>${level}</b></div><div><small>레벨</small><b>${p.clv}</b></div><div><small>처치</small><b>${kills.toLocaleString()}</b></div><div><small>플레이 시간</small><b>${fmtPlay(playtime)}</b></div></div>
-      <div class="row-btns">${last >= 0 ? `<button class="btn pri" data-nav id="gLast">마지막 저장 불러오기 <span class="k">슬롯 ${last + 1}</span></button>` : ''}<button class="btn" data-nav id="gLoad">불러오기</button><button class="btn" data-nav id="gTitle">메인 메뉴</button></div>
+      <div class="row-btns">${last !== -1 ? `<button class="btn pri" data-nav id="gLast">마지막 저장 불러오기 <span class="k">${slotName(last)}</span></button>` : ''}<button class="btn" data-nav id="gLoad">불러오기</button><button class="btn" data-nav id="gTitle">메인 메뉴</button></div>
     </div>`, { cls: 'fail', back: null });
-  if (last >= 0) on('gLast', () => fadeThen(() => loadGame(last)));
+  if (last !== -1) on('gLast', () => fadeThen(() => loadGame(last)));
   on('gLoad', () => loadScreen(() => gameOverScreen(reason)));
   on('gTitle', toTitle);
 }

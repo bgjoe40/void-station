@@ -1,7 +1,7 @@
 // ===== 게임 데이터 정의 (무기 / 탄약 / 수류탄 / 아이템 / 적) =====
 
 // 버전: GitHub에 커밋·푸시할 때마다 올림 (새 기능은 가운데 자리, 고침·작은 추가는 끝자리) — 타이틀·일시정지 화면에 표시, git 태그 v<버전>
-const VERSION = '0.3.1';
+const VERSION = '0.4.0';
 
 const CAT_NAMES = ['근접', '권총', '샷건', '라이플', '기관총', '에너지'];
 const MAX_LOAD = 30;   // 장착 + 가방 무기 무게 합이 넘으면 이동속도 감소
@@ -383,6 +383,18 @@ const ENEMIES = {
   // 되살아난 적은 경험치·전리품이 없음 — 먼저 처치할 것
   summoner: { name: '되살리는 자', hp: 170, spd: 1.6, r: 0.42, dmg: 8,  atkRate: 1.2, gold: 70,  blood: '#7b4', loot: 0.2, keep: 6, roomMax: 1, from: 5, w: 1.2, cost: 4,
               raise: { rate: 6, range: 8, wind: 0.9, max: 5, hp: 0.7 } },
+  // 매복자: 천장에 붙어 숨어 있음 (보이지 않고 맞지 않음 — 바닥에 옅은 그림자만 어른거림). 플레이어가 drop칸 안에 오면 그 바로 위로 기어가 warn초 동안 그림자가 짙어진 뒤
+  // fall초 만에 떨어져 덮침 (r칸 안이면 피해 hit + knock만큼 밀려남). 내려온 뒤로는 빠르게 붙어 할퀴는 근접 적 (무리로 몰려올 때는 천장에 붙지 않음)
+  lurker:   { name: '매복자',     hp: 120, spd: 3.3, r: 0.4,  dmg: 15, atkRate: 0.8, gold: 35,  blood: '#a5c', loot: 0.12, from: 3, w: 2, cost: 3,
+              ceiling: { drop: 2.8, warn: 0.6, fall: 0.3, r: 1.1, hit: 24, knock: 7 } },
+  // 굴착자: 플레이어를 알아채면 바닥 밑으로 파고들어 (dig초, 땅속에서는 보이지 않고 맞지 않음 — 흙더미가 움직이는 자국만) spd칸/초로 다가오고, near칸 안에 들거나 max초가 지나면
+  // warn초 동안 땅이 흔들린 뒤 솟아오르며 r칸 안을 쳐 올림 (피해 hit + 밀려남). up초 동안 땅 위에서 싸우다가 다시 파고듦
+  burrower: { name: '굴착자',     hp: 160, spd: 2.2, r: 0.4,  dmg: 16, atkRate: 1.0, gold: 45,  blood: '#a73', loot: 0.15, from: 4, w: 1.8, cost: 3,
+              burrow: { spd: 4.2, near: 1.4, max: 6, warn: 0.6, r: 1.3, hit: 20, knock: 6, up: 4.5, dig: 0.5 } },
+  // 수호 드론: 떠다니며 거리를 두고, range칸 안의 다른 적 n마리까지 보호막을 씌움 — 보호막을 받은 적은 직접 맞는 피해를 cut만큼 덜 받음 (지속 피해는 그대로, 보스는 제외).
+  // 드론을 쓰러뜨리면 보호막이 모두 꺼짐. 스스로는 공격하지 않고 약함, 터지며 사라짐 (시체 없음)
+  warden:   { name: '수호 드론',   hp: 60,  spd: 2.6, r: 0.3,  dmg: 0,  atkRate: 99,  gold: 40,  blood: '#9cf', loot: 0.12, keep: 6, fly: true, roomMax: 1, nocorpse: true, from: 5, w: 1.5, cost: 3,
+              ward: { range: 5.5, n: 4, cut: 0.6 } },
   // 보스: 다음 구역으로 가는 길목 방(코어는 가장 안쪽 방)을 지키고, 쓰러뜨리면 봉쇄 격벽이 열림 (boss 값이 공격 방식)
   titan:      { name: '타이탄',     hp: 1600, spd: 1.5, r: 0.75, dmg: 40, atkRate: 1.6, gold: 800, blood: '#9c3', lootBonus: 3, knock: 10, boss: 'titan' },
   hivemother: { name: '하이브 마더', hp: 1900, spd: 1.2, r: 0.85, dmg: 30, atkRate: 1.4, gold: 900, blood: '#bd2', lootBonus: 3, boss: 'hive' },
@@ -643,6 +655,8 @@ const MONSTER_DESC = {
   mortar: '느리고 단단하다. 화염탄 3발을 부채꼴로 쏜다.', watcher: '움직이지 않고 멀리서 발밑에 불기둥을 일으킨다.',
   shielder: '정면을 에너지 방패로 막는다 — 막을 때마다 닳아 결국 부서진다. 천천히 돌아서고, 공격할 때는 방패가 내려간다.', bomber: '날아와 곁에서 터진다. 먼저 쏘아 떨어뜨려라.',
   assassin: '거의 보이지 않고, 등 뒤로 순간이동해 기습한다.', summoner: '쓰러진 몬스터를 다시 일으켜 세운다.',
+  lurker: '천장에 숨어 있다가 바로 위로 기어와 떨어진다 — 바닥의 그림자가 짙어지면 비켜라.', burrower: '땅속을 파고 다가와 발밑에서 솟아오른다 — 흔들리는 흙더미를 피하고, 땅 위에 있을 때 쳐라.',
+  warden: '주변 적에게 보호막을 씌운다 — 보호막을 받은 적은 덜 아프다. 드론부터 쓰러뜨려라.',
   nest: '옆에 몬스터를 계속 낳는 번식 둥지.', thief: '보급품을 잔뜩 훔쳐 달아나는 약탈자 — 맞을 때마다 골드를 흘리고, 놓치면 차원 틈으로 사라진다. 잡으면 보물이 쏟아진다.',
   titan: '로켓 3연발과 땅 내려찍기. 구역 3의 봉쇄 격벽을 지킨다.', hivemother: '산성액 부채꼴과 크롤러 소환. 구역 6의 봉쇄 격벽을 지킨다.',
   overmind: '정거장 코어의 군체의 뇌. 쓰러뜨리면 자폭이 시작된다.',
@@ -808,7 +822,15 @@ const EVENTS = {
 const MUSIC = {
   title: 'd_e2m2', base: 'd_e3m8', escape: 'd_dm17', ending: 'd_victor', rift: 'd_e1m7', // base: 보급 거점 안, rift: 차원 균열
   zones: ['d_map21', 'd_e1m1', 'd_e4m8', 'd_e2m6', 'd_map23', 'd_map22', 'd_e4m3', 'd_e1m7', 'd_map30'],
+  combat: ['d_map20', 'd_dm32', 'd_map13'], // 전투 곡: 구역 1~3 · 4~6 · 7~9 (COMBAT_MUSIC)
 };
+// 전투 음악: 플레이어를 알아챈 적이 r칸 안에 있으면 전투 곡으로, 그런 적이 없어지고 hold초 뒤 원래 곡으로
+const COMBAT_MUSIC = { r: 12, hold: 6 };
+
+// 거점 습격: 구역 from부터, 보급 거점에 들어갈 때 chance 확률로 delay초 뒤 경보 → warn초 뒤 적 무리 waves번 (gap초 간격, 크기 wave, 마지막엔 정예)이 안전막을 두드림.
+// 습격 중에는 거점 안에서도 싸울 수 있음. 안전막 체력 hp + lvHp x 구역 — 막에 붙은 적은 초당 (피해 x atk)씩, 막에 맞은 적 탄은 그 피해의 절반만큼 깎음 (다 깎이면 안전막이 꺼져 적이 들어옴).
+// 모두 처치하면 보상 (골드 gold x 구역, 경험치 xp x 구역 — 막이 버텼으면 hold배), 거점에서 far칸 넘게 멀어지면 흩어짐. 다음 습격까지 cd초
+const ASSAULT = { from: 2, chance: 0.35, delay: [5, 10], warn: 5, waves: 3, gap: 13, wave: 0.85, hp: 300, lvHp: 120, atk: 0.6, far: 24, gold: [70, 110], xp: 50, hold: 1.5, cd: 300 };
 // 곡 제목, 작곡 (Freedoom CREDITS-MUSIC), 음량 보정 (합성해서 잰 크기 차이를 줄임: 조용한 곡은 키우고 시끄러운 곡은 줄임)
 const MUSIC_INFO = {
   d_e2m2: ['Voidgaze', 'Korp', 1.44], d_e3m8: ['The Zenith', 'Lola "BlueWorrior" Harvey', 1.69],
@@ -818,6 +840,7 @@ const MUSIC_INFO = {
   d_map23: ["Within the Trilo's Den", 'MoonDeLaAxel, Korp', 1.48], d_map22: ['Alien Waltz', 'Korp', 1.25],
   d_e4m3: ['Space Spectre', 'Matzu', 1.13], d_e1m7: ['Totally Surrounded', 'J.Astartes', 0.74],
   d_map30: ['Devoured by the Jaws of Defeat', 'Korp (원곡 Tyler "Picklehammer" P.)', 1.23],
+  d_map20: ['Wrath of Horizon', 'J.Astartes', 0.8], d_dm32: ['Bullet Hell', 'rostuhan', 0.78], d_map13: ['Fear', 'Discoholic', 0.72], // 전투 곡 (음표가 빽빽해 조금 줄임)
 };
 
 // 상자: 근접 공격으로 부숨 (체력), 부서질 때 탄약·골드·아이템이 나올 확률
@@ -912,6 +935,8 @@ const TIPS = {
                       '체인톱은 누르고 있으면 계속 갈고 처치하면 탄약이 넉넉히, 방전 진압봉은 기절 + 연쇄 번개, 플라즈마 블레이드는 쳐낸 탄을 되돌려 보낸다'] },
   thief:    { title: '보물 약탈자', icon: 'sthfa1',
               lines: ['금빛 제복의 약탈자가 보물을 짊어지고 달아난다 — 맞을 때마다 골드를 흘린다', '몇 초 안에 잡지 못하면 차원 틈으로 사라진다. 달리기(Shift)로 쫓거나 멀리서 쏴라 — 잡으면 보물이 쏟아진다'] },
+  assault:  { title: '거점 습격', icon: 'icon_case_white',
+              lines: ['몬스터 무리가 이 보급 거점의 안전막을 두드린다 — 습격 중에는 거점 안에서도 싸울 수 있다', '안전막이 버티는 동안 모두 처치하면 보상 (막이 버티면 더 많이). 막이 다 깎이면 적이 안으로 들어온다'] },
   armory:   { title: '무기 슬롯 · 무기고', icon: null,
               lines: ['무기 슬롯은 처음 2칸 — 어떤 무기든 끼울 수 있다 (1~4번, 휠로 바꿈)', '구역 2·5의 잠긴 무기고 단말기를 [F]로 해제하고 버티면 슬롯이 한 칸씩 늘어난다 (최대 4칸)'] },
   rift:     { title: '차원 균열', icon: 'pinsa0',
@@ -958,6 +983,12 @@ const TIPS = {
               lines: ['거의 보이지 않는다 — 멀어지면 등 뒤로 순간이동해 기습하고, 기습이 맞으면 다시 사라진다', '동작 추적기에는 잡힌다. 맞히면 잠시 드러나니 그때 몰아쳐라'] },
   summoner: { title: '되살리는 자', icon: 'vsuma1d1',
               lines: ['멀찍이 떨어져서 쓰러진 몬스터를 초록빛으로 다시 일으켜 세운다', '되살아난 적은 경험치·전리품이 없다 — 되살리는 자부터 처치하라'] },
+  lurker:   { title: '매복자', icon: null,
+              lines: ['천장에 숨어 있다가 바로 위로 기어와 떨어져 덮친다 — 숨어 있을 때는 맞지 않는다', '바닥에 그림자가 짙어지면 곧 떨어진다 — 그 자리에서 비켜라'] },
+  burrower: { title: '굴착자', icon: null,
+              lines: ['땅속으로 파고들어 다가온다 — 땅속에 있을 때는 맞지 않고 흙더미만 움직인다', '흙더미가 흔들리면 곧 솟아오른다 — 피했다가 땅 위에 올라온 동안 쳐라'] },
+  warden:   { title: '수호 드론', icon: null,
+              lines: ['주변 적에게 푸른 보호막을 씌운다 — 보호막을 받은 적은 직접 맞는 피해가 크게 줄어든다', '드론을 쓰러뜨리면 보호막이 모두 꺼진다 — 드론부터 노려라'] },
   gamble:   { title: '도박', icon: 'icon_case_gold',
               lines: ['골드를 내고 정체를 모르는 장비를 산다 — 종류만 고르고, 고급 이상만 나온다', '가끔 희귀·전설, 아주 드물게 고유 전설. 구역이 깊을수록 비싸고 좋은 바탕 장비가 나온다'] },
   codex:    { title: '수집 도감', icon: null,

@@ -92,7 +92,10 @@ DERIVED = {'bspr': ('bspi', 0.9),   # 질주 크롤러 (붉은 크롤러)
            'bfat': ('fatt', 0.18),  # 역병 거인 (누런 모르타르)
            'bvil': ('vile', 0.72),  # 공허 사제 (보랏빛 감시자)
            'bske': ('skel', 0.9),   # 처형자 (붉은 스피터)
-           'sthf': ('sswv', 0.46, (0.5, 0.78), (1, 1.15))}  # 보물 약탈자 (푸른 제복만 금빛으로 — 피부·바지는 그대로)
+           'sthf': ('sswv', 0.46, (0.5, 0.78), (1, 1.15)),  # 보물 약탈자 (푸른 제복만 금빛으로 — 피부·바지는 그대로)
+           'blrk': ('bspi', 0.75, None, (1.1, 0.6)),        # 매복자 (어두운 보랏빛 크롤러)
+           'tbur': ('troo', 0.07, None, (0.55, 0.85)),      # 굴착자 (흙빛 제노이드)
+           'fskw': ('fsku', 0.5, None, (1.2, 1.0))}         # 수호 드론 (푸른 기계 해골 — 플레이어 드론은 붉은 그대로)
 
 # 벽 텍스처(패치 합성)와 바닥 텍스처(flat)
 WALL_TEX = ['STARTAN2', 'STARBR2', 'STARG3', 'STARGR1', 'TEKWALL1', 'METAL2', 'SUPPORT3', 'BROWN96', 'BRONZE1',
@@ -120,7 +123,8 @@ SOUNDS = ['dspistol', 'dsshotgn', 'dsdshtgn', 'dssgcock', 'dsdbload', 'dsswtchn'
 
 # Freedoom 배경음악 (musics/*.mid 그대로 복사, 게임이 Web Audio 신시사이저로 연주) — data.js의 MUSIC과 맞출 것
 MUSIC = ['d_e2m2', 'd_e3m8', 'd_dm17', 'd_victor', 'd_map21', 'd_e1m1', 'd_e4m8', 'd_e2m6', 'd_map23', 'd_map22',
-         'd_e4m3', 'd_e1m7', 'd_map30']
+         'd_e4m3', 'd_e1m7', 'd_map30',
+         'd_map20', 'd_dm32', 'd_map13']  # 전투 곡
 
 # knekko 시트에서 잘라낼 아이콘: 이름 -> (파일, (x0, y0, x1, y1), 후처리)
 ICONS = {
