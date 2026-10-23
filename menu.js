@@ -285,7 +285,7 @@ function titleScreen() {
         <div class="row"><span>탈출 성공</span><b>${clears.length ? clears.length + '회' : '—'}</b></div></div>
     </aside>
     <div class="t-foot"><span>그래픽·소리·음악 Freedoom (BSD) · 아이콘 knekko · MELLE · AlejandroHaibi (CC0)</span>
-      <span class="keys-h"><span><kbd>↑</kbd><kbd>↓</kbd> 선택</span><span><kbd>Enter</kbd> 확인</span></span><span class="ver">BUILD 2026.10</span></div>`,
+      <span class="keys-h"><span><kbd>↑</kbd><kbd>↓</kbd> 선택</span><span><kbd>Enter</kbd> 확인</span></span><span class="ver">v${VERSION}</span></div>`,
   { cls: 'title', back: null, focus: UI.lastTitle || (L ? '#m_cont' : '#m_new'), hints: false });
   const go = (id, fn) => on(id, () => { UI.lastTitle = '#' + id; fn(); }); // 돌아오면 고르던 항목에
   go('m_cont', () => fadeThen(() => loadGame(latestSlot())));
@@ -491,6 +491,7 @@ function pauseGame(from) {
         <div><small>무기 슬롯</small><b>${slotsOpen()} / ${WEAPON_SLOTS.max}</b></div>
       </div>
       <div class="muted" style="font-size:12px;margin-top:14px">저장은 보급 거점의 기록 단말기에서 — 메인 메뉴로 나가면 마지막 저장 이후의 진행은 사라집니다</div>
+      <div class="muted" style="font-size:11px;margin-top:10px;letter-spacing:.15em">VOID STATION · v${VERSION}</div>
     </aside>`, { cls: 'dim', back: resumeGame, focus: from || 0 });
   on('p_res', resumeGame);
   on('p_set', () => settingsScreen(() => pauseGame('#p_set')));
