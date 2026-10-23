@@ -1,7 +1,7 @@
 // ===== 게임 데이터 정의 (무기 / 탄약 / 수류탄 / 아이템 / 적) =====
 
 // 버전: GitHub에 커밋·푸시할 때마다 올림 (새 기능은 가운데 자리, 고침·작은 추가는 끝자리) — 타이틀·일시정지 화면에 표시, git 태그 v<버전>
-const VERSION = '0.4.1';
+const VERSION = '0.5.0';
 
 const CAT_NAMES = ['근접', '권총', '샷건', '라이플', '기관총', '에너지'];
 const MAX_LOAD = 30;   // 장착 + 가방 무기 무게 합이 넘으면 이동속도 감소
@@ -831,6 +831,18 @@ const COMBAT_MUSIC = { r: 12, hold: 6 };
 // 습격 중에는 거점 안에서도 싸울 수 있음. 안전막 체력 hp + lvHp x 구역 — 막에 붙은 적은 초당 (피해 x atk)씩, 막에 맞은 적 탄은 그 피해의 절반만큼 깎음 (다 깎이면 안전막이 꺼져 적이 들어옴).
 // 모두 처치하면 보상 (골드 gold x 구역, 경험치 xp x 구역 — 막이 버텼으면 hold배), 거점에서 far칸 넘게 멀어지면 흩어짐. 다음 습격까지 cd초
 const ASSAULT = { from: 2, chance: 0.35, delay: [5, 10], warn: 5, waves: 3, gap: 13, wave: 0.85, hp: 300, lvHp: 120, atk: 0.6, far: 24, gold: [70, 110], xp: 50, hold: 1.5, cd: 300 };
+
+// 신단: 구역마다 SHRINE_PER개 (빈 방 가운데쯤) — [F]로 쓰면 t초 동안 효과 (한 번에 하나 — 새로 쓰면 바뀜). 그림은 Freedoom의 파워업 구체
+const SHRINES = {
+  power: { name: '힘의 신단',   spr: 'soul', col: '#ffb040', rgb: '255,170,60',  t: 20, desc: '20초 동안 무기 피해 2배', dmg: 2 },
+  guard: { name: '수호의 신단', spr: 'pinv', col: '#c39bff', rgb: '190,140,255', t: 20, desc: '20초 동안 받는 피해 60% 감소', cut: 0.6 },
+  haste: { name: '신속의 신단', spr: 'pins', tint: 'sepia(1) saturate(5) hue-rotate(150deg) brightness(1.8)', col: '#7fe8ff', rgb: '120,230,255', t: 20, desc: '20초 동안 이동 속도 +40% · 공격 속도 +25%', spd: 1.4, rate: 1.25 },
+};
+const SHRINE_PER = 2;
+// 시련의 방: 구역 from부터 구역마다 하나 (minW x minH칸 이상, 입구를 막을 수 있는 방 — 빈 방이 없으면 필드 사건 하나를 바꿈) — 들어서면 입구가 붉은 막으로 잠기고 적 무리가 waves번 몰려옴
+// (크기 wave, 앞 무리가 하나 남거나 gap초가 지나면 다음, 마지막엔 정예). 다 처치하면 막이 걷히고 가운데 보물함이 열림 (경험치 xp x 구역).
+// 쓰러지면 막이 걷히고 남은 적은 사라짐 — 다시 도전할 수 있음. 마친 시련은 저장됨
+const TRIAL = { from: 2, waves: 3, wave: 0.9, gap: 18, minW: 6, minH: 6, xp: 60 };
 // 곡 제목, 작곡 (Freedoom CREDITS-MUSIC), 음량 보정 (합성해서 잰 크기 차이를 줄임: 조용한 곡은 키우고 시끄러운 곡은 줄임)
 const MUSIC_INFO = {
   d_e2m2: ['Voidgaze', 'Korp', 1.44], d_e3m8: ['The Zenith', 'Lola "BlueWorrior" Harvey', 1.69],
@@ -935,6 +947,10 @@ const TIPS = {
                       '체인톱은 누르고 있으면 계속 갈고 처치하면 탄약이 넉넉히, 방전 진압봉은 기절 + 연쇄 번개, 플라즈마 블레이드는 쳐낸 탄을 되돌려 보낸다'] },
   thief:    { title: '보물 약탈자', icon: 'sthfa1',
               lines: ['금빛 제복의 약탈자가 보물을 짊어지고 달아난다 — 맞을 때마다 골드를 흘린다', '몇 초 안에 잡지 못하면 차원 틈으로 사라진다. 달리기(Shift)로 쫓거나 멀리서 쏴라 — 잡으면 보물이 쏟아진다'] },
+  shrine:   { title: '신단', icon: 'soula0',
+              lines: ['필드 곳곳의 떠 있는 구체 — [F]로 쓰면 20초 동안 강해진다 (힘: 무기 피해 2배 · 수호: 받는 피해 감소 · 신속: 이동·공격 속도)', '한 번에 하나만 — 새 신단을 쓰면 효과가 바뀐다. 쓴 신단은 꺼진다'] },
+  trial:    { title: '시련의 방', icon: 'icon_case_gold',
+              lines: ['들어서면 입구가 붉은 막으로 잠기고 적 무리가 세 번 몰려온다 — 모두 처치하면 막이 걷히고 보물함이 열린다', '쓰러지면 처음부터 다시 도전할 수 있다'] },
   assault:  { title: '거점 습격', icon: 'icon_case_white',
               lines: ['몬스터 무리가 이 보급 거점의 안전막을 두드린다 — 습격 중에는 거점 안에서도 싸울 수 있다', '안전막이 버티는 동안 모두 처치하면 보상 (막이 버티면 더 많이). 막이 다 깎이면 적이 안으로 들어온다'] },
   armory:   { title: '무기 슬롯 · 무기고', icon: null,

@@ -373,7 +373,8 @@ function settingsScreen(back, tab = setTab) {
     view: `<div class="sect">DISPLAY · 화면</div>${slider('shake', '화면 흔들림', '폭발·큰 공격에 맞을 때 화면이 흔들리는 정도')}${toggle('dmgNums', '피해 숫자', '적에게 준 피해를 머리 위에 숫자로')}${toggle('hurtFx', '피격 화면 효과', '맞을 때 화면 가장자리가 붉게 번쩍임')}
       <button class="opt act" data-nav id="oFull"><span class="lbl">전체 화면<small>브라우저 창을 화면 가득 (F11과 같음)</small></span><span></span><span class="val">${document.fullscreenElement ? '켜짐' : '꺼짐'}</span></button>`,
     game: `<div class="sect">GUIDE · 안내</div>${toggle('tips', '첫 플레이 안내', '처음 만나는 것마다 왼쪽 아래에 안내 카드')}
-      <button class="opt act" data-nav id="oTips"><span class="lbl">본 안내 처음부터 다시 보기<small>지금까지 ${tipsSeen.size}개를 봤습니다</small></span><span></span><span class="val">초기화</span></button>`,
+      <button class="opt act" data-nav id="oTips"><span class="lbl">본 안내 처음부터 다시 보기<small>지금까지 ${tipsSeen.size}개를 봤습니다</small></span><span></span><span class="val">초기화</span></button>
+      <div class="sect" style="margin-top:18px">LOOT · 전리품</div>${toggle('hideCommon', '바닥의 일반 등급 장비 숨기기', '하얀 이름의 무기·방어구는 바닥에 보이지 않고 줍지도 않음 (고급 이상·스킬 쉘·보석은 그대로)')}`,
     keys: keysHTML(),
   }[tab];
   screen(`<div class="center" style="position:absolute;inset:0"><div class="frm" style="width:min(${tab === 'keys' ? 1080 : 760}px,94vw)">
@@ -429,6 +430,8 @@ const GUIDE = [
   ['grow', '성장', 'pstra0', `레벨이 오를 때마다 <b>[K]</b> 성장 창에서 특성 1점 · 능력치 3점. 능력치(근력·민첩·기술·정신)는 스킬마다 다른 수치를 키운다.`],
   ['super', '고유 정예 · 금고', 'yskua0', `구역마다 이름 붙은 <b>고유 정예</b>가 부하와 함께 있다. 처치하면 금고 열쇠 — 금빛 금고 문 뒤의 보물함을 [F]로 연다.`],
   ['spot', '필드 사건', 'tlp2a0', `<b>보급 캐시</b>: 열면 보급품, 대신 적이 몰려온다. <b>조난 신호기</b>: 켜고 곁을 지키면 보상.`],
+  ['shrine', '신단', 'soula0', `필드 곳곳에 떠 있는 구체 (구역마다 ${SHRINE_PER}개까지) — [F]로 쓰면 ${SHRINES.power.t}초 동안 강해진다: ${Object.values(SHRINES).map(S => `<b>${S.name}</b>(${S.desc.replace(/^\d+초 동안 /, '')})`).join(' · ')}. 한 번에 하나만 걸린다.`],
+  ['trial', '시련의 방', 'icon_case_gold', `구역 ${TRIAL.from}부터 대부분의 구역에 하나씩. 가운데에 봉인된 보물함이 있고, 들어서면 입구가 <b>붉은 막</b>으로 잠긴 채 적 무리가 ${TRIAL.waves}번 몰려온다. 모두 처치하면 막이 걷히고 보물함이 열린다. 쓰러지면 다시 도전할 수 있다.`],
   ['assault', '거점 습격', 'icon_case_white', `구역 ${ASSAULT.from}부터 가끔, 보급 거점에 들어가면 경보가 울리고 몬스터 무리가 ${ASSAULT.waves}번 몰려와 <b>안전막</b>을 두드린다. 습격 중에는 거점 안에서도 싸울 수 있다.<br>모두 처치하면 골드·경험치·장비 — <b>안전막이 버티면 보상이 더 크다</b>. 막이 다 깎이면 꺼져서 적이 안으로 들어온다.`],
   ['boss', '구역 보스', 'cybra1', `구역마다 깊숙한 큰 방에 보스가 있다 (구역 3·6은 길목, 9는 코어). 패턴이 다 다르고 체력이 절반 밑이면 <b>격노</b>한다.`],
   ['thief', '보물 약탈자', 'sthfa1', `금빛 제복의 약탈자. 들키면 달아나다 몇 초 뒤 차원 틈으로 사라진다 — 맞을 때마다 골드를 흘리고, 잡으면 보물이 쏟아진다.`],
