@@ -2935,13 +2935,12 @@ function startEvent(type) {
     const pipes = [];
     for (let j = r.y; j < r.y + r.h; j++) for (let i = r.x; i < r.x + r.w; i++) if (tileAt(i, j) === T.PIPEX || tileAt(i, j) === T.PIPEY) pipes.push({ x: i + 0.5, y: j + 0.5 });
     const src = pipes.length ? pick(pipes) : randomFloorIn(r, 0.3);
-    Object.assign(h, { room: r, sx: src.x, sy: src.y, n: clamp(Math.round(r.w * r.h / 14), ...E.clouds), made: 0, next: 0, hiss: 0 });
-    msg('⚠ 독가스 누출 — 배관이 터졌다! 해독제(E)로 버티거나 이 방을 벗어나라', E.color);
-  } else { // 선체 파손: 가까운 벽이 뚫려 빨아들임
+    Object.assign(h, { room: r, sx: src.x, sy: src.y, n: clamp(Math.round(r.w * r.h / 14), ...E.clouds), made: 0, next: 0, hiss: 0 }); // 알림은 배관 위의 표지 (drawHazardLabels)
+    Snd.play('alarm');
+  } else { // 선체 파손: 가까운 벽이 뚫려 빨아들임 — 알림은 구멍 위의 표지
     const b = breachSpot();
     if (!b) return false;
     Object.assign(h, b, { wind: 0, hurtT: 0.5, jag: Array.from({ length: 11 }, () => rnd(0.75, 1.15)), stars: Array.from({ length: 7 }, () => [rnd(-0.6, 0.6), rnd(-0.6, 0.6)]) });
-    msg('⚠ 선체 파손 — 우주로 빨려 나간다! 구멍에서 멀어져라', E.color);
     Snd.play('explode', h.x, h.y); Snd.play('alarm'); shake = Math.max(shake, 12);
     flashes.push({ x: h.x, y: h.y, r: 520, t: 0.4, max: 0.4, col: '170,210,255' }); spark(h.x, h.y, 24, '#dde', 6);
   }
@@ -2976,11 +2975,10 @@ function tickEvent(h, dt) {
       const own = areas.filter(a => a.leak), far = q => Math.min(...own.map(a => Math.hypot(a.x - q.x, a.y - q.y)));
       let q = { x: h.sx, y: h.sy };
       if (h.made) for (let k = 0, best = -1; k < 10; k++) { const c = randomFloorIn(h.room, 0.3), f = far(c); if (f > best) { best = f; q = c; } }
-      areas.push({ type: 'gas', x: q.x, y: q.y, r: EVENTS.gas.r, t: h.t, max: h.max, leak: true });
+      areas.push({ type: 'gas', x: q.x, y: q.y, r: EVENTS.gas.r, t: h.t, max: h.max, leak: true, room: h.room }); // room: 안개를 그 방 바닥 안에서만 그림
       h.made++;
     }
-    if (Math.random() < dt * 8) smoke(h.sx, h.sy, 1, '120,200,60', 1.2); // 터진 배관에서 뿜어져 나옴
-    if (h.hiss <= 0) { h.hiss = 3; Snd.play('gas', h.sx, h.sy); }
+    if (h.hiss <= 0) { h.hiss = 3; Snd.play('gas', h.sx, h.sy); } // 터진 배관에서 솟는 가스 기둥은 drawGasFog
   } else if (h.type === 'breach') {
     const E = EVENTS.breach, p = player, gust = Math.min(1, (h.max - h.t) / 0.5); // 처음 0.5초 동안 세짐
     // 구멍 쪽으로 끌어당김 (가까울수록 셈, 회피 중에는 안 끌림), 큰 적·보스는 덜, 고정된 것(둥지·오버마인드)은 그대로
@@ -3012,8 +3010,39 @@ function tickEvent(h, dt) {
 }
 function endEvent(h) {
   if (h.type === 'blackout') { msg('비상 전원 복구 — 조명이 다시 들어온다', '#9f9'); Snd.play('unlock'); }
-  else if (h.type === 'gas') msg('배관이 차단되었다 — 독가스가 걷힌다', '#9f9');
-  else { msg('비상 격벽이 구멍을 막았다', '#9cf'); Snd.play('doorClose', h.x, h.y); spark(h.x, h.y, 12, '#ffd27a', 3); }
+  else if (h.type === 'gas') eventNotes.push({ x: h.sx, y: h.sy, z: 118, t: '배관 차단 — 독가스가 걷힌다', col: '#9f9', until: gtime + 3 });
+  else { eventNotes.push({ x: h.x, y: h.y, z: 86, t: '비상 격벽이 구멍을 막았다', col: '#9cf', until: gtime + 3 }); Snd.play('doorClose', h.x, h.y); spark(h.x, h.y, 12, '#ffd27a', 3); }
+}
+// 돌발 상황 표지 (화면 위 대신 그 자리에): 독가스는 터진 배관 위, 선체 파손은 구멍 위 — 이름 · 할 일 · 남은 시간 고리. 화면 밖이면 가장자리에 붙고 화살표로 가리킴
+let eventNotes = []; // 끝난 자리에 잠깐 남는 글 { x, y, z, t, col, until }
+function drawHazardLabels() {
+  const box = (wx, wy, z, title, sub, col, frac) => {
+    ctx.font = 'bold 14px sans-serif'; const w1 = ctx.measureText(title).width + (frac === undefined ? 0 : 26);
+    ctx.font = '11px sans-serif'; const w2 = sub ? ctx.measureText(sub).width : 0;
+    const w = Math.max(w1, w2) + 22, h = sub ? 40 : 24, ax = PX(wx, wy), ay = PY(wx, wy) - z + Math.sin(gtime * 3) * 3;
+    const off = ax < 0 || ax > W || ay - h < 0 || ay > VH; // 화면 밖: 가장자리로 (위쪽 목표·메시지, 아래 스킬 칸은 피해서)
+    const x = off ? clamp(ax, w / 2 + 14, W - w / 2 - 14) : ax, y = off ? clamp(ay, h + 170, VH - 96) : ay;
+    ctx.fillStyle = 'rgba(8,10,8,0.8)'; rr(x - w / 2, y - h, w, h, 5); ctx.fill();
+    ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.stroke(); ctx.lineWidth = 1;
+    ctx.fillStyle = col; ctx.beginPath(); // 아래 꼭지 (화면 밖이면 그쪽을 가리키는 화살표)
+    if (off) { const a = Math.atan2(ay - y, ax - x), cx = x + Math.cos(a) * (w / 2 + 8) * 0.9, cy = y - h / 2 + Math.sin(a) * (h / 2 + 10); ctx.moveTo(cx + Math.cos(a) * 9, cy + Math.sin(a) * 9); ctx.lineTo(cx + Math.cos(a + 2.4) * 7, cy + Math.sin(a + 2.4) * 7); ctx.lineTo(cx + Math.cos(a - 2.4) * 7, cy + Math.sin(a - 2.4) * 7); }
+    else { ctx.moveTo(x - 6, y); ctx.lineTo(x + 6, y); ctx.lineTo(x, y + 7); }
+    ctx.fill();
+    ctx.textAlign = 'center'; ctx.font = 'bold 14px sans-serif'; ctx.fillStyle = col; ctx.fillText(title, x - (frac === undefined ? 0 : 13), y - h + 18);
+    if (sub) { ctx.font = '11px sans-serif'; ctx.fillStyle = '#d8dccf'; ctx.fillText(sub, x, y - 8); }
+    if (frac !== undefined) { // 남은 시간 고리
+      const cx = x + w1 / 2 - 4, cy = y - h + 13;
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(cx, cy, 7, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = col; ctx.beginPath(); ctx.arc(cx, cy, 7, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac); ctx.stroke(); ctx.lineWidth = 1;
+    }
+  };
+  for (const h of hazards) {
+    if (h.type === 'blackout') continue;
+    const E = EVENTS[h.type], gas = h.type === 'gas', blink = h.t < 4 && Math.sin(gtime * 10) < 0;
+    box(gas ? h.sx : h.x, gas ? h.sy : h.y, gas ? 118 : 86, `⚠ ${E.name}`, gas ? '해독제 [8] · 이 방을 벗어나라' : '우주로 빨려 나간다 — 구멍에서 멀어져라', blink ? '#fff' : E.color, h.t / h.max);
+  }
+  eventNotes = eventNotes.filter(n => n.until > gtime);
+  for (const n of eventNotes) { ctx.globalAlpha = clamp(n.until - gtime, 0, 1); box(n.x, n.y, n.z, n.t, '', n.col); ctx.globalAlpha = 1; }
 }
 // 선체에 뚫린 구멍 (벽 면에 맞춰 기울인 들쭉날쭉한 검은 구멍 + 별 + 얼어붙은 테두리)
 function drawBreach(h) {
@@ -5271,7 +5300,7 @@ canvas.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.cli
 canvas.addEventListener('mousedown', e => {
   Snd.init();
   mouse.x = e.clientX; mouse.y = e.clientY;
-  if (state === 'intro') { introSkip(); return; }
+  if (state === 'intro') { if (e.button === 0) mouse.down = true; return; } // 컷신: 누르고 있으면 건너뜀 (introTick)
   if (state === 'trade') { tradeMouseDown(e.button); return; }
   if (state === 'play' && invOpen && invMouseDown(e.button)) return;
   if (state === 'play' && codexOpen && codexMouseDown(e.button)) return;
@@ -5288,7 +5317,7 @@ canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('wheel', e => { if (state === 'play') cycleWeapon(Math.sign(e.deltaY || e.deltaX)); }, { passive: true });
 
 function onKey(code) {
-  if (state === 'intro') { introSkip(); return; }
+  if (state === 'intro') return; // 컷신: 누르고 있으면 건너뜀 (introTick)
   if (code === 'Escape') {
     if (state === 'play' && codexOpen) codexOpen = false;
     else if (state === 'play' && perkOpen) perkOpen = false;
@@ -5891,7 +5920,6 @@ function updateProjectiles(dt) {
       else { e.burn = Math.max(e.burn, 2); hitEnemy(e, 16 * dt, 0, 0, true); }
     }
     if (!a.safe && Math.hypot(p.x - a.x, p.y - a.y) < a.r) afflict(a.type === 'gas' ? 'poison' : 'burn', a.type === 'gas' ? 3 : 1.5); // safe: 내 스킬·맹독 살포기의 장판은 무해
-    if (a.type === 'gas' && Math.random() < dt * 14) { const ang = rnd(0, 6.28), rr = rnd(0, a.r); smoke(a.x + Math.cos(ang) * rr, a.y + Math.sin(ang) * rr, 1, '110,190,50', 0.3); }
     if (a.type === 'fire' && Math.random() < dt * 30) { const ang = rnd(0, 6.28), rr = rnd(0, a.r); fireBurst(a.x + Math.cos(ang) * rr, a.y + Math.sin(ang) * rr, 1, 0.4); }
   }
   areas = areas.filter(a => a.t > 0);
@@ -6647,18 +6675,85 @@ function drawFx(f) {
   ctx.globalAlpha = 1;
 }
 function drawArea(a) {
-  const f = Math.min(1, a.t / 1.5), c = a.type === 'gas' ? '110,200,50' : '255,110,30';
+  if (a.type === 'gas') return; // 독가스는 drawGasFog (바닥을 기는 안개)
+  const f = Math.min(1, a.t / 1.5), c = '255,110,30';
   const g = ctx.createRadialGradient(PX(a.x, a.y), PY(a.x, a.y), 0, PX(a.x, a.y), PY(a.x, a.y), a.r * 45);
   g.addColorStop(0, `rgba(${c},${0.4 * f})`); g.addColorStop(1, `rgba(${c},0)`);
   ctx.fillStyle = g; isoEllipse(a.x, a.y, a.r); ctx.fill();
   if (!a.seeds) a.seeds = Array.from({ length: 6 }, () => [rnd(-0.7, 0.7) * a.r, rnd(-0.7, 0.7) * a.r, rnd(0, 10)]);
-  ctx.globalAlpha = a.type === 'fire' ? f : 0.45 * f;
-  for (const [ox, oy, ph] of a.seeds) {
-    const x = PX(a.x + ox, a.y + oy), y = PY(a.x + ox, a.y + oy);
-    if (a.type === 'fire') drawSprite('fire', 'abcdefgh'[Math.floor(gtime * 12 + ph) % 8], x, y, 0, 0.55);
-    else drawSprite('tfog', 'efghij'[Math.floor(gtime * 8 + ph) % 6], x, y, 0, 0.9);
-  }
+  ctx.globalAlpha = f;
+  for (const [ox, oy, ph] of a.seeds) drawSprite('fire', 'abcdefgh'[Math.floor(gtime * 12 + ph) % 8], PX(a.x + ox, a.y + oy), PY(a.x + ox, a.y + oy), 0, 0.55);
   ctx.globalAlpha = 1;
+}
+// --- 독가스: 바닥을 기는 안개 — 이음매 없는 노이즈 무늬(가스 결)를 바닥 시점으로 눕혀 흘려보내고, 구름마다 가장자리가 옅은 덩어리 모양으로 오려 냄 ---
+// top=false: 바닥 (진하게, 캐릭터 아래), top=true: 캐릭터 발목까지 덮는 옅은 겹 (다른 방향으로 흐름). 누출 가스는 그 방 바닥 안에서만
+let gasPat = null, gasC = null, gctx = null;
+function gasPattern() {
+  if (gasPat) return gasPat;
+  const N = 128, c = document.createElement('canvas'), v = new Float32Array(N * N);
+  c.width = c.height = N;
+  for (let o = 0, f = 4, a = 0.55; o < 4; o++, f *= 2, a *= 0.5) { // 값 노이즈 네 겹 (격자가 이어져서 바둑판처럼 붙여도 이음매 없음)
+    const grid = Array.from({ length: f * f }, () => Math.random()), at = (i, j) => grid[(j % f) * f + (i % f)];
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const gx = x / N * f, gy = y / N * f, i = Math.floor(gx), j = Math.floor(gy), u = gx - i, w = gy - j, su = u * u * (3 - 2 * u), sw = w * w * (3 - 2 * w);
+      v[y * N + x] += a * ((at(i, j) * (1 - su) + at(i + 1, j) * su) * (1 - sw) + (at(i, j + 1) * (1 - su) + at(i + 1, j + 1) * su) * sw);
+    }
+  }
+  const g = c.getContext('2d'), img = g.createImageData(N, N);
+  for (let k = 0; k < N * N; k++) { // 옅은 곳은 투명, 진할수록 어두운 올리브 → 밝은 황록 (부피감)
+    const t = clamp((v[k] / 1.03 - 0.28) / 0.5, 0, 1), s = t * t * (3 - 2 * t);
+    img.data.set([60 + 140 * s, 105 + 135 * s, 20 + 90 * s, 255 * Math.min(1, s * 1.3)], k * 4);
+  }
+  g.putImageData(img, 0, 0);
+  return gasPat = ctx.createPattern(c, 'repeat');
+}
+const gasDensity = a => Math.min(1, a.t / 1.5, a.max ? (a.max - a.t) / 1.2 : 1); // 나타날 때·걷힐 때 옅게
+function drawGasFog(top) {
+  const G = areas.filter(a => a.type === 'gas' && Math.abs(PX(a.x, a.y) - W / 2) < W / 2 + a.r * 50 && Math.abs(PY(a.x, a.y) - VH / 2) < VH / 2 + a.r * 30);
+  const plumes = top ? hazards.filter(h => h.type === 'gas') : [];
+  if (!G.length && !plumes.length) return;
+  if (!gasC) { gasC = document.createElement('canvas'); gctx = gasC.getContext('2d'); }
+  if (gasC.width !== W || gasC.height !== VH) { gasC.width = W; gasC.height = VH; }
+  const lift = top ? 10 : 0, P = gasPattern();
+  const blobs = (col, k = 1) => { // 구름마다 부드러운 덩어리 (조금씩 부풀었다 줄었다), k: 진하기
+    for (const a of G) {
+      const f = gasDensity(a) * k, R = a.r * 45.25 * (top ? 0.85 : 1) * (1 + 0.05 * Math.sin(gtime * 0.8 + a.x * 3));
+      gctx.save();
+      if (a.room) { const r = a.room; gctx.beginPath(); for (const [x, y] of [[r.x, r.y], [r.x + r.w, r.y], [r.x + r.w, r.y + r.h], [r.x, r.y + r.h]]) gctx.lineTo(PX(x, y), PY(x, y) - lift); gctx.clip(); }
+      gctx.translate(PX(a.x, a.y), PY(a.x, a.y) - lift); gctx.scale(1, 0.5);
+      const g = gctx.createRadialGradient(0, 0, 0, 0, 0, R);
+      g.addColorStop(0, `rgba(${col},${f})`); g.addColorStop(0.55, `rgba(${col},${0.7 * f})`); g.addColorStop(1, `rgba(${col},0)`);
+      gctx.fillStyle = g; gctx.fillRect(-R, -R, 2 * R, 2 * R);
+      gctx.restore();
+    }
+  };
+  gctx.globalCompositeOperation = 'source-over'; gctx.clearRect(0, 0, W, VH);
+  blobs('0,0,0');
+  gctx.globalCompositeOperation = 'source-in'; // 덩어리 모양 안에만 가스 결
+  const [dx, dy] = top ? [-gtime * 11, gtime * 15] : [gtime * 17, gtime * 6];
+  P.setTransform(new DOMMatrix([0.5, 0.25, -0.5, 0.25, W / 2 - cam.x + shx, VH / 2 - cam.y + shy - lift]).scale(top ? 1.5 : 2.2).translate(dx, dy));
+  gctx.fillStyle = P; gctx.fillRect(0, 0, W, VH);
+  gctx.globalCompositeOperation = 'destination-over'; // 결 사이도 아주 옅게 차 있음
+  blobs(top ? '90,140,30' : '70,120,25', 0.3);
+  ctx.globalAlpha = top ? 0.5 : 0.95; ctx.drawImage(gasC, 0, 0); ctx.globalAlpha = 1;
+  for (const h of plumes) { // 터진 배관에서 솟구치는 가스 기둥 (결이 위로 빠르게 흐름)
+    const x = PX(h.sx, h.sy), y = PY(h.sx, h.sy) - 4, f = gasDensity(h), sway = Math.sin(gtime * 2.3) * 4;
+    gctx.globalCompositeOperation = 'source-over'; gctx.clearRect(x - 60, y - 140, 120, 150);
+    const plume = (col, k) => {
+      gctx.save(); gctx.translate(x + sway, y - 50); gctx.scale(0.45, 1);
+      const g = gctx.createRadialGradient(0, 0, 0, 0, 0, 58);
+      g.addColorStop(0, `rgba(${col},${k * f})`); g.addColorStop(1, `rgba(${col},0)`);
+      gctx.fillStyle = g; gctx.fillRect(-58, -58, 116, 116); gctx.restore();
+    };
+    plume('0,0,0', 1);
+    gctx.globalCompositeOperation = 'source-in';
+    P.setTransform(new DOMMatrix([1, 0, 0, 1, x, y - gtime * 80]).scale(0.9));
+    gctx.fillStyle = P; gctx.fillRect(x - 60, y - 140, 120, 150);
+    gctx.globalCompositeOperation = 'destination-over'; plume('130,190,55', 0.6);
+    ctx.drawImage(gasC, x - 60, y - 140, 120, 150, x - 60, y - 140, 120, 150);
+    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.35; ctx.drawImage(gasC, x - 60, y - 140, 120, 150, x - 60, y - 140, 120, 150); // 뿜어져 나오는 가운데는 밝게
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+  }
 }
 
 // ===== 무기 아이콘 / 툴팁 =====
@@ -6955,6 +7050,7 @@ function render() {
   ctx.globalAlpha = 1;
   for (const c of corpses) drawCorpse(c);
   for (const a of areas) drawArea(a);
+  drawGasFog(false);
   drawMissionFloor();
   drawMines();
   // 벽 윗면 텍스처를 카메라에 맞춤
@@ -6993,6 +7089,7 @@ function render() {
   for (const h of hubs) for (const b of h.edges) list.push({ d: b.d, f: drawBarrier, a: [b] });
   list.sort((a, b) => a.d - b.d);
   for (const o of list) o.f(...o.a);
+  drawGasFog(true); // 캐릭터 발목까지 덮는 독가스 겹
 
   // 수류탄
   for (const g of grenades) {
@@ -7090,7 +7187,7 @@ function render() {
     ctx.fillStyle = staminaCol(); ctx.fillRect(bx, by, bw * p.stamina / staminaMax(), bh);
     ctx.globalAlpha = 1;
   }
-  if (!scene && !cine) { drawLootLabels(); drawEliteLabels(); drawTerminalLabels(); drawMissionLabels(); }
+  if (!scene && !cine) { drawLootLabels(); drawEliteLabels(); drawTerminalLabels(); drawMissionLabels(); drawHazardLabels(); }
 
   // 떠오르는 숫자
   ctx.textAlign = 'center'; ctx.font = 'bold 13px sans-serif';
@@ -7536,7 +7633,7 @@ function drawTopInfo() {
   if (!trade) msgs.forEach((m, k) => { ctx.globalAlpha = clamp(m.life, 0, 1); ctx.fillStyle = '#000'; ctx.fillText(m.t, 17, top + 1 + k * 20); ctx.fillStyle = m.col; ctx.fillText(m.t, 16, top + k * 20); });
   ctx.globalAlpha = 1;
   // 상태이상 칩
-  const f = player.fx, chips = hazards.map(h => ['⚠ ' + EVENTS[h.type].name, h.t, EVENTS[h.type].color]); // 돌발 상황 남은 시간 먼저
+  const f = player.fx, chips = hazards.filter(h => h.type === 'blackout').map(h => ['⚠ ' + EVENTS[h.type].name, h.t, EVENTS[h.type].color]); // 정전 남은 시간 먼저 (독가스·선체 파손은 그 자리에 표지 — drawHazardLabels)
   if (!inBase && inHub()) chips.unshift(['안전 지대', null, '#7fd8ff']); // 보급 거점 안 (시간 없음)
   if (f.poison > 0) chips.push(['중독', f.poison, '#9e4']);
   if (f.burn > 0) chips.push(['화상', f.burn, '#f83']);
@@ -7908,7 +8005,7 @@ function resetWorld() {
   escape = null; hurtDirs = []; hitFlash = 0; hitStop = 0; crateHp = new Map(); crateHitT = new Map();
   enemies = []; bullets = []; eshots = []; grenades = []; areas = []; parts = []; decals = []; pickups = []; barrels = [];
   texts = []; flashes = []; beams = []; corpses = []; fxs = [];
-  mission = PURGE; hackM = null; armoryOn = null; survivors = []; hazards = []; eventClock = 0; nextEvent = 0; lastEvent = null; beaconOn = null;
+  mission = PURGE; hackM = null; armoryOn = null; survivors = []; hazards = []; eventNotes = []; eventClock = 0; nextEvent = 0; lastEvent = null; beaconOn = null;
   turrets = []; mines = []; rings = []; drones = []; coils = []; wells = []; pillars = []; waves = []; decoys = []; delayed = [];
   if (player) { player.scd = {}; player.sk = {}; player.inv = 0; } // 스킬 대기시간·지속 효과는 장소를 옮길 때마다 처음부터
 }
@@ -7961,8 +8058,8 @@ function drawEnding() {
   ctx.globalAlpha = 1;
 }
 // ===== 오프닝 컷신 (INTRO, 새 작전): 착륙 지점 거점의 위·왼쪽 벽(되도록 우주에 맞닿은 바깥벽)을 폭파하고 해병이 걸어 들어와 포효 =====
-// 실제 필드 그대로 (위아래 검은 띠, HUD 없음, 타이틀처럼 조명만) — 가까이 장면만 정면 그림을 크게. 아무 키·클릭이면 건너뜀
-let intro = null; // { t, s: 구멍 자리, dir, sx·sy → ex·ey: 걸어 들어오는 길, hole, white, typed, step, msgs, done }
+// 실제 필드 그대로 (위아래 검은 띠, HUD 없음, 타이틀처럼 조명만) — 가까이 장면만 정면 그림을 크게. 클릭·키를 누르고 있으면 건너뜀
+let intro = null; // { t, s: 구멍 자리, dir, sx·sy → ex·ey: 걸어 들어오는 길, hole, white, typed, step, hold: 누르고 있은 시간, msgs, done }
 function introSpot() {
   const r = hubs[0] && hubs[0].room, cand = [];
   if (!r) return null;
@@ -7981,7 +8078,7 @@ function startIntro(done) {
   const s = introSpot();
   if (!s) { done(); return; }
   const p = player, dir = Math.atan2(s.dj, s.di), ex = s.x + s.di * 2.7, ey = s.y + s.dj * 2.7;
-  intro = { t: 0, s, dir, sx: s.x + s.di * 0.3, sy: s.y + s.dj * 0.3, ex, ey, hole: null, white: 0, typed: 0, step: 0, msgs, done };
+  intro = { t: 0, s, dir, sx: s.x + s.di * 0.3, sy: s.y + s.dj * 0.3, ex, ey, hole: null, white: 0, typed: 0, step: 0, hold: 0, msgs, done };
   msgs = []; state = 'intro'; vis = null; mouse.down = mouse.pressed = false; Music.stop(0.8);
   placePlayer(ex, ey); p.x = intro.sx; p.y = intro.sy; p.aim = p.look = dir;
   for (const [a, b] of [[1.5, 0.5], [-1.8, -0.3]]) { // 먼저 당한 경비병 둘과 핏자국
@@ -7993,6 +8090,9 @@ function startIntro(done) {
 function introTick(dt) {
   const I = INTRO, it = intro, p = player, s = it.s, t0 = it.t;
   gtime += dt; it.t += dt;
+  const held = it.t > 0.6 && (mouse.down || Object.values(keys).some(Boolean)); // 건너뛰기: 누르고 있는 동안 차오름 (시작할 때 누르고 있던 키는 무시)
+  it.hold = held ? it.hold + dt : Math.max(0, it.hold - dt * 3);
+  if (it.hold >= I.hold) { introEnd(); return; }
   const at = x => t0 < x && it.t >= x; // 이번 프레임에 지난 시각
   const n = Math.floor((it.t - 0.5) * 16); // 장소 자막을 치는 소리
   if (n > it.typed && n <= I.place.length + I.sub.length) { it.typed = n; Snd.play('uiMove'); }
@@ -8045,7 +8145,6 @@ function introSeal() {
   Snd.play('doorClose', h.x, h.y); spark(h.x, h.y, 16, '#ffd27a', 3);
   flashes.push({ x: h.x, y: h.y, r: 200, t: 0.25, max: 0.25, col: '150,200,255' });
 }
-const introSkip = () => { if (intro && intro.t > 0.6) introEnd(); }; // 시작할 때 누르고 있던 키는 무시
 function introEnd() {
   const it = intro, p = player;
   intro = null;
@@ -8089,7 +8188,14 @@ function drawIntro() {
     ctx.globalAlpha = 1;
   }
   if (t < 1.2) { ctx.fillStyle = `rgba(0,0,0,${1 - t / 1.2})`; ctx.fillRect(0, 0, W, H); }
-  if (bh > bar * 0.5) { ctx.globalAlpha = 0.55; ctx.textAlign = 'right'; ctx.font = `12px ${ui}`; ctx.fillStyle = '#9a968c'; ctx.fillText('아무 키나 누르면 건너뜀 ▸', W - 24, H - bh / 2 + 4); ctx.globalAlpha = 1; }
+  if (bh > bar * 0.5) { // 건너뛰기 안내: 누르고 있으면 둥근 게이지가 참
+    const k = Math.min(1, it.hold / I.hold), x = W - 32, y = H - bh / 2;
+    ctx.globalAlpha = k > 0 ? 0.95 : 0.55; ctx.textAlign = 'right'; ctx.font = `12px ${ui}`; ctx.fillStyle = k > 0 ? '#f2ede4' : '#9a968c';
+    ctx.fillText('클릭·키를 누르고 있으면 건너뜀', x - 16, y + 4);
+    ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI * 2); ctx.stroke();
+    if (k > 0) { ctx.lineWidth = 3; ctx.strokeStyle = '#ff9a3c'; ctx.beginPath(); ctx.arc(x, y, 8, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
   ctx.restore();
 }
 // 가까이: 어둡게 덮고 붉은 역광 앞에 해병의 정면 그림을 크게 — 포효할 때 집중선과 흔들림, 하늘에 한 발 (총구 섬광 그림), 옆에 대사
