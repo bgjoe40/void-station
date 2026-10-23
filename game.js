@@ -82,8 +82,9 @@ const ENEMY_STEP = { titan: ['stepBig', 0.55, 16], hivemother: ['stepMetal', 0.5
   crusher: ['stepHeavy', 0.45, 14], plaguegiant: ['stepBig', 0.9, 14], executioner: ['stepMetal', 0.5, 12] };
 // 몬스터별 소리: 발견, 사망, 피격, 공격, idle: 아직 플레이어를 모를 때 멀리서 들리는 기척 (Doom의 'active' 소리)
 const ENEMY_SFX = {
-  crawler: { sight: 'dsbspsit', death: 'dsbspdth', pain: 'dsdmpain', attack: 'dssgtatk', idle: 'dsbspact' },
-  runner:  { sight: 'dsbspsit', death: 'dsbspdth', pain: 'dsdmpain', attack: 'dssgtatk', idle: 'dsbspact' },
+  // 크롤러는 떼로 와서 소리가 겹치므로 작고 짧은 소리로, 조금 높게 (vol: 크기 배율, rate: 재생 속도 — 작은 몸집)
+  crawler: { sight: 'dsbgact', death: 'dsslop', pain: 'dspopain', attack: 'dsclaw', idle: 'dsposact', vol: 0.55, rate: 1.25 },
+  runner:  { sight: 'dsbgact', death: 'dsslop', pain: 'dspopain', attack: 'dsclaw', idle: 'dsposact', vol: 0.55, rate: 1.4 },
   xenoid:  { sight: ['dsbgsit1', 'dsbgsit2'], death: ['dsbgdth1', 'dsbgdth2'], pain: 'dspopain', attack: 'dsclaw', idle: 'dsbgact' },
   spitter: { sight: 'dsskesit', death: 'dsskedth', pain: 'dspopain', attack: 'dsskeatk', idle: 'dsskeact' },
   sparker: { sight: 'dscacsit', death: 'dscacdth', pain: 'dsdmpain', attack: 'dsplasma', idle: 'dsdmact' },
@@ -218,8 +219,11 @@ const Snd = {
   },
   // 몬스터 소리: kind = sight | death | pain | attack (같은 종류는 잠시 겹치지 않게)
   mon(e, kind) {
-    const s = ENEMY_SFX[e.type][kind];
-    if (this.ctx && this.ready(e.type + kind, kind === 'death' ? 0.05 : 0.4)) this.sample(s, kind === 'death' ? 0.9 : 0.7, 1, e.x, e.y);
+    if (this.ctx && this.ready(e.type + kind, kind === 'death' ? 0.05 : 0.4)) this.monPlay(e.type, kind, e.x, e.y);
+  },
+  monPlay(type, kind, x, y) { // 몬스터 소리 한 번 — 종류별 크기·높낮이 (ENEMY_SFX의 vol·rate, 디버그 뷰어도 씀)
+    const S = ENEMY_SFX[type];
+    this.sample(S[kind], (kind === 'death' ? 0.9 : 0.7) * (S.vol || 1), S.rate || 1, x, y);
   },
 };
 
@@ -5992,7 +5996,7 @@ function ambientTick(dt) {
   ambT = rnd(...AMBIENCE.gap);
   const p = player, [lo, hi] = AMBIENCE.far;
   const cand = enemies.filter(e => { const d = Math.hypot(e.x - p.x, e.y - p.y); return !e.aggro && !e.dead && ENEMY_SFX[e.type].idle && d > lo && d < hi; });
-  if (cand.length && Math.random() < 0.6) { const e = pick(cand); Snd.sample(ENEMY_SFX[e.type].idle, 0.9, rnd(0.85, 1.05), e.x, e.y, Snd.amb); return; }
+  if (cand.length && Math.random() < 0.6) { const e = pick(cand), S = ENEMY_SFX[e.type]; Snd.sample(S.idle, 0.9 * (S.vol || 1), rnd(0.85, 1.05) * (S.rate || 1), e.x, e.y, Snd.amb); return; } // 종류별 크기·높낮이
   const [n, v, r] = pick(AMBIENCE.noises), a = rnd(0, 6.28), d = rnd(6, 14);
   Snd.sample(n, v, r * rnd(0.9, 1.1), p.x + Math.cos(a) * d, p.y + Math.sin(a) * d, Snd.amb);
 }

@@ -140,7 +140,7 @@ function dbgWire(it) {
   on('dRotR', () => { dbg.spin = false; dbg.rot = (dbg.rot + 1) % 8; re(); }, 'uiMove');
   on('dSpin', () => { dbg.spin = !dbg.spin; re(); }, 'uiMove');
   on('dSpeed', () => { dbg.speed = dbg.speed === 1 ? 0.5 : dbg.speed === 0.5 ? 0.25 : dbg.speed === 0.25 ? 2 : 1; re(); }, 'uiMove');
-  if (it.mon) for (const [k] of MON_SND) on('ds_' + k, () => dbgRaw(it.mon[k]), null);
+  if (it.mon) for (const [k] of MON_SND) on('ds_' + k, () => { Snd.init(); Snd.monPlay(it.id, k); }, null); // 게임과 같은 크기·높낮이
   if (it.snd) it.snd.forEach(([, k], n) => on('ds_' + n, () => dbgSfx(k), null));
   on('dFire', () => dbgAttack(it.w), null);
   on('dAuto', () => { dbg.auto = !dbg.auto; if (!dbg.auto) dbg.sawT = 0; re(); }, 'uiMove');
