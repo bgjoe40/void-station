@@ -134,6 +134,32 @@ ICONS = {
     'chainsaw':      ('melee_0.png',      (87, 56, 134, 62), 'chain'),    # 마체테 칼날 -> 사슬 톱날 + 검은 서류가방(misc_3) -> 주황 엔진
     'baton':         ('melee_0.png',      (71, 74, 135, 80), 'shock'),    # 진압봉 끝에 전극 두 갈래와 불꽃
     'pblade':        ('melee_0.png',      (70, 11, 165, 21), 'plasma'),   # 카타나 칼날을 푸른 플라즈마로, 붉은 손잡이는 금속으로
+    # 새 무기: 시트에서 아직 안 쓴 모양 + 색만 다른 그림 (청록 무늬 = 아크·감전, 자홍 무늬 = 헬파이어·화염, 얼룩 = 위장)
+    'bat':           ('melee_0.png',      (4, 4, 14, 68), 'rot'),
+    'wrench':        ('melee_0.png',      (20, 10, 33, 62), 'rot'),
+    'axe':           ('melee_0.png',      (36, 9, 64, 58), 'rot'),
+    'knuckles':      ('melee_0.png',      (42, 67, 64, 83), None),
+    'crowbar':       ('melee_0.png',      (71, 32, 135, 50), None),
+    'machete':       ('melee_0.png',      (71, 56, 134, 64), None),
+    'heavypistol':   ('pistols.png',      (3, 2, 35, 29), None),
+    'compact':       ('pistols.png',      (3, 70, 35, 92), None),
+    'taser':         ('pistols.png',      (111, 3, 143, 26), None),
+    'arcrevolver':   ('pistols.png',      (147, 35, 179, 59), None),
+    'mp5':           ('machine_guns.png', (136, 5, 200, 37), None),
+    'p90':           ('machine_guns.png', (111, 104, 175, 132), None),
+    'arccarbine':    ('machine_guns.png', (5, 103, 102, 134), None),
+    'combatpump':    ('shotguns_3.png',   (104, 59, 195, 85), None),
+    'dragon':        ('shotguns_3.png',   (8, 92, 96, 121), None),
+    'arcpump':       ('shotguns_3.png',   (103, 86, 195, 112), None),
+    'arcsniper':     ('sniper_0.png',     (2, 2, 128, 27), None),
+    'camolmg':       ('military.png',     (105, 3, 201, 35), None),
+    'railgun':       ('military.png',     (4, 35, 100, 67), None),
+    'hellhmg':       ('military.png',     (4, 67, 100, 99), None),
+    'homingrl':      ('military.png',     (106, 38, 191, 65), None),
+    'rpg':           ('military.png',     (106, 65, 191, 92), None),
+    'neonpistol':    ('neonpunk.png',     (5, 2, 36, 24), None),
+    'neonblaster':   ('neonpunk.png',     (45, 3, 125, 31), None),
+    'neonshotgun':   ('neonpunk.png',     (43, 61, 139, 87), None),
     'revolver':      ('pistols.png',      (147, 3, 179, 27), None),
     'autopistol':    ('pistols.png',      (3, 36, 35, 62), None),
     'machinepistol': ('machine_guns.png', (4, 38, 68, 70), None),
@@ -166,6 +192,44 @@ ICONS = {
     'case_white':    ('misc_3.png',       (60, 5, 92, 30), None),
     'case_gold':     ('misc_3.png',       (60, 38, 92, 62), ('tint', (3.2, 2.5, 1.1))),
 }
+# 무기 파츠 그림 (knekko 무기에서 부품만 잘라 씀): 이름 -> (파일, (x0, y0, x1, y1), 후처리, 붙는 칸)
+# 게임은 무기 그림의 붙는 자리(META.anchors)에 파츠 그림의 붙는 점(프레임의 ox·oy, ATTACH_PIVOT)을 맞춰 겹쳐 그림
+ATTACH_ART = {
+    'suppressor': ('melee_0.png',      (118, 74, 135, 80), None, 'muzzle'),        # 진압봉 끝 마디 (홈이 팬 원통)
+    'brake':      ('machine_guns.png', (85, 142, 101, 146), None, 'muzzle'),       # M4 총구 소염기
+    'longbarrel': ('sniper_0.png',     (96, 37, 128, 41), None, 'muzzle'),         # 저격소총 총열 끝
+    'choke':      ('shotguns_3.png',   (186, 5, 195, 11), None, 'muzzle'),         # 펌프 샷건 총구
+    'reddot':     ('pistols.png',      (19, 2, 29, 6), 'lens', 'sight'),           # 권총 위 소형 조준기 + 붉은 점
+    'holo':       ('machine_guns.png', (145, 104, 168, 113), None, 'sight'),       # P90 일체형 광학 조준기
+    'scope':      ('sniper_0.png',     (31, 29, 64, 37), None, 'sight'),           # 저격소총 스코프
+    'thermal':    ('sniper_0.png',     (31, 29, 64, 37), ('tint', (0.75, 1.5, 0.85)), 'sight'),  # 스코프를 초록빛으로 (열상)
+    'extmag':     ('machine_guns.png', (47, 153, 56, 167), None, 'mag'),           # M4 탄창
+    'drum':       ('military.png',     (13, 13, 29, 27), None, 'mag'),             # 중기관총 상자 탄창
+    'quickmag':   ('machine_guns.png', (176, 21, 188, 37), None, 'mag'),           # MP5 곡선 탄창
+    'apmag':      ('machine_guns.png', (47, 153, 56, 167), ('band', (255, 210, 60)), 'mag'),   # M4 탄창 + 노란 띠 (철갑탄)
+    'incmag':     ('machine_guns.png', (47, 153, 56, 167), ('band', (255, 80, 40)), 'mag'),    # M4 탄창 + 붉은 띠 (소이탄)
+    'lightstock': ('machine_guns.png', (5, 140, 27, 156), None, 'stock'),          # M4 접이식 개머리판
+    'heavystock': ('sniper_0.png',     (2, 39, 21, 53), None, 'stock'),            # 저격소총 개머리판
+    'vgrip':      ('machine_guns.png', (186, 15, 192, 25), None, 'under'),         # MP5 수직 손잡이
+    'laser':      ('pistols.png',      (130, 5, 143, 11), 'laser', 'under'),       # 테이저 카트리지를 쇳빛으로 + 붉은 렌즈
+    # 근접 무기
+    'serrated':   ('melee_0.png',      (120, 56, 134, 62), 'teeth', 'edge'),       # 마체테 칼끝에 톱니
+    'weight':     ('melee_0.png',      (150, 37, 162, 44), None, 'edge'),          # 슬레지해머 머리 한 토막
+    'mono':       ('melee_0.png',      (146, 11, 165, 17), 'mono', 'edge'),        # 카타나 칼끝을 푸른빛으로
+    'wrap':       ('melee_0.png',      (4, 76, 13, 80), ('tint', (1.6, 1.1, 0.7)), 'grip'),   # 총검 손잡이를 가죽색으로
+    'absorb':     ('melee_0.png',      (71, 74, 83, 80), None, 'grip'),            # 진압봉 손잡이 홈
+    'shockmod':   ('pistols.png',      (133, 6, 142, 13), None, 'module'),         # 테이저 카트리지 앞쪽
+    'firemod':    ('pistols.png',      (133, 6, 142, 13), ('hue', 0.88), 'module'),
+    'cryomod':    ('pistols.png',      (133, 6, 142, 13), ('hue', 0.4), 'module'),
+}
+# 파츠 그림의 붙는 점: 칸 -> (가로, 세로) 비율 (0 왼쪽·위, 1 오른쪽·아래)
+ATTACH_PIVOT = {'muzzle': (0, 0.5), 'sight': (0.5, 1), 'mag': (0.5, 0), 'under': (0.5, 0), 'stock': (1, 0.5),
+                'grip': (1, 0.5), 'module': (0.5, 0.5), 'edge': (0.5, 0.5)}
+# 무기 그림의 붙는 자리를 직접 정함 (자동으로 찾은 자리가 어색한 무기): 무기 -> {칸: (x, y)}
+# M4·MP5는 원래 탄창 자리, 중기관총(뒤쪽 상자 탄창)·로켓은 탄창 자리, 저격소총은 원래 스코프를 덮게
+ANCHOR_FIX = {'assault': {'mag': (46, 19)}, 'arccarbine': {'mag': (46, 19)}, 'mp5': {'mag': (46, 16), 'under': (53, 10)},
+              'mg': {'mag': (17, 10)}, 'camolmg': {'mag': (17, 10)}, 'hellhmg': {'mag': (17, 10)}, 'railgun': {'mag': (17, 10)},
+              'marksman': {'sight': (45, 8)}, 'arcsniper': {'sight': (45, 8)}, 'rpg': {'mag': (62, 15)}, 'homingrl': {'mag': (62, 15)}}
 # 보석 아이콘: MELLE의 보석 5색 (zip 안의 32x32) — 이름 -> (파일, 후처리). 사파이어는 루비의 사각 컷을 파랗게, 다이아몬드는 하늘색 컷을 무채색으로
 GEM_ZIP = 'gem-melle_0.zip'
 GEM_ICONS = {
@@ -200,6 +264,8 @@ README = """# assets/ — 그래픽 출처와 라이선스
   2연발은 펌프 손잡이를 총열색으로 칠함, 수류탄 일부는 색조를 바꿈 (출처 표기는 필수 아님)
   (체인톱은 마체테 칼날에 사슬 무늬를 넣고 검은 서류가방을 주황 엔진으로 칠해 붙임, 방전 진압봉은 진압봉 끝에 전극과 불꽃을 그려 넣음,
   플라즈마 블레이드는 카타나 칼날을 푸른빛으로·손잡이를 금속색으로 칠함)
+  (무기 파츠 그림은 시트의 무기에서 부품만 잘라 씀 — 스코프·총열·개머리판은 저격소총, 탄창·소염기·접이식 개머리판은 M4, 곡선 탄창·앞손잡이는 MP5,
+  상자 탄창은 중기관총, 광학 조준기는 P90, 소음기는 진압봉 끝, 모듈·레이저는 테이저 카트리지(색을 바꿈), 근접 파츠는 마체테·해머·카타나·총검·진압봉에서)
   (소드오프 아이콘은 Freedoom의 2연발 샷건 스프라이트, 칼날 부채 스킬 그림은 총검 세 자루를 부채꼴로 겹침)
 
 ## MELLE 보석 아이콘 — CC0 (퍼블릭 도메인)
@@ -498,6 +564,106 @@ def make_icon(name, spec):
     return trim(im)
 
 
+def attach_icon(spec):
+    """파츠 그림 하나 (ATTACH_ART) -> (그림, 붙는 점 (x, y))"""
+    fn, box, post, slot = spec
+    im = trim(Image.open(fetch(OGA + fn, 'knekko_' + fn)).convert('RGBA').crop(box))
+    w, h = im.size
+    px = im.load()
+    if post == 'lens':                      # 조준기 가운데 붉은 점
+        px[w // 2, 1] = (255, 50, 40, 255)
+    elif post == 'laser':                   # 노란 카트리지 -> 쇳빛, 앞쪽에 붉은 렌즈
+        for y in range(h):
+            for x in range(w):
+                r, g, b, a = px[x, y]
+                if a and r > 150 and g > 150 and b < 100:
+                    px[x, y] = (96, 100, 108, a) if (x + y) % 3 else (70, 74, 82, a)
+        px[w - 2, h // 2] = (255, 40, 40, 255)
+    elif post == 'teeth':                   # 위쪽 테두리에 2칸마다 톱니
+        t = Image.new('RGBA', (w, h + 1), (0, 0, 0, 0))
+        t.paste(im, (0, 1))
+        tp = t.load()
+        for x in range(1, w - 1, 2):
+            if tp[x, 1][3]:
+                tp[x, 0] = (200, 200, 206, 255)
+        im = t
+    elif post == 'mono':                    # 칼날 전체를 푸른 플라즈마로 + 둘레 빛
+        for y in range(h):
+            for x in range(w):
+                r, g, b, a = px[x, y]
+                if a:
+                    l = (r + g + b) / 3
+                    t = min(1, l / 170) ** 0.9
+                    px[x, y] = (20, 110, 170, a) if l < 30 else (int(60 + 180 * t), int(190 + 65 * t), 255, a)
+        im = halo(im, (90, 210, 255, 110))
+    elif isinstance(post, tuple) and post[0] == 'band':  # 탄창 가운데에 색 띠 (특수탄)
+        for y in range(int(h * 0.3), int(h * 0.5) + 1):
+            for x in range(w):
+                r, g, b, a = px[x, y]
+                if a and (r + g + b) / 3 > 45:
+                    px[x, y] = post[1] + (a,)
+    elif isinstance(post, tuple) and post[0] == 'hue':
+        im = hue_shift(im, post[1])
+    elif isinstance(post, tuple) and post[0] == 'tint':
+        im = tint(im, post[1])
+    fx, fy = ATTACH_PIVOT[slot]
+    return im, (round((im.width - 1) * fx), round((im.height - 1) * fy))
+
+
+def weapon_types():
+    """data.js의 WEAPONS에서 무기 id -> ('gun' | 'melee', 분류 번호) (붙는 자리를 찾을 무기 그림)"""
+    src = open(os.path.join(ROOT, 'data.js'), encoding='utf-8').read()
+    body = src[src.index('const WEAPONS = {'):]
+    body = body[:body.index('\n};')]
+    return {m.group(1): (m.group(3), int(m.group(2))) for m in re.finditer(r"^\s+(\w+):\s*\{\s*name: '[^']*', cat: (\d), type: '(\w+)'", body, re.M)}
+
+
+def anchors_for(im, kind, cat):
+    """무기 그림에서 파츠가 붙는 자리: 총 -> 총구·조준경·탄창·개머리판·하부, 근접 -> 손잡이·모듈·날 ({칸: [x, y]})
+    권총류(분류 1)는 손잡이 속 탄창이라 손잡이 끝에서 아래로 늘어나게 붙임"""
+    w, h = im.size
+    a = im.split()[3].load()
+    cols = [[y for y in range(h) if a[x, y]] for x in range(w)]
+    mid = lambda x: (cols[x][0] + cols[x][-1]) / 2
+    xs = [x for x in range(w) if cols[x]]
+
+    def mid_at(x0, x1):
+        ys = [mid(x) for x in range(max(0, x0), min(w, x1)) if cols[x]]
+        return round(sum(ys) / len(ys)) if ys else h // 2
+    if kind == 'melee':
+        return {'grip': [min(4, w // 4), mid_at(0, 3)], 'module': [round(w * 0.42), mid_at(round(w * 0.42) - 1, round(w * 0.42) + 2)],
+                'edge': [round(w * 0.8), mid_at(round(w * 0.8) - 1, round(w * 0.8) + 2)]}
+    xr = xs[-1]
+    out = {'muzzle': [xr - 1, mid_at(xr - 2, xr + 1)], 'stock': [5, mid_at(0, 3)]}
+    band = [x for x in range(int(w * 0.3), int(w * 0.65)) if cols[x]]  # 조준경: 가운데 윗면
+    out['sight'] = [round((band[0] + band[-1]) / 2), min(cols[x][0] for x in band) + 1]
+    bots = sorted(cols[x][-1] for x in xs)
+    body = bots[int(len(bots) * 0.35)]  # 몸통 아랫면 (손잡이·탄창처럼 아래로 늘어진 곳을 뺀 높이)
+    runs, cur = [], None                # 아래로 늘어진 구간 (왼쪽 끝 개머리판은 뺌)
+    for x in range(w):
+        low = cols[x] and cols[x][-1] > body + 3
+        if low and cur is None:
+            cur = [x, x]
+        elif low:
+            cur[1] = x
+        if (not low or x == w - 1) and cur is not None:
+            if cur[0] > 2:
+                runs.append(cur)
+            cur = None
+    yb = max(cols[x][-1] for x in xs)
+    if cat == 1:  # 권총류: 가장 아래 두 줄의 가운데 (손잡이 끝)
+        low = [x for x in xs if cols[x][-1] >= yb - 1]
+        out['mag'] = [round((low[0] + low[-1]) / 2), yb - 2]
+    elif runs:    # 탄창: 가장 깊이 늘어진 구간
+        r = max(runs, key=lambda r: max(cols[x][-1] for x in range(r[0], r[1] + 1)))
+        out['mag'] = [round((r[0] + r[1]) / 2), body]
+    else:
+        out['mag'] = [round(w * 0.45), body]
+    ux = round(w * 0.72)
+    out['under'] = [ux, cols[ux][-1] if cols[ux] else body]
+    return out
+
+
 def pack(images, width=2048, pad=2):
     """선반(shelf) 방식 아틀라스 패킹. images: {key: Image} -> ({key: (x, y)}, (w, h))"""
     order = sorted(images, key=lambda k: -images[k].height)
@@ -583,6 +749,14 @@ def main():
             im = im.transpose(Image.FLIP_LEFT_RIGHT)
         images['icon_' + name] = im
         frames['icon_' + name] = [0, 0, im.width, im.height, im.width // 2, im.height // 2]
+    for name, spec in ATTACH_ART.items():  # 무기 파츠: 프레임의 ox·oy가 붙는 점
+        im, (ox, oy) = attach_icon(spec)
+        images['att_' + name] = im
+        frames['att_' + name] = [0, 0, im.width, im.height, ox, oy]
+    anchors = {}  # 무기 그림마다 파츠가 붙는 자리
+    for wid, (kind, cat) in weapon_types().items():
+        if 'icon_' + wid in images:
+            anchors[wid] = {**anchors_for(images['icon_' + wid], kind, cat), **{k: list(v) for k, v in ANCHOR_FIX.get(wid, {}).items()}}
 
     pos, size = pack(images)
     atlas = Image.new('RGBA', size, (0, 0, 0, 0))
@@ -626,7 +800,7 @@ def main():
                 open(os.path.join(OUT, 'music', name + '.mid'), 'wb') as b:
             b.write(a.read())
 
-    meta = {'atlas': 'assets/atlas.png', 'frames': frames, 'sprites': table, 'textures': textures, 'sounds': SOUNDS}
+    meta = {'atlas': 'assets/atlas.png', 'frames': frames, 'sprites': table, 'textures': textures, 'sounds': SOUNDS, 'anchors': anchors}
     with open(os.path.join(OUT, 'atlas.js'), 'w', encoding='utf-8') as f:
         f.write('// tools/build_assets.py 가 생성한 파일 — 직접 고치지 마세요\n')
         f.write('window.ASSET_META = ' + json.dumps(meta, separators=(',', ':')) + ';\n')

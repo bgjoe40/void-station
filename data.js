@@ -1,7 +1,7 @@
 // ===== 게임 데이터 정의 (무기 / 탄약 / 수류탄 / 아이템 / 적) =====
 
 // 버전: GitHub에 커밋·푸시할 때마다 올림 (새 기능은 가운데 자리, 고침·작은 추가는 끝자리) — 타이틀·일시정지 화면에 표시, git 태그 v<버전>
-const VERSION = '0.6.0';
+const VERSION = '0.7.0';
 
 const CAT_NAMES = ['근접', '권총', '샷건', '라이플', '기관총', '에너지'];
 const MAX_LOAD = 30;   // 장착 + 가방 무기 무게 합이 넘으면 이동속도 감소
@@ -51,6 +51,20 @@ const WEAPONS = {
   pblade:   { name: '플라즈마 블레이드', cat: 0, type: 'melee', dmg: 46, rate: 0.42, range: 1.6, arc: 2.6, knock: 0.5, stamina: 9, weight: 2, size: [4, 1], price: 1600, minLvl: 5,
               reflect: true,
               desc: '넓게 휘두르는 플라즈마 칼날. 쳐낸 적 탄을 앞쪽의 적에게 되돌려 보낸다.' },
+  // shieldMul: 방패를 근접 기본(MELEE.shield)보다 더 깎음, crit: 기본 치명타, exec: 체력 30% 아래인 적에게 피해 배율,
+  // combo: 1초 안에 연달아 맞힐 때마다 피해 +step (최대 max번)
+  bat:      { name: '알루미늄 배트', cat: 0, type: 'melee', dmg: 44, rate: 0.6, range: 1.4, arc: 2.0, knock: 3.0, stun: 0.25, stamina: 10, weight: 1.5, size: [3, 1], price: 150, minLvl: 1,
+              desc: '힘껏 휘둘러 적을 멀리 날려 버린다. 맞은 적은 잠깐 휘청인다.' },
+  wrench:   { name: '파이프 렌치', cat: 0, type: 'melee', dmg: 30, rate: 0.42, range: 1.15, arc: 1.5, knock: 0.7, stun: 0.3, stamina: 6, weight: 1.5, size: [3, 1], price: 220, minLvl: 1, shieldMul: 6,
+              desc: '묵직한 쇳덩이. 방패를 다른 근접 무기의 두 배로 부순다.' },
+  crowbar:  { name: '쇠지렛대', cat: 0, type: 'melee', dmg: 36, rate: 0.5, range: 1.25, arc: 1.6, knock: 0.9, stun: 0.2, stamina: 8, weight: 2, size: [3, 1], price: 300, minLvl: 2, crit: 0.15,
+              desc: '갈고리 끝으로 약한 곳을 노린다. 치명타가 잘 터진다 (기본 15%).' },
+  machete:  { name: '정글 마체테', cat: 0, type: 'melee', dmg: 26, rate: 0.3, range: 1.3, arc: 2.4, knock: 0.3, stamina: 6, weight: 1, size: [3, 1], price: 380, minLvl: 2,
+              desc: '넓게 베어 여러 적을 한꺼번에 벤다. 가볍고 빠르다.' },
+  knuckles: { name: '강철 너클', cat: 0, type: 'melee', dmg: 14, rate: 0.16, range: 0.95, arc: 1.4, knock: 0.08, stamina: 3, weight: 0.5, size: [2, 1], price: 420, minLvl: 3, combo: { step: 0.08, max: 8 },
+              desc: '아주 빠른 주먹질. 쉬지 않고 맞힐수록 점점 세진다 (최대 +64%).' },
+  axe:      { name: '소방 도끼', cat: 0, type: 'melee', dmg: 78, rate: 0.75, range: 1.3, arc: 1.5, knock: 1.2, stamina: 14, weight: 2.5, size: [3, 2], price: 600, minLvl: 3, exec: 1.8,
+              desc: '무겁게 내려찍는 도끼. 체력이 30% 아래인 적에게는 피해가 1.8배.' },
   // --- 권총 ---
   revolver:      { name: '.44 매그넘 리볼버', cat: 1, type: 'gun', ammo: 'pistol', mag: 6, dmg: 55, rate: 0.45, reload: 1.9, spread: 0.02, speed: 28, weight: 1, size: [2, 2], snd: 'revolver', shake: 2.5, price: 0, minLvl: 1,
                    desc: '한 발 한 발이 강력한 6연발 리볼버. 정확하지만 재장전이 느리다.' },
@@ -58,6 +72,19 @@ const WEAPONS = {
                    desc: '반자동 권총. 클릭할 때마다 한 발, 장탄이 넉넉하고 재장전이 빠르다.' },
   machinepistol: { name: 'M10 기관권총', cat: 1, type: 'gun', ammo: 'pistol', mag: 30, dmg: 10, rate: 0.065, reload: 1.5, spread: 0.16, speed: 26, weight: 1.5, size: [2, 2], snd: 'smg', auto: true, price: 350, minLvl: 2,
                    desc: '누르고 있으면 탄을 쏟아붓는다. 탄퍼짐이 크고 권총탄을 빠르게 소모한다.' },
+  // burst: 한 번 누르면 n발 점사 (rate는 점사와 점사 사이 간격), elem: 기본 속성 (청록 무늬 '아크' = 감전 기절, 자홍 무늬 '헬파이어' = 화상)
+  compact:     { name: 'P-9 점사 권총', cat: 1, type: 'gun', ammo: 'pistol', mag: 18, dmg: 13, rate: 0.36, burst: 3, reload: 1.0, spread: 0.06, speed: 28, weight: 0.6, size: [2, 2], snd: 'pistol', price: 260, minLvl: 1,
+                 desc: '한 번 누르면 세 발씩 점사하는 작은 권총. 가볍고 재장전이 빠르다.' },
+  heavypistol: { name: 'HX-50 핸드캐논', cat: 1, type: 'gun', ammo: 'pistol', mag: 7, dmg: 66, rate: 0.5, reload: 2.0, spread: 0.03, speed: 30, pierce: 1, weight: 1.5, size: [2, 2], snd: 'revolver', shake: 3, price: 450, minLvl: 2,
+                 desc: '대구경 탄을 쓰는 커다란 권총. 한 발이 적 하나를 꿰뚫고 뒤의 적까지 맞힌다.' },
+  taser:       { name: 'TZ-1 테이저', cat: 1, type: 'gun', ammo: 'cell', mag: 6, dmg: 22, rate: 0.55, reload: 1.6, spread: 0.02, speed: 24, weight: 1, size: [2, 2], snd: 'zap', tracer: '#ffe14a', elem: { type: 'shock', chance: 1 }, price: 380, minLvl: 2,
+                 desc: '전기 침을 쏜다. 맞은 적은 반드시 기절한다 (보스는 짧게). 에너지 셀을 쓴다.' },
+  mp5:         { name: 'MP5 기관단총', cat: 1, type: 'gun', ammo: 'pistol', mag: 30, dmg: 12, rate: 0.075, reload: 1.8, spread: 0.07, speed: 28, weight: 2, size: [3, 2], snd: 'smg', auto: true, price: 520, minLvl: 2,
+                 desc: '권총탄을 쓰는 기관단총. 기관권총보다 훨씬 정확하다.' },
+  arcrevolver: { name: '아크 리볼버', cat: 1, type: 'gun', ammo: 'pistol', mag: 6, dmg: 52, rate: 0.45, reload: 1.8, spread: 0.02, speed: 28, weight: 1, size: [2, 2], snd: 'revolver', shake: 2.5, tracer: '#9df', elem: { type: 'shock', chance: 0.3 }, price: 700, minLvl: 3,
+                 desc: '아크 사의 전기 리볼버. 맞힌 적을 30% 확률로 기절시킨다.' },
+  p90:         { name: 'P90 개인화기', cat: 1, type: 'gun', ammo: 'pistol', mag: 50, dmg: 10, rate: 0.06, reload: 2.2, spread: 0.09, speed: 30, pierce: 1, weight: 2.5, size: [3, 2], snd: 'smg', auto: true, price: 900, minLvl: 4,
+                 desc: '50발 탄창의 기관단총. 관통탄이라 줄지어 오는 적을 한꺼번에 뚫는다.' },
   // --- 샷건 ---
   sawedoff:     { name: '소드오프 더블배럴', cat: 2, type: 'gun', ammo: 'shell', mag: 2, pellets: 10, dmg: 12, rate: 0.2, reload: 1.5, spread: 0.55, range: 5, speed: 24, weight: 1.5, size: [3, 2], snd: 'dshotgun', shake: 5, price: 250, minLvl: 1,
                   desc: '총열을 잘라낸 2연발 산탄총. 코앞에서는 가장 강하지만 사거리가 매우 짧다.' },
@@ -67,14 +94,28 @@ const WEAPONS = {
                   desc: '6발 펌프 액션 산탄총. 중거리까지 안정적인 주력 샷건.' },
   autoshotgun:  { name: 'M1014 반자동 샷건', cat: 2, type: 'gun', ammo: 'shell', mag: 10, pellets: 7, dmg: 10, rate: 0.24, reload: 2.8, spread: 0.28, range: 8, speed: 26, weight: 4, size: [4, 2], snd: 'shotgun', shake: 3.5, auto: true, price: 900, minLvl: 4,
                   desc: '누르고 있으면 연사되는 산탄총. 무겁고 비싸지만 근접 화력이 압도적이다.' },
+  combatpump:   { name: 'M870 전투 산탄총', cat: 2, type: 'gun', ammo: 'shell', mag: 7, pellets: 8, dmg: 15, rate: 0.7, reload: 2.6, spread: 0.16, range: 11, speed: 28, weight: 3, size: [4, 2], snd: 'shotgun', shake: 4, price: 600, minLvl: 3,
+                  desc: '탄이 좁게 모여 날아가는 펌프 샷건. 다른 샷건보다 멀리서도 아프다.' },
+  dragon:       { name: '드래곤 브레스', cat: 2, type: 'gun', ammo: 'shell', mag: 6, pellets: 9, dmg: 10, rate: 0.6, reload: 2.4, spread: 0.32, range: 7, speed: 24, weight: 3, size: [4, 2], snd: 'shotgun', shake: 4, tracer: '#ff8a40', elem: { type: 'fire', chance: 0.3 }, price: 850, minLvl: 4,
+                  desc: '헬파이어 사의 소이 산탄. 불붙은 산탄이 30% 확률로 적을 태운다.' },
+  arcpump:      { name: '아크 펌프 샷건', cat: 2, type: 'gun', ammo: 'shell', mag: 6, pellets: 8, dmg: 13, rate: 0.65, reload: 2.4, spread: 0.24, range: 9, speed: 26, weight: 3, size: [4, 2], snd: 'shotgun', shake: 4, tracer: '#9df', elem: { type: 'shock', chance: 0.15 }, price: 800, minLvl: 4,
+                  desc: '아크 사의 펌프 샷건. 산탄마다 15% 확률로 기절, 무리를 한꺼번에 멈춘다.' },
   // --- 라이플 ---
   marksman: { name: 'M24 저격소총', cat: 3, type: 'gun', ammo: 'rifle', mag: 5, dmg: 150, rate: 1.0, reload: 2.4, spread: 0, speed: 48, range: 30, pierce: 4, weight: 4, size: [5, 2], snd: 'rifle', shake: 3, tracer: '#aef', price: 800, minLvl: 3,
               desc: '볼트액션 저격소총. 한 발이 일직선 위의 적 다섯 마리까지 꿰뚫는다.' },
   assault:  { name: 'M4A1 카빈', cat: 3, type: 'gun', ammo: 'rifle', mag: 30, dmg: 17, rate: 0.095, reload: 2.0, spread: 0.06, speed: 34, range: 18, weight: 3.5, size: [4, 2], snd: 'smg', auto: true, price: 700, minLvl: 3,
               desc: '30발 자동소총. 정확하고 다루기 쉬워 어느 거리에서나 쓸 만하다.' },
+  arccarbine: { name: '아크 카빈', cat: 3, type: 'gun', ammo: 'rifle', mag: 30, dmg: 17, rate: 0.095, reload: 2.0, spread: 0.06, speed: 34, range: 18, weight: 3.5, size: [4, 2], snd: 'smg', auto: true, tracer: '#9df', elem: { type: 'shock', chance: 0.12 }, price: 1000, minLvl: 4,
+                desc: '아크 사의 개량 카빈. 12% 확률로 맞은 적을 기절시킨다.' },
+  arcsniper:  { name: '아크 반자동 저격소총', cat: 3, type: 'gun', ammo: 'rifle', mag: 10, dmg: 70, rate: 0.4, reload: 2.6, spread: 0.01, speed: 46, range: 26, pierce: 2, weight: 4, size: [5, 2], snd: 'rifle', shake: 2.5, tracer: '#9df', elem: { type: 'shock', chance: 0.25 }, price: 1300, minLvl: 5,
+                desc: '빠르게 연달아 쏘는 저격소총. 셋까지 꿰뚫고 25% 확률로 기절시킨다.' },
   // --- 기관총 ---
   mg: { name: 'M249 분대지원화기', cat: 4, type: 'gun', ammo: 'belt', mag: 100, dmg: 15, rate: 0.055, reload: 4.2, spread: 0.11, speed: 32, range: 18, weight: 7, size: [5, 3], slow: 0.68, spin: true, snd: 'smg', shake: 1.5, auto: true, price: 1400, minLvl: 5,
         desc: '100발 벨트 급탄 경기관총. 발사 속도가 점점 올라가 탄막을 퍼붓지만, 들고 있으면 느려진다.' },
+  camolmg: { name: '위장 경기관총', cat: 4, type: 'gun', ammo: 'belt', mag: 80, dmg: 20, rate: 0.085, reload: 3.5, spread: 0.09, speed: 32, range: 18, weight: 6, size: [5, 2], slow: 0.8, snd: 'smg', shake: 1.5, auto: true, price: 1500, minLvl: 5,
+             desc: '분대지원화기보다 느리게 쏘지만 처음부터 정확하고, 들고 있어도 덜 느려진다.' },
+  hellhmg: { name: '헬파이어 중기관총', cat: 4, type: 'gun', ammo: 'belt', mag: 120, dmg: 15, rate: 0.06, reload: 4.5, spread: 0.12, speed: 32, range: 18, weight: 8, size: [5, 2], slow: 0.62, spin: true, snd: 'smg', shake: 1.8, auto: true, tracer: '#ff8a40', elem: { type: 'fire', chance: 0.15 }, price: 2200, minLvl: 6,
+             desc: '헬파이어 사의 소이탄 기관총. 점점 빨라지는 탄막이 15% 확률로 적을 태운다. 매우 무겁다.' },
   // --- 에너지·중화기 (5구역 무렵부터, 정예·보스가 잘 떨어뜨림) ---
   plasma:   { name: 'PX-7 플라즈마 소총', cat: 5, type: 'gun', ammo: 'cell', mag: 40, dmg: 22, rate: 0.085, reload: 2.2, spread: 0.07, speed: 30, range: 16, weight: 4, size: [4, 2], proj: 'plasma', snd: 'plasmaGun', shake: 1.2, auto: true, price: 2400, minLvl: 5,
               desc: '뜨거운 플라즈마 탄을 쏟아붓는 에너지 소총. 빠르고 강하지만 에너지 셀을 많이 먹는다.' },
@@ -82,6 +123,19 @@ const WEAPONS = {
               desc: '맞은 곳 주변을 통째로 날려버리는 로켓. 무리에 강하지만, 너무 가까이 쏘면 나도 휘말린다.' },
   bfg:      { name: 'XB-9 분쇄포', cat: 5, type: 'gun', ammo: 'cell', mag: 1, cost: 40, dmg: 420, rate: 1.2, reload: 1.8, charge: 0.8, spread: 0, speed: 9, range: 18, blast: 4.2, weight: 8, size: [5, 3], proj: 'bfg', snd: 'bfgGun', shake: 10, price: 5200, minLvl: 7,
               desc: '0.8초 동안 에너지를 모아 거대한 구체를 쏜다. 터지면 넓은 범위를 휩쓸고, 앞쪽에 보이는 적들까지 번개처럼 꿰뚫는다. 한 발에 에너지 셀 40.' },
+  // seek: 미사일이 저마다 가까운 적을 쫓아감 (초당 꺾는 각도)
+  neonpistol:  { name: '네온 플라즈마 권총', cat: 5, type: 'gun', ammo: 'cell', mag: 20, dmg: 28, rate: 0.2, reload: 1.5, spread: 0.04, speed: 26, range: 14, weight: 1, size: [2, 2], proj: 'plasma', snd: 'plasmaGun', shake: 1, price: 1400, minLvl: 4,
+                 desc: '네온 사의 에너지 권총. 가볍고 빠른 플라즈마 탄을 쏜다.' },
+  neonshotgun: { name: '네온 플라즈마 산탄총', cat: 5, type: 'gun', ammo: 'cell', mag: 8, pellets: 6, dmg: 15, rate: 0.45, reload: 2.2, spread: 0.3, range: 8, speed: 22, weight: 3, size: [4, 2], proj: 'plasma', snd: 'plasmaGun', shake: 3, price: 1900, minLvl: 5,
+                 desc: '플라즈마 탄을 부채꼴로 흩뿌리는 에너지 산탄총.' },
+  rpg:         { name: 'RPG-7 무반동포', cat: 5, type: 'gun', ammo: 'rocket', mag: 1, dmg: 160, rate: 0.5, reload: 2.0, spread: 0.02, speed: 15, range: 18, blast: 3.0, weight: 5, size: [5, 2], proj: 'rocket', snd: 'rocketGun', shake: 7, price: 2400, minLvl: 5,
+                 desc: '한 발씩 장전하는 대형 로켓. 로켓 발사기보다 넓게 터진다.' },
+  neonblaster: { name: '네온 플라즈마 캐논', cat: 5, type: 'gun', ammo: 'cell', mag: 8, cost: 2, dmg: 75, rate: 0.6, reload: 2.0, spread: 0.02, speed: 16, range: 16, blast: 1.4, weight: 4.5, size: [4, 2], proj: 'plasma', snd: 'plasmaGun', shake: 4, price: 2600, minLvl: 6,
+                 desc: '커다란 플라즈마 구체를 쏜다. 맞은 자리에서 작게 터진다. 한 발에 셀 2.' },
+  homingrl:    { name: '스마트 유도 로켓', cat: 5, type: 'gun', ammo: 'rocket', mag: 4, pellets: 3, dmg: 45, rate: 0.9, reload: 2.6, spread: 0.6, speed: 9, range: 18, blast: 1.6, seek: 4, weight: 5.5, size: [5, 2], proj: 'micro', snd: 'missiles', shake: 4, price: 3200, minLvl: 6,
+                 desc: '작은 유도 미사일 셋을 한꺼번에 쏜다. 미사일은 저마다 가까운 적을 쫓아간다.' },
+  railgun:     { name: 'XR 레일건', cat: 5, type: 'gun', ammo: 'cell', mag: 4, cost: 6, dmg: 240, rate: 0.9, charge: 0.35, reload: 2.2, spread: 0, speed: 70, range: 30, pierce: 99, weight: 6, size: [5, 2], snd: 'bfgGun', shake: 6, tracer: '#7ef', price: 3600, minLvl: 6,
+                 desc: '0.35초 충전한 뒤 쏘는 전자기 탄. 일직선 위의 모든 적을 꿰뚫는다. 한 발에 셀 6.' },
 };
 
 // ===== 인벤토리 / 루팅 =====
@@ -213,6 +267,54 @@ const SOCKET_ROLL = [0.5, 0.35, 0.25, 0.15];        // 등급별(일반·고급�
 const SOCKET_COST = { parts: [4, 10, 20], gold: [120, 350, 800] }; // 개조 자판기에서 소켓 뚫기: 지금 소켓 수(0·1·2)에 따라
 const UNSOCKET_GOLD = 100;                          // 보석 빼기: 끼운 보석 하나당 (보석은 가방으로)
 const GEM_UP_GOLD = [60, 200];                      // 합성: 조각난 3개 → 보통 1개, 보통 3개 → 완벽한 1개
+
+// ===== 무기 파츠 (parts.js): 무기마다 칸에 하나씩 — 보급 거점의 개조 자판기 '파츠 개조' 탭에서만 끼우고 뺌 =====
+// 칸: 총은 총구·조준경·탄창·개머리판·하부 (에너지·로켓처럼 탄을 쏘지 않는 무기는 총구 없음, 자동이 아닌 권총은 개머리판 없음), 근접은 날·손잡이·모듈
+const ATTACH_SLOTS = { muzzle: '총구', sight: '조준경', mag: '탄창', stock: '개머리판', under: '하부', edge: '날', grip: '손잡이', module: '모듈' };
+// fx: 효과 (값 하나 또는 등급별 [일반, 고급, 희귀]) — ATT_FX 설명 참고. need: 끼울 수 있는 무기 (bullet 탄을 쏘는 총, single 산탄이 아닌 총,
+// pellets 샷건, auto 자동 화기, mag 장탄 3발 이상), size: 가방 칸, price: 일반 등급 값 (ATTACH_MUL배), 그림: att_<이름> (tools/build_assets.py ATTACH_ART)
+const ATTACH = {
+  suppressor: { name: '소음기',          slot: 'muzzle', size: [2, 1], price: 220, need: 'bullet',  fx: { spread: 0.1, crit: [0.03, 0.05, 0.08], quiet: 1, weight: 0.3 }, desc: '총소리를 줄인다. 멀리 있는 적이 총소리를 듣고 몰려오지 않는다.' },
+  brake:      { name: '총구 제동기',     slot: 'muzzle', size: [1, 1], price: 180, need: 'bullet',  fx: { spread: [0.2, 0.28, 0.36], shake: 0.4 }, desc: '총구가 튀는 것을 눌러 연사해도 탄이 덜 퍼진다.' },
+  longbarrel: { name: '확장 총열',       slot: 'muzzle', size: [2, 1], price: 240, need: 'single',  fx: { dmg: [0.08, 0.12, 0.16], range: [0.2, 0.25, 0.3], speed: 0.25, weight: 0.5 }, desc: '길어진 총열로 탄이 더 빠르고 멀리, 더 세게 날아간다.' },
+  choke:      { name: '산탄 초크',       slot: 'muzzle', size: [1, 1], price: 160, need: 'pellets', fx: { spread: [0.25, 0.35, 0.45], rangeN: [1.5, 2, 2.5] }, desc: '산탄이 덜 퍼지게 모아 준다.' },
+  reddot:     { name: '레드닷 조준기',   slot: 'sight',  size: [1, 1], price: 160, fx: { crit: [0.04, 0.06, 0.09] }, desc: '붉은 점에 맞춰 약한 곳을 노린다.' },
+  holo:       { name: '홀로 조준기',     slot: 'sight',  size: [1, 1], price: 200, fx: { spread: [0.12, 0.18, 0.24], crit: [0.02, 0.03, 0.04] }, desc: '넓은 시야의 광학 조준기. 탄이 덜 퍼지고 약한 곳도 조금 더 노린다.' },
+  scope:      { name: '4배율 스코프',    slot: 'sight',  size: [2, 1], price: 260, fx: { range: [0.3, 0.4, 0.5], crit: [0.08, 0.11, 0.15], rate: -0.08, weight: 0.3 }, desc: '멀리, 정확히. 대신 조준하느라 조금 느리게 쏜다.' },
+  thermal:    { name: '열상 조준경',     slot: 'sight',  size: [2, 1], price: 320, fx: { elite: [0.1, 0.15, 0.2], thermal: 1, weight: 0.3 }, desc: '열을 보는 조준경. 숨은 그림자 추적자도 잡아내고, 정예·보스의 약점을 보여 준다.' },
+  extmag:     { name: '확장 탄창',       slot: 'mag',    size: [1, 1], price: 180, need: 'mag',     fx: { mag: [0.3, 0.45, 0.6], reload: -0.05 }, desc: '탄이 더 들어가는 긴 탄창.' },
+  drum:       { name: '드럼 탄창',       slot: 'mag',    size: [1, 1], price: 300, need: 'auto',    fx: { mag: [0.8, 1, 1.2], reload: -0.25, weight: 1 }, desc: '장탄이 두 배 가까이 되는 대용량 탄창. 무겁고 갈아 끼우기 느리다.' },
+  quickmag:   { name: '급속 탄창',       slot: 'mag',    size: [1, 1], price: 200, fx: { reload: [0.2, 0.3, 0.4] }, desc: '손잡이가 달려 빠르게 갈아 끼우는 탄창.' },
+  apmag:      { name: '철갑탄 탄창',     slot: 'mag',    size: [1, 1], price: 280, need: 'bullet',  fx: { ap: [0.5, 0.75, 1] }, desc: '단단한 탄심의 철갑탄. 철갑 거수 같은 장갑을 뚫는다.' },
+  incmag:     { name: '소이탄 탄창',     slot: 'mag',    size: [1, 1], price: 260, need: 'bullet',  fx: { fire: [0.1, 0.15, 0.2] }, desc: '맞으면 불붙는 소이탄.' },
+  lightstock: { name: '경량 개머리판',   slot: 'stock',  size: [2, 1], price: 180, fx: { lighter: [0.25, 0.35, 0.45], reload: [0.05, 0.08, 0.12] }, desc: '가벼운 접이식 개머리판. 무게가 줄고 다루기 쉬워진다.' },
+  heavystock: { name: '안정 개머리판',   slot: 'stock',  size: [2, 1], price: 200, fx: { spread: [0.12, 0.18, 0.24], dmg: [0.04, 0.06, 0.08], weight: 0.5 }, desc: '어깨에 단단히 붙는 개머리판. 흔들림이 줄어 정확하고 세게 맞힌다.' },
+  vgrip:      { name: '수직 손잡이',     slot: 'under',  size: [1, 1], price: 150, fx: { spread: [0.12, 0.18, 0.24] }, desc: '앞손잡이를 잡아 총을 단단히 고정한다.' },
+  laser:      { name: '레이저 조준기',   slot: 'under',  size: [1, 1], price: 180, fx: { crit: [0.03, 0.05, 0.07], spread: 0.08 }, desc: '붉은 레이저가 맞을 곳을 짚어 준다.' },
+  serrated:   { name: '톱니 날',         slot: 'edge',   size: [1, 1], price: 200, fx: { dmg: [0.1, 0.15, 0.2] }, desc: '날에 톱니를 덧대 더 깊이 벤다.' },
+  weight:     { name: '무게추',          slot: 'edge',   size: [1, 1], price: 180, fx: { knock: 0.6, stun: [0.15, 0.22, 0.3], rate: -0.1, weight: 0.5 }, desc: '머리에 쇳덩이를 단다. 더 밀어내고 더 오래 기절시키지만 느려진다.' },
+  mono:       { name: '단분자 날',       slot: 'edge',   size: [1, 1], price: 300, fx: { crit: [0.08, 0.12, 0.16] }, desc: '분자 하나 두께의 날. 갑옷 틈을 파고들어 치명타가 잘 터진다.' },
+  wrap:       { name: '가죽 손잡이',     slot: 'grip',   size: [1, 1], price: 150, fx: { rate: [0.08, 0.12, 0.16] }, desc: '미끄러지지 않는 손잡이. 더 빠르게 휘두른다.' },
+  absorb:     { name: '충격흡수 손잡이', slot: 'grip',   size: [1, 1], price: 160, fx: { stamina: [0.2, 0.3, 0.4] }, desc: '반동을 흡수해 덜 지친다.' },
+  shockmod:   { name: '방전 모듈',       slot: 'module', size: [1, 1], price: 260, fx: { shock: [0.12, 0.18, 0.25] }, desc: '맞힐 때 전기를 흘려 적을 기절시킨다.' },
+  firemod:    { name: '화염 모듈',       slot: 'module', size: [1, 1], price: 240, fx: { fire: [0.15, 0.22, 0.3] }, desc: '날을 달궈 맞은 적에게 불을 붙인다.' },
+  cryomod:    { name: '냉각 모듈',       slot: 'module', size: [1, 1], price: 240, fx: { cryo: [0.15, 0.22, 0.3] }, desc: '냉각제를 뿜어 맞은 적을 느리게 만든다.' },
+};
+// 효과 설명 (fx 키별)
+const ATT_FX = {
+  dmg: v => `피해 +${pct(v)}`, spread: v => `탄퍼짐 -${pct(v)}`, crit: v => `치명타 확률 +${pct(v)}`, range: v => `사거리 +${pct(v)}`,
+  rangeN: v => `사거리 +${v}칸`, speed: v => `탄속 +${pct(v)}`, mag: v => `장탄수 +${pct(v)}`,
+  reload: v => v >= 0 ? `재장전 시간 -${pct(v)}` : `재장전 시간 +${pct(-v)}`, rate: v => v >= 0 ? `공격속도 +${pct(v)}` : `공격속도 -${pct(-v)}`,
+  weight: v => `무게 +${v}`, lighter: v => `무게 -${pct(v)}`, shake: v => `반동 -${pct(v)}`, elite: v => `정예·보스에게 피해 +${pct(v)}`,
+  ap: v => `장갑 ${pct(v)} 무시`, fire: v => `명중 시 ${pct(v)} 확률로 화상`, cryo: v => `명중 시 ${pct(v)} 확률로 둔화`, shock: v => `명중 시 ${pct(v)} 확률로 기절`,
+  knock: v => `넉백 +${pct(v)}`, stun: v => `기절 +${v}초`, stamina: v => `스태미너 소모 -${pct(v)}`,
+  quiet: () => '총소리가 작아짐 (멀리 있는 적이 덜 몰려옴)', thermal: () => '숨은 그림자 추적자도 자동 조준',
+};
+const ATTACH_MUL = [1, 2, 4];       // 등급별(일반·고급·희귀) 값 배율 (구매가 · 판매가 = 값 x SELL_RATE)
+const ATTACH_DROP = { kill: 0.015, elite: 0.4, crate: 0.08, boss: 2, thief: 2 }; // 파츠가 떨어질 확률 (보스·보물 약탈자는 개수)
+const ATTACH_ON_LOOT = 0.3;          // 희귀 이상 무기가 맞는 파츠 하나를 달고 나올 확률
+const ATTACH_STOCK = 12;             // 보급 자판기 '파츠' 진열 수
+const BURST_GAP = 0.07;              // 점사 무기의 발과 발 사이 (초)
 const PICKUP_MAGNET = { r: 2.2, v: 10 };            // 골드·보석: 이 거리(칸) 안이면 v칸/초로 끌려와 저절로 주워짐 (보석은 가방 칸을 차지하지 않는 보석 주머니로)
 
 // ===== 보석 조합 (디아블로2의 룬워드처럼) =====
@@ -923,6 +1025,7 @@ const TIPS = {
   watcher:   { title: '감시자', icon: 'vilea1d1', lines: ['발밑에 붉은 원이 생기면 바로 비켜서라'] },
   gear:      { title: '방어구', icon: 'icon_vest_tac', lines: ['머리, 몸, 다리 방어구가 받는 피해를 줄인다'] },
   melee:     { title: '근접 무기', icon: 'icon_knife', lines: ['근접으로 처치하면 체력과 탄약을 얻는다'] },
+  attach:    { title: '무기 파츠', icon: 'att_scope', lines: ['보급 거점의 개조 자판기에서 무기에 끼운다'] },
   thief:     { title: '보물 약탈자', icon: 'sthfa1', lines: ['놓치면 사라진다. 달려서 쫓아라'] },
   shrine:    { title: '신단', icon: 'soula0', lines: ['[F]로 쓰면 20초 동안 강해진다'] },
   trial:     { title: '시련의 방', icon: 'icon_case_gold', lines: ['들어서면 입구가 잠긴다. 적 무리를 모두 처치하라'] },
