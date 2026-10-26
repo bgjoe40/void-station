@@ -2,7 +2,7 @@
 // ===================== VOID STATION =====================
 // 아이소메트릭 우주기지 핵앤슬래시 프로토타입 (HTML5 Canvas)
 
-const TW = 64, TH = 32, WALLH = 72, HUD_H = 132;
+const TW = 64, TH = 32, WALLH = 72;
 // 글자: 한 글꼴, 세 크기 — 작게 (부가 설명·좁은 칸), 보통 (이름표·본문), 크게 (제목·큰 숫자)
 const FONT = "'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif", FS = 12, FM = 14, FL = 20;
 const font = (size, bold) => `${bold ? 'bold ' : ''}${size}px ${FONT}`;
@@ -18,7 +18,7 @@ const overlay = document.getElementById('overlay');
 let W = 0, H = 0, VH = 0;
 let Z = 1, VW = 0, VVH = 0; // 화면 확대: 세계의 한 픽셀을 Z x Z로 (1080p에서 2배), 확대 전 세계 화면 크기
 function resize() {
-  W = canvas.width = innerWidth; H = canvas.height = innerHeight; VH = H - HUD_H;
+  W = canvas.width = innerWidth; H = canvas.height = innerHeight; VH = H;
   Z = Math.max(1, Math.round(Math.min(W / 960, H / 540)));
   VW = Math.ceil(W / Z); VVH = Math.ceil(VH / Z);
 }
@@ -1278,8 +1278,7 @@ function drawLog() {
   ctx.font = font(FM);
   const lines = wrapPx(`"${L.text}"`, w - tx - 16), h = 52 + lines.length * 19 + 18, y = 50;
   ctx.globalAlpha = clamp(Math.min((T.max - T.t) / 0.25, T.t / 0.6), 0, 1);
-  ctx.fillStyle = 'rgba(8,16,20,0.92)'; rr(x, y, w, h, 7); ctx.fill();
-  ctx.strokeStyle = '#3fb8d8'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.lineWidth = 1;
+  pxCard(x, y, w, h);
   ctx.fillStyle = 'rgba(80,200,255,0.08)'; ctx.fillRect(x + 12, y + 14, 48, 48); drawIcon(Math.floor(gtime * 3) % 2 ? 'pmapb0' : 'pmapa0', x + 16, y + 18, 40, 40);
   ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = '#7fe0ff'; ctx.fillText(fitText(`데이터 기록: ${L.title}`, w - tx - 16), x + tx, y + 26);
   ctx.font = font(FS); ctx.fillStyle = '#8fb0b8'; ctx.fillText(`${L.who}, 구역 ${L.reg} ${CAMPAIGN[L.reg - 1].name}`, x + tx, y + 44);
@@ -1731,7 +1730,7 @@ function respawn() {
   player.shrine = null;
   const p = player, inRift = !!rift, h = inRift ? null : hubs[lastHub] || hubs[0], lost = inRift ? 0 : Math.round(p.gold * DEATH_GOLD);
   p.gold -= lost; p.hp = p.maxhp; p.stamina = staminaMax(); p.exhausted = false; p.deathT = 0; p.stagger = 0;
-  p.fx = { poison: 0, burn: 0, shock: 0, regen: 0, adren: 0, immP: 0, immS: 0, curse: 0 };
+  p.fx = { poison: 0, burn: 0, shock: 0, adren: 0, immP: 0, immS: 0, curse: 0 };
   p.sk = {}; p.inv = 2; // 일어난 직후 잠깐 무적
   bullets = []; eshots = []; grenades = []; pillars = []; waves = []; wells = []; hazards = []; areas = areas.filter(a => a.safe);
   for (const e of enemies) { e.aggro = false; e.burst = 0; } // 쫓던 적은 놓침
@@ -1797,11 +1796,11 @@ function newPlayer() {
     shells: [makeShell('shock'), null, null, null], attr: { str: 0, agi: 0, tec: 0, psi: 0 }, apts: 0, // 스킬 칸 Z X V B의 쉘, 투자한 능력치, 남은 능력치 점수
     scd: {}, sk: {}, inv: 0, // 스킬별 남은 대기시간, 지속 중인 스킬 효과, 무적 시간 (순간 이동·돌진)
     cool: 0, reload: 0, reloadMax: 1, spin: 0,
-    gren: { frag: 3, gas: 1, shock: 1, fire: 0, cryo: 0 }, gsel: 'frag', gcool: 0,
-    items: { medS: 2, medM: 1, medL: 0, nano: 0, antidote: 1, insul: 0, armor: 0, adren: 0 },
+    gren: { frag: 3, cryo: 1 }, gsel: 'frag', gcool: 0,
+    items: { med: 3, cure: 1, adren: 0 },
     gold: 0, gemBag: emptyPouch(), // 보석 주머니: 종류별 [조각난, 보통, 완벽한] 개수 (가방 칸을 차지하지 않음)
-    fx: { poison: 0, burn: 0, shock: 0, regen: 0, adren: 0, immP: 0, immS: 0, curse: 0 }, // curse: 저주하는 정예의 저주 (방어 절반)
-    stamina: STAMINA_MAX, staminaDelay: 0, exhausted: false, sprinting: false, staminaBarA: 0,
+    fx: { poison: 0, burn: 0, shock: 0, adren: 0, immP: 0, immS: 0, curse: 0 }, // curse: 저주하는 정예의 저주 (방어 절반)
+    stamina: STAMINA_MAX, staminaDelay: 0, exhausted: false, sprinting: false,
     dash: 0, dashCd: 0, ddx: 0, ddy: 0, kx: 0, ky: 0, walk: 0, moving: false, swing: 0, swingMax: 0.18,
     fireT: 0, painT: 0, deathT: 0, // 스프라이트 동작: 사격, 피격, 사망 애니메이션 시간
     hitT: 0, stagger: 0, // 피격 시 붉게 번쩍임, 큰 공격에 맞은 경직
@@ -1845,7 +1844,6 @@ function levelUpFx() {
   flashes.push({ x: p.x, y: p.y, r: 420, t: 0.5, max: 0.5, col: '255,220,120' });
   for (let k = 0; k < 40; k++) parts.push({ x: p.x + rnd(-0.4, 0.4), y: p.y + rnd(-0.4, 0.4), z: rnd(0, 10), vx: 0, vy: 0, vz: rnd(60, 160), g: 0, life: rnd(0.6, 1.1), max: 1.1, col: pick(['#ffe08a', '#fff2c0', '#ffc850']), size: 3, glow: true });
 }
-const staminaCol = () => player.exhausted ? (Math.sin(gtime * 10) > 0 ? '#e64' : '#833') : '#cd4';
 
 function msg(t, col = '#cfe8c8') { const same = msgs.find(m => m.t === t); if (same) { same.life = 4; return; } msgs.unshift({ t, col, life: 4 }); if (msgs.length > 4) msgs.pop(); }
 function addText(x, y, t, col, z = 30) { texts.push({ x, y, z, t: String(t), col, life: 0.8 }); }
@@ -2883,12 +2881,11 @@ function drawBossBar() {
   for (const e of enemies) if (e.d.boss && !e.dead && e.aggro) { const d = Math.hypot(e.x - player.x, e.y - player.y); if (d < bd) { bd = d; boss = e; } }
   if (!boss) return;
   const bw = Math.min(520, W * 0.5), x = W / 2 - bw / 2, y = 52, f = clamp(boss.hp / boss.maxhp, 0, 1);
-  ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(x - 6, y - 16, bw + 12, 36);
+  pxCard(x - 8, y - 18, bw + 16, 40, false, '#c8302a');
   ctx.textAlign = 'center'; ctx.font = font(FM, true); ctx.fillStyle = '#ff8a5a';
   ctx.fillText(`${boss.rift ? '균열 수호자 ' : ''}${boss.d.name}${boss.rage ? ' (격노)' : ''}`, W / 2, y);
   ctx.fillStyle = '#3a1010'; ctx.fillRect(x, y + 6, bw, 9);
   ctx.fillStyle = boss.rage ? '#ff5030' : '#c8302a'; ctx.fillRect(x, y + 6, bw * f, 9);
-  ctx.strokeStyle = '#8c8574'; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 6.5, bw - 1, 8);
 }
 
 // ===== 구역 임무: 섬멸(기본) · 생존자 구출 · 해킹 · 둥지 파괴 =====
@@ -3319,9 +3316,8 @@ function drawHazardLabels() {
     ctx.font = font(FS); const w2 = sub ? ctx.measureText(sub).width : 0;
     const w = Math.max(w1, w2) + 22, h = sub ? 40 : 24, ax = SX(wx, wy), ay = SY(wx, wy, z) + Math.sin(gtime * 3) * 3;
     const sx0 = SX(wx, wy), sy0 = SY(wx, wy), off = sx0 < 0 || sx0 > W || sy0 < 0 || sy0 > VH; // 그 자리가 화면 밖: 가장자리로 (위쪽 목표·메시지, 아래 스킬 칸은 피해서)
-    const x = off ? clamp(ax, w / 2 + 14, W - w / 2 - 14) : clamp(ax, w / 2 + 8, W - w / 2 - 8), y = off ? clamp(ay, h + 170, VH - 96) : Math.max(ay, h + 8); // 화면 안이면 위로 넘치지만 않게
-    ctx.fillStyle = 'rgba(8,10,8,0.8)'; rr(x - w / 2, y - h, w, h, 5); ctx.fill();
-    ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.stroke(); ctx.lineWidth = 1;
+    const x = off ? clamp(ax, w / 2 + 14, W - w / 2 - 14) : clamp(ax, w / 2 + 8, W - w / 2 - 8), y = off ? clamp(ay, h + 170, hudBottom() - 8) : Math.max(ay, h + 8); // 화면 안이면 위로 넘치지만 않게
+    pxCard(x - w / 2, y - h, w, h, false, col);
     ctx.fillStyle = col; ctx.beginPath(); // 아래 꼭지 (화면 밖이면 그쪽을 가리키는 화살표)
     if (off) { const a = Math.atan2(ay - y, ax - x), cx = x + Math.cos(a) * (w / 2 + 8) * 0.9, cy = y - h / 2 + Math.sin(a) * (h / 2 + 10); ctx.moveTo(cx + Math.cos(a) * 9, cy + Math.sin(a) * 9); ctx.lineTo(cx + Math.cos(a + 2.4) * 7, cy + Math.sin(a + 2.4) * 7); ctx.lineTo(cx + Math.cos(a - 2.4) * 7, cy + Math.sin(a - 2.4) * 7); }
     else { ctx.moveTo(x - 6, y); ctx.lineTo(x + 6, y); ctx.lineTo(x, y + 7); }
@@ -3337,7 +3333,7 @@ function drawHazardLabels() {
   for (const h of hazards) {
     if (h.type === 'blackout') continue;
     const E = EVENTS[h.type], gas = h.type === 'gas', blink = h.t < 4 && Math.sin(gtime * 10) < 0;
-    box(gas ? h.sx : h.x, gas ? h.sy : h.y, gas ? 118 : 86, E.name, gas ? '해독제 [8], 또는 방을 벗어나라' : '구멍에서 멀어져라', blink ? '#fff' : E.color, h.t / h.max);
+    box(gas ? h.sx : h.x, gas ? h.sy : h.y, gas ? 118 : 86, E.name, gas ? '치료제 [E], 또는 방을 벗어나라' : '구멍에서 멀어져라', blink ? '#fff' : E.color, h.t / h.max);
   }
   const A = assault; // 거점 습격: 패드 위에 경보 (카운트다운 고리) → 몇 번째 무리 · 안전막 남은 정도 (고리) · 남은 적
   if (A && A.phase !== 'wait') {
@@ -3890,36 +3886,6 @@ function skillLeft(id) {
   return o && o.t > 0 ? o.t / o.max : 0;
 }
 // 화면 아래 가운데 스킬 칸 (Z X V B): 끼운 쉘 그림·등급 테두리, 대기시간(시계 방향으로 걷힘), 지속 중인 효과 막대. 커서를 올리면 쉘 설명
-function drawSkillBar() {
-  if (inBase || !player) return;
-  const p = player, s = 46, gap = 8, x0 = Math.round(W / 2 - (4 * s + 3 * gap) / 2), y0 = VH - s - 10;
-  let hover = null;
-  p.shells.forEach((sh, n) => {
-    const x = x0 + n * (s + gap), S = sh && SKILLS[sh.id], cd = sh ? p.scd[sh.id] || 0 : 0, left = sh ? skillLeft(sh.id) : 0;
-    ctx.fillStyle = 'rgba(12,12,10,0.82)'; rr(x, y0, s, s, 6); ctx.fill();
-    ctx.strokeStyle = !sh ? '#3a3830' : left ? (Math.sin(gtime * 10) > 0 ? S.color : '#fff') : cd > 0 ? '#5a5648' : RARITY[sh.rarity].color;
-    ctx.lineWidth = left ? 2.5 : 1.5; ctx.stroke(); ctx.lineWidth = 1;
-    ctx.textAlign = 'center';
-    if (sh) {
-      drawIcon(S.icon, x + 6, y0 + 5, s - 12, s - 14);
-      if (cd > 0) {
-        ctx.save(); rr(x, y0, s, s, 6); ctx.clip();
-        ctx.fillStyle = 'rgba(0,0,0,0.62)'; ctx.beginPath(); ctx.moveTo(x + s / 2, y0 + s / 2);
-        ctx.arc(x + s / 2, y0 + s / 2, s, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(cd / shellVals(sh).cd, 0, 1)); ctx.closePath(); ctx.fill();
-        ctx.restore();
-        ctx.font = font(FM, true); ctx.fillStyle = '#000'; ctx.fillText(Math.ceil(cd), x + s / 2 + 1, y0 + s / 2 + 6); ctx.fillStyle = '#fff'; ctx.fillText(Math.ceil(cd), x + s / 2, y0 + s / 2 + 5);
-      }
-      if (left) { ctx.fillStyle = S.color; ctx.fillRect(x + 3, y0 + 2, (s - 6) * clamp(left, 0, 1), 3); }
-    } else { ctx.font = font(FS); ctx.fillStyle = '#5a5648'; ctx.fillText('빈 칸', x + s / 2, y0 + s / 2 + 4); }
-    ctx.font = font(FS, true); ctx.textAlign = 'left'; ctx.fillStyle = '#000'; ctx.fillRect(x + 1, y0 + s - 14, 13, 13);
-    ctx.fillStyle = sh ? '#ffd27a' : '#6a6458'; ctx.fillText(SHELL_SLOTS[n], x + 3.5, y0 + s - 3);
-    if (sh && mouse.x >= x && mouse.x < x + s && mouse.y >= y0 && mouse.y < y0 + s) hover = { sh, x };
-  });
-  const res = ATTR_KEYS.filter(k => resTier(k)); // 계열 공명
-  ctx.textAlign = 'right'; ctx.font = font(FS, true);
-  res.forEach((k, n) => { const t = `${ATTRS[k].name} 공명 ${RES_LABEL[resTier(k)]}`; ctx.fillStyle = '#000'; ctx.fillText(t, x0 - 9, y0 + 17 + n * 15); ctx.fillStyle = ATTRS[k].color; ctx.fillText(t, x0 - 10, y0 + 16 + n * 15); });
-  if (hover && !held) { const L = shellTooltip(hover.sh); drawTooltip(L, hover.x - 60, y0 - L.length * 17 - 18, VH); }
-}
 
 let apNow = 0; // 철갑탄 파츠로 맞히는 중: 장갑을 무시하는 비율 (weaponHit → hitEnemy)
 let meleeNow = false; // 근접 공격이 맞히는 중인 무기 스탯 (장갑 무시·방패 강타·처치 보급 — 체인톱은 탄약 더)
@@ -4722,20 +4688,15 @@ function drawPillars() {
 
 // ===== 아이템 =====
 function heal(p, n) { if (p.hp >= p.maxhp) return false; p.hp = Math.min(p.maxhp, p.hp + n); return true; }
-const MED_HEAL = { medS: 40, medM: 90, medL: 200 };
-const medHeal = k => MED_HEAL[k] * (1 + perkV('medic')); // 응급 처치 특성 반영
 const ITEM_FX = {
-  medS: p => heal(p, medHeal('medS')), medM: p => heal(p, medHeal('medM')), medL: p => heal(p, medHeal('medL')),
-  nano: p => { p.fx.regen += 140; return true; },
-  antidote: p => { p.fx.poison = 0; p.fx.burn = 0; p.fx.immP = 8; return true; },
-  insul: p => { p.fx.shock = 0; p.fx.immS = 10; return true; },
-  armor: p => { if (p.armor >= 100) return false; p.armor = Math.min(100, p.armor + 50); return true; },
+  med: p => heal(p, p.maxhp * MED_HEAL * (1 + perkV('medic'))), // 응급 처치 특성 반영
+  cure: p => { const f = p.fx; if (!(f.poison > 0 || f.burn > 0 || f.shock > 0)) return false; f.poison = f.burn = f.shock = 0; f.immP = f.immS = 8; return true; },
   adren: p => { p.fx.adren = 12; return true; },
 };
 function useItem(id) {
   const p = player;
   if (!p.items[id]) { msg(`${ITEMS[id].name} 없음`, '#a99'); return; }
-  if (!ITEM_FX[id](p)) { msg(MED_ORDER.includes(id) ? '체력이 가득 찼습니다' : '지금은 사용할 필요가 없습니다', '#a99'); return; }
+  if (!ITEM_FX[id](p)) { msg(id === 'med' ? '체력이 가득 찼습니다' : '지금은 사용할 필요가 없습니다', '#a99'); return; }
   p.items[id]--; Snd.play('heal');
   for (let k = 0; k < 14; k++) parts.push({ x: p.x + rnd(-.3, .3), y: p.y + rnd(-.3, .3), z: rnd(0, 20), vx: 0, vy: 0, vz: rnd(30, 70), g: 0, life: rnd(0.4, 0.8), max: 0.8, col: ITEMS[id].color, size: 3, glow: true });
 }
@@ -5702,7 +5663,7 @@ function onKey(code) {
   }
   if (state !== 'play') return;
   const p = player;
-  if (code in ITEM_KEYS) useItem(ITEM_KEYS[code]); // 소모품 (메디킷 Q·E·T, 보조 아이템 7·8·9·0·-)
+  if (code in ITEM_KEYS) useItem(ITEM_KEYS[code]); // 소모품 (메디킷 Q, 치료제 E, 아드레날린 T)
   else if (code.startsWith('Digit')) { const n = +code.slice(5); if (n >= 1 && n <= NSLOT) selectSlot(n - 1); }
   else if (code === 'KeyI' || code === 'Tab') { if (invOpen) closeInventory(); else { invOpen = true; perkOpen = false; codexOpen = false; } }
   else if (code === 'KeyK') { perkOpen = !perkOpen; if (perkOpen) { closeInventory(); codexOpen = false; } Snd.play('menu'); } // 캐릭터 성장 창
@@ -5729,7 +5690,6 @@ function updatePlayer(dt) {
   const dm = DIFFICULTY[difficulty].dmg, safe = inHub(); // 중독·화상 피해도 난이도 배율, 안전 지대에서는 깎이지 않음
   if (f.poison > 0) { f.poison -= dt; if (!safe) p.hp -= 5 * dt * dm; if (Math.random() < dt * 6) parts.push({ x: p.x, y: p.y, z: 30, vx: 0, vy: 0, vz: 30, g: 0, life: 0.6, max: 0.6, col: '#9e4', size: 3 }); }
   if (f.burn > 0) { f.burn -= dt; if (!safe) p.hp -= 9 * dt * dm; if (Math.random() < dt * 15) fireBurst(p.x, p.y, 1, 0.3); }
-  if (f.regen > 0) { const h = Math.min(f.regen, 14 * dt); f.regen -= h; p.hp = Math.min(p.maxhp, p.hp + h); }
   const rg = gearV('regen'); if (rg > 0) p.hp = Math.min(p.maxhp, p.hp + rg * dt); // 방어구 체력 회복 옵션
   if (p.hp <= 0 && !rebirth()) { p.hp = 0; die(); return; }
 
@@ -5757,7 +5717,6 @@ function updatePlayer(dt) {
   if (p.staminaDelay <= 0) p.stamina = Math.min(staminaMax(), p.stamina + STAMINA_REGEN * (1 + perkV('stamina')) * dt);
   if (p.exhausted && p.stamina >= STAMINA_RECOVER) p.exhausted = false;
   // 중앙 스태미너 바: 가득 차 있지 않으면 표시, 다 차면 서서히 사라짐
-  p.staminaBarA = p.stamina < staminaMax() ? 1 : Math.max(0, p.staminaBarA - dt * 2.5);
   p.dashCd -= dt; p.gcool -= dt;
   const C = buff('charge');
   if (C) chargeStep(C, dt); // 강습 돌진
@@ -6309,6 +6268,7 @@ function updateProjectiles(dt) {
 }
 
 function updateMisc(dt) {
+  hudTick(dt);
   for (const q of parts) {
     q.x += q.vx * dt; q.y += q.vy * dt; q.vz -= q.g * dt; q.z += q.vz * dt; q.life -= dt;
     if (q.z < 0) { q.z = 0; q.vz *= -0.3; q.vx *= 0.6; q.vy *= 0.6; }
@@ -6438,10 +6398,9 @@ function drawTip() { // 처음 만나는 것 안내: 왼쪽 아래의 작은 카
   const D = TIPS[T.id], icon = T.icon && META.frames[T.icon] ? T.icon : null, tx = icon ? 50 : 14, line = D.lines[0];
   ctx.font = font(FM, true); const w1 = ctx.measureText(D.title).width;
   ctx.font = font(FM); const w2 = ctx.measureText(line).width;
-  const w = Math.min(W - 28, tx + Math.max(w1, w2) + 16), h = 50, x = 14, y = VH - h - 34;
+  const w = Math.min(W - 28, tx + Math.max(w1, w2) + 16), h = 50, x = HUD_M * Z, y = hudBottom() - h - 6 * Z;
   ctx.globalAlpha = clamp(Math.min((T.max - T.t) / 0.25, T.t / 0.5), 0, 1);
-  ctx.fillStyle = 'rgba(16,14,10,0.9)'; ctx.fillRect(x, y, w, h);
-  ctx.fillStyle = '#c9a03a'; ctx.fillRect(x, y, 3, h);
+  pxCard(x, y, w, h);
   if (icon) drawIcon(icon, x + 10, y + 9, 32, 32);
   ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = '#ffd27a'; ctx.fillText(D.title, x + tx, y + 21);
   ctx.font = font(FM); ctx.fillStyle = '#e8dcc0'; ctx.fillText(fitText(line, w - tx - 10), x + tx, y + 39);
@@ -7029,10 +6988,7 @@ function drawLamp(l) { drawSprite('tlmp', 'abcd'[Math.floor(gtime * 8 + l.ph) % 
 
 // --- 아이템 ---
 // [스프라이트, 크기 배율]
-const ITEM_ART = {
-  medS: ['stima0', 1.1], medM: ['media0', 1], medL: ['media0', 1.4], nano: ['icon_syringe_blue', 0.8],
-  antidote: ['bon1a0', 1.3], insul: ['suita0', 0.5], armor: ['arm1a0', 0.9], adren: ['icon_syringe_red', 0.8],
-};
+const ITEM_ART = { med: ['media0', 1.1], cure: ['bon1a0', 1.3], adren: ['icon_syringe_red', 0.8] };
 const AMMO_ART = { pistol: ['clipa0', 1.3], shell: ['shela0', 1.2], rifle: ['ammoa0', 1], belt: ['broka0', 0.55], cell: ['cella0', 1.3], rocket: ['rocka0', 1.1] };
 function drawPickup(it) {
   const sx = PX(it.x, it.y), sy = PY(it.x, it.y), z = 2 + Math.sin(gtime * 3 + it.bob) * 2;
@@ -7476,7 +7432,7 @@ function render() {
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
   if (!tiles || !player) return;
   const scene = state === 'title', cine = state === 'intro'; // 타이틀: 플레이어·HUD 없이 화면 전체에 정거장 풍경, 오프닝 컷신: HUD 없이
-  VH = scene || cine ? H : H - HUD_H; VVH = Math.ceil(VH / Z);
+  VH = H; VVH = Math.ceil(VH / Z);
   // 세계: 확대 전 크기(VW x VVH)의 worldC에 그린 뒤 Z배로 키움 — 스프라이트·벽·효과가 모두 같은 크기의 픽셀로 보임
   if (worldC.width !== VW || worldC.height !== VVH) { worldC.width = lightC.width = VW; worldC.height = lightC.height = VVH; }
   const W0 = W, VH0 = VH;
@@ -7625,14 +7581,6 @@ function render() {
     g.addColorStop(0, 'rgba(235,245,255,0.95)'); g.addColorStop(0.45, `rgba(130,165,255,${0.55 + 0.35 * k})`); g.addColorStop(1, 'rgba(80,120,255,0)');
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(mx, my, r, 0, Math.PI * 2); ctx.fill();
   }
-  // 스태미너 바 (화면 중앙, 캐릭터 발밑) — 소모·회복 중에만 표시
-  if (p.staminaBarA > 0) {
-    const bw = 64, bh = 6, bx = psx - bw / 2, by = psy + 14;
-    ctx.globalAlpha = p.staminaBarA;
-    ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillRect(bx - 2, by - 2, bw + 4, bh + 4);
-    ctx.fillStyle = staminaCol(); ctx.fillRect(bx, by, bw * p.stamina / staminaMax(), bh);
-    ctx.globalAlpha = 1;
-  }
   ctx.restore(); ctx = mainCtx; W = W0; VH = VH0;
   ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, VH); ctx.clip();
   ctx.imageSmoothingEnabled = false; ctx.drawImage(worldC, 0, 0, VW * Z, VVH * Z); ctx.imageSmoothingEnabled = true;
@@ -7676,7 +7624,6 @@ function render() {
   drawMinimap();
   drawTip();
   drawLog();
-  drawSkillBar();
   ctx.restore();
   drawHUD();
   if (state === 'trade') drawTrade();
@@ -7970,16 +7917,17 @@ function resetMinimap(all) {
 function drawMinimap() {
   if (state === 'title' || invOpen || trade || perkOpen || codexOpen) return;
   const R = rift ? null : regions[level];
-  let k = 1, w = 230, h = 150, x0 = W - w - 14, y0 = 14, sx = mmX(player.x, player.y) - w / 2, sy = mmY(player.x, player.y) - h / 2;
+  let k = Z, w = Math.max(200, 120 * Z), h = Math.round(w * 0.63), x0 = W - w - 14, y0 = 14, sx = Math.round(mmX(player.x, player.y) - w / 2 / k), sy = Math.round(mmY(player.x, player.y) - h / 2 / k); // 작은 지도도 게임처럼 Z배 픽셀
   if (mapBig) { k = Math.min(2.4, (W - 80) / mapC.width, (VH - 90) / mapC.height); w = mapC.width * k; h = mapC.height * k; x0 = (W - w) / 2; y0 = (VH - h) / 2; sx = sy = 0; }
   const keyRow = !inBase && R && R.locks.length ? 30 : 0; // 아래에 이 구역의 키카드 칸
-  ctx.fillStyle = mapBig ? 'rgba(6,8,10,0.55)' : 'rgba(6,8,10,0.6)'; rr(x0 - 8, y0 - 8, w + 16, h + 26 + keyRow, 6); ctx.fill(); // 크게 볼 때도 뒤의 전투가 보이게
-  ctx.strokeStyle = '#5a5648'; ctx.lineWidth = 1; ctx.stroke();
+  pxCard(x0 - 8, y0 - 8, w + 16, h + 26 + keyRow);
   ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.clip();
   if (mapBig) ctx.drawImage(mapC, x0, y0, w, h);
   else { // 지도 캔버스 밖은 잘라서
-    const a0 = Math.max(0, sx), b0 = Math.max(0, sy), a1 = Math.min(mapC.width, sx + w), b1 = Math.min(mapC.height, sy + h);
-    if (a1 > a0 && b1 > b0) ctx.drawImage(mapC, a0, b0, a1 - a0, b1 - b0, x0 + a0 - sx, y0 + b0 - sy, a1 - a0, b1 - b0);
+    const a0 = Math.max(0, sx), b0 = Math.max(0, sy), a1 = Math.min(mapC.width, sx + w / k), b1 = Math.min(mapC.height, sy + h / k);
+    ctx.imageSmoothingEnabled = false;
+    if (a1 > a0 && b1 > b0) ctx.drawImage(mapC, a0, b0, a1 - a0, b1 - b0, x0 + (a0 - sx) * k, y0 + (b0 - sy) * k, (a1 - a0) * k, (b1 - b0) * k);
+    ctx.imageSmoothingEnabled = true;
   }
   const at = (wx, wy) => [x0 + (mmX(wx, wy) - sx) * k, y0 + (mmY(wx, wy) - sy) * k], s1 = Math.max(1, k * 0.6);
   if (mapBig && !rift) { // 들어가 본 구역의 이름
@@ -8049,6 +7997,12 @@ function drawMinimap() {
     const [ex, ey] = at(e.x, e.y);
     circle(ex, ey, (e.d.boss ? 3.5 : e.elite ? 2.6 : 1.8) * s1, e.d.boss ? '#ff9933' : e.elite ? '#ffcc55' : '#ff5a4a');
   }
+  for (const e of enemies) { // 동작 탐지기: 시야 밖에서 움직이는 적 (24칸 안, 그림자 추적자·숨은 적도 잡힘) — 희미하게 깜박임
+    if (e.dead || e.d.nest || (canSee(e.x, e.y) && !ghost(e)) || Math.hypot(e.x - player.x, e.y - player.y) > 24) continue;
+    const [ex, ey] = at(e.x, e.y), q = Math.max(1, Math.round(s1));
+    ctx.globalAlpha = 0.4 + 0.3 * Math.sin(gtime * 6 + e.x * 1.7); ctx.fillStyle = e.aggro ? '#ff6a5a' : '#cfc8b8';
+    ctx.fillRect(Math.round(ex - q), Math.round(ey - q), 2 * q, 2 * q); ctx.globalAlpha = 1;
+  }
   // 플레이어: 바라보는 방향 삼각형
   const [px, py] = at(player.x, player.y), a = player.aim, ax = Math.cos(a) - Math.sin(a), ay = (Math.cos(a) + Math.sin(a)) / 2, l = Math.hypot(ax, ay);
   const ux = ax / l, uy = ay / l, r = 5 * s1;
@@ -8057,7 +8011,7 @@ function drawMinimap() {
   ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.restore();
   ctx.font = font(FS); ctx.textAlign = 'left'; ctx.fillStyle = '#9a9484';
-  ctx.fillText(`${rift ? `차원 균열 ${rift.tier}단계` : inBase || !R ? '우주 기지' : `구역 ${level} ${CAMPAIGN[level - 1].name}`}   [M] ${mapBig ? '작게' : '전체 지도'}`, x0, y0 + h + 12);
+  ctx.fillText(fitText(`${rift ? `차원 균열 ${rift.tier}단계` : inBase || !R ? '우주 기지' : `구역 ${level} ${CAMPAIGN[level - 1].name}`}   [M] ${mapBig ? '작게' : '전체 지도'}`, w), x0, y0 + h + 12);
   if (keyRow) { // 이 구역의 키카드 칸 (주운 것은 밝게)
     const ky = y0 + h + 20;
     ctx.fillText('키카드', x0, ky + 15);
@@ -8077,8 +8031,7 @@ function drawTopInfo() {
   if (box) {
     ctx.font = font(FM, true);
     const w = ctx.measureText(box.t).width + 22, h = box.frac === undefined ? 28 : 34;
-    ctx.fillStyle = 'rgba(0,0,0,0.65)'; rr(10, 8, w, h, 5); ctx.fill();
-    ctx.strokeStyle = box.edge; ctx.lineWidth = 1; ctx.stroke();
+    pxCard(10, 8, w, h, false, box.edge);
     ctx.fillStyle = box.col; ctx.fillText(box.t, 21, 28);
     if (box.frac !== undefined) { // 해킹 진행 막대
       ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(21, 34, w - 22, 4);
@@ -8095,7 +8048,6 @@ function drawTopInfo() {
   if (f.burn > 0) chips.push(['화상', f.burn, '#f83']);
   if (f.shock > 0) chips.push(['감전', f.shock, '#fd4']);
   if (f.curse > 0) chips.push(['저주 (방어 절반)', f.curse, '#b08aff']);
-  if (f.regen > 0) chips.push(['나노 회복', f.regen / 14, '#6ef']);
   if (f.adren > 0) chips.push(['아드레날린', f.adren, '#f8c']);
   if (f.immP > 0) chips.push(['중독 면역', f.immP, '#ad8']);
   if (f.immS > 0) chips.push(['감전 면역', f.immS, '#ed8']);
@@ -8105,8 +8057,7 @@ function drawTopInfo() {
   const cw = chips.map(([n, t]) => Math.max(96, Math.ceil(ctx.measureText(chipText(n, t)).width) + 16)); // 글이 길면 칩도 넓게
   let x = W / 2 - (cw.reduce((s, w) => s + w + 4, 0) - 4) / 2;
   chips.forEach(([n, t, c], k) => {
-    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(x, 10, cw[k], 22);
-    ctx.strokeStyle = c; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, 10.5, cw[k] - 1, 21);
+    pxCard(x, 10, cw[k], 22, false, c);
     ctx.fillStyle = c; ctx.fillText(chipText(n, t), x + cw[k] / 2, 25);
     x += cw[k] + 4;
   });
@@ -8115,8 +8066,7 @@ function drawTopInfo() {
     const t = Math.max(0, escape.t), s = `자폭까지 ${z2(Math.floor(t / 60))}:${z2(Math.floor(t % 60))}.${Math.floor(t * 10) % 10}`;
     ctx.font = font(FL, true); ctx.textAlign = 'center';
     const w = ctx.measureText(s).width + 32;
-    ctx.fillStyle = 'rgba(40,0,0,0.78)'; rr(W / 2 - w / 2, 40, w, 42, 6); ctx.fill();
-    ctx.strokeStyle = '#f44'; ctx.lineWidth = 2; ctx.stroke(); ctx.lineWidth = 1;
+    pxCard(W / 2 - w / 2, 40, w, 42, false, '#f44');
     ctx.fillStyle = t < 15 && Math.sin(gtime * 12) > 0 ? '#fff' : '#ff5a4a'; ctx.fillText(s, W / 2, 70);
   }
   // 마우스 아래 적 이름 (원작 스타일)
@@ -8130,152 +8080,130 @@ function drawTopInfo() {
     : !md ? '' : G ? gateMsg(G) : !K ? '자동문' : !md.locked ? K.door : keysHeld.has(`${md.kr}:${md.key}`) ? `${K.door} (다가가면 열림)` : `${K.door} (${K.name} 필요)`;
   if (label) {
     ctx.font = font(FM); ctx.textAlign = 'center';
-    const ly = inBase ? VH - 12 : VH - 70; // 구역에서는 스킬 칸 위에
+    const ly = hudBottom() - 12; // 아래 카드들 위에
     ctx.fillStyle = '#000'; ctx.fillText(label, W / 2 + 1, ly + 1);
     ctx.fillStyle = K ? K.color : G ? '#ff9a6a' : '#d8f0c8'; ctx.fillText(label, W / 2, ly);
   }
   if (autoNote > 0) { // 거점 자동 저장 (오른쪽 아래)
     ctx.globalAlpha = clamp(autoNote, 0, 1); ctx.font = font(FS, true); ctx.textAlign = 'right';
-    ctx.fillStyle = '#000'; ctx.fillText('✔ 자동 저장됨', W - 15, VH - 13); ctx.fillStyle = '#9fe0a0'; ctx.fillText('✔ 자동 저장됨', W - 16, VH - 14);
+    ctx.fillStyle = '#000'; ctx.fillText('✔ 자동 저장됨', W - HUD_M * Z + 1, hudBottom() - 7); ctx.fillStyle = '#9fe0a0'; ctx.fillText('✔ 자동 저장됨', W - HUD_M * Z, hudBottom() - 8);
     ctx.globalAlpha = 1;
   }
 }
 
-// ===== HUD =====
 function rr(x, y, w, h, r) { ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h); }
-function lcd(x, y, w, h, on) {
-  ctx.fillStyle = '#2b2a24'; rr(x - 3, y - 3, w + 6, h + 6, 5); ctx.fill();
-  ctx.fillStyle = on ? '#12401c' : '#0b1d0f'; rr(x, y, w, h, 3); ctx.fill();
-  if (on) { ctx.strokeStyle = '#8f8'; ctx.lineWidth = 1.5; rr(x, y, w, h, 3); ctx.stroke(); }
+// ===== HUD: 판 없이 모서리의 작은 픽셀 카드 (게임 그림과 같은 픽셀 크기 Z) =====
+// 왼쪽 아래 체력·방어·기력, 오른쪽 아래 무기·장탄, 아래 가운데 스킬·소모품·수류탄. 숫자는 Freedoom 상태 바 숫자 (hud_sttnum 큰 빨간 숫자, hud_stysnum 작은 노란 숫자)
+const HC = { acc: '#d89a3a', edge: '#3a3d44', fill: 'rgba(7,8,11,0.8)', slot: 'rgba(16,17,21,0.9)', dim: '#6f6b62' };
+const HUD_CARD_H = 42, HUD_SLOT = 22, HUD_M = 8; // 카드 높이, 가운데 칸 크기, 화면 가장자리 여백 (확대 전 픽셀)
+const hudBottom = () => VH - (HUD_M + HUD_CARD_H) * Z; // 아래 카드들의 윗변 (안내 카드·이름표는 이보다 위에)
+let digCache = null; // 숫자 그림: 큰 숫자는 빨강 + 호박색으로 바꾼 것, 작은 숫자는 노랑 + 회색으로 바꾼 것
+function digits() {
+  if (digCache || !ART.ready) return digCache;
+  const cut = key => { const f = META.frames[key], c = document.createElement('canvas'); c.width = f[2]; c.height = f[3]; c.getContext('2d').drawImage(ART.atlas, f[0], f[1], f[2], f[3], 0, 0, f[2], f[3]); return c; };
+  const tint = (src, rgb) => { // 원래 밝기는 살리고 색만
+    const c = document.createElement('canvas'); c.width = src.width; c.height = src.height;
+    const g = c.getContext('2d'); g.drawImage(src, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height);
+    for (let i = 0; i < d.data.length; i += 4) { const l = Math.max(d.data[i], d.data[i + 1], d.data[i + 2]) / 255; d.data[i] = rgb[0] * l; d.data[i + 1] = rgb[1] * l; d.data[i + 2] = rgb[2] * l; }
+    g.putImageData(d, 0, 0); return c;
+  };
+  const red = [...Array(10)].map((_, i) => cut('hud_sttnum' + i)), small = [...Array(10)].map((_, i) => cut('hud_stysnum' + i));
+  return digCache = { red, small, minus: cut('hud_sttminus'), amber: red.map(c => tint(c, [240, 176, 70])), grey: small.map(c => tint(c, [150, 146, 136])) };
+}
+// 숫자 (set: red·amber 큰 숫자 13x16, small·grey 작은 숫자 4x6), x·y: 왼쪽 위 (align: right·center). 그린 너비를 돌려줌
+function pxNum(n, x, y, set = 'small', align) {
+  const D = digits(); if (!D) return 0;
+  const str = String(n), big = set === 'red' || set === 'amber', cw = (big ? 13 : 4) * Z, w = str.length * cw;
+  let cx = Math.round(align === 'right' ? x - w : align === 'center' ? x - w / 2 : x);
+  ctx.imageSmoothingEnabled = false;
+  for (const ch of str) { const c = ch === '-' ? D.minus : D[set][+ch]; if (c) ctx.drawImage(c, cx, Math.round(y), c.width * Z, c.height * Z); cx += cw; }
+  ctx.imageSmoothingEnabled = true;
+  return w;
+}
+// 3x5 픽셀 글자 (단축키·레벨 표시), 픽셀 모양 (# 채움)
+const GLYPH = { Z: '111001010100111', X: '101101010101101', V: '101101101101010', B: '110101110101110', Q: '010101101110011', E: '111100110100111', T: '111010010010010', G: '011100101101011', K: '101110100110101', L: '100100100100111' };
+function pxGlyph(ch, x, y, col) { const g = GLYPH[ch]; if (!g) return; ctx.fillStyle = col; for (let k = 0; k < 15; k++) if (g[k] === '1') ctx.fillRect(x + (k % 3) * Z, y + Math.floor(k / 3) * Z, Z, Z); }
+function pxShape(rows, x, y, col) { ctx.fillStyle = col; rows.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (r[i] === '#') ctx.fillRect(x + i * Z, y + j * Z, Z, Z); }); }
+const SH_CROSS = ['..###..', '..###..', '#######', '#######', '#######', '..###..', '..###..'];
+const SH_SHIELD = ['#######', '#######', '#######', '#######', '.#####.', '..###..', '...#...'];
+// 카드: 모서리를 깎은 반투명 판, 1픽셀 테두리, (accent면) 왼쪽 위에 호박색 꺾쇠, (line이면) 윗변을 그 색으로. 크기는 화면 픽셀
+function pxCard(x, y, w, h, accent = true, line) {
+  const U = Z, c = 2 * U; x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
+  ctx.fillStyle = HC.fill;
+  ctx.fillRect(x + c, y, w - 2 * c, h); ctx.fillRect(x, y + c, w, h - 2 * c); ctx.fillRect(x + U, y + U, w - 2 * U, h - 2 * U);
+  ctx.fillStyle = HC.edge;
+  ctx.fillRect(x + c, y, w - 2 * c, U); ctx.fillRect(x + c, y + h - U, w - 2 * c, U); ctx.fillRect(x, y + c, U, h - 2 * c); ctx.fillRect(x + w - U, y + c, U, h - 2 * c);
+  ctx.fillRect(x + U, y + U, U, U); ctx.fillRect(x + w - 2 * U, y + U, U, U); ctx.fillRect(x + U, y + h - 2 * U, U, U); ctx.fillRect(x + w - 2 * U, y + h - 2 * U, U, U);
+  if (line) { ctx.fillStyle = line; ctx.fillRect(x + c, y, w - 2 * c, U); }
+  if (accent) { ctx.fillStyle = HC.acc; ctx.fillRect(x + c, y, Math.min(12 * U, w - 2 * c), U); ctx.fillRect(x, y + c, U, Math.min(6 * U, h - 2 * c)); ctx.fillRect(x + U, y + U, U, U); }
+}
+function pxSegBar(x, y, n, sw, sh, frac, col) { for (let k = 0; k < n; k++) { ctx.fillStyle = (k + 0.5) / n <= frac ? col : 'rgba(255,255,255,0.08)'; ctx.fillRect(x + k * (sw + 1) * Z, y, sw * Z, sh * Z); } }
+const hudFx = { slot: -1, name: 0, xp: -1, xpT: 0 }; // 무기를 바꾼 직후 이름이 보일 시간, 경험치를 얻은 직후 밝게 보일 시간 (초)
+function hudTick(dt) {
+  const p = player; if (!p) return;
+  if (hudFx.slot !== p.slot) { if (hudFx.slot >= 0) hudFx.name = 2.5; hudFx.slot = p.slot; }
+  if (hudFx.xp !== p.xp) { if (hudFx.xp >= 0) hudFx.xpT = 2; hudFx.xp = p.xp; }
+  hudFx.name = Math.max(0, hudFx.name - dt); hudFx.xpT = Math.max(0, hudFx.xpT - dt);
 }
 function drawHUD() {
-  const p = player, y0 = VH;
-  const g = ctx.createLinearGradient(0, y0, 0, H); g.addColorStop(0, '#8e8775'); g.addColorStop(1, '#4b463a');
-  ctx.fillStyle = g; ctx.fillRect(0, y0, W, HUD_H);
-  // 경험치 막대 (HUD 윗변) + 남은 특성 점수 안내
-  ctx.fillStyle = '#1a1712'; ctx.fillRect(0, y0, W, 5);
-  ctx.fillStyle = '#c9a03a'; ctx.fillRect(0, y0, W * p.xp / xpNeed(p.clv), 5);
-  if ((p.pts > 0 || p.apts > 0) && state !== 'title') {
-    const t = `[K] 성장 점수 ${p.pts + p.apts}`;
-    ctx.textAlign = 'right'; ctx.font = font(FM, true);
-    ctx.fillStyle = '#000'; ctx.fillText(t, W - 15, y0 - 9);
-    ctx.fillStyle = Math.sin(gtime * 6) > 0 ? '#fff2a0' : '#ffc850'; ctx.fillText(t, W - 16, y0 - 10);
+  const p = player, U = Z, m = HUD_M * U, ch = HUD_CARD_H * U, top = hudBottom();
+  // 왼쪽 아래: 체력 (큰 숫자, 칸 막대), 방어 (방패, 작은 숫자), 기력 (가는 막대), 남은 성장 점수 (K)
+  const cw = 132 * U, cx = m;
+  pxCard(cx, top, cw, ch);
+  pxShape(SH_CROSS, cx + 7 * U, top + 8 * U, p.hp < p.maxhp * 0.3 && Math.sin(gtime * 8) > 0 ? '#ffffff' : '#c8202a');
+  pxNum(Math.ceil(p.hp), cx + 18 * U, top + 4 * U, 'red');
+  pxSegBar(cx + 7 * U, top + 24 * U, 12, 8, 4, p.hp / p.maxhp, '#c8202a');
+  if (p.armor > 0) { pxShape(SH_SHIELD, cx + cw - 30 * U, top + 6 * U, '#5a8fe0'); pxNum(Math.round(p.armor), cx + cw - 20 * U, top + 7 * U); }
+  ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(cx + 7 * U, top + 32 * U, 107 * U, 2 * U);
+  ctx.fillStyle = p.exhausted ? HC.dim : '#4f8fe8'; ctx.fillRect(cx + 7 * U, top + 32 * U, Math.round(107 * clamp(p.stamina / staminaMax(), 0, 1)) * U, 2 * U);
+  if (p.pts > 0 || p.apts > 0) { pxGlyph('K', cx + cw - 22 * U, top + 31 * U, Math.sin(gtime * 6) > 0 ? '#ffe08a' : HC.acc); pxNum(p.pts + p.apts, cx + cw - 17 * U, top + 30 * U); }
+  // 오른쪽 아래: 무기 (슬롯 표시, 끼운 파츠까지 그린 무기, 장탄 큰 숫자, 남은 탄). 무기 이름은 바꾼 직후에만
+  const ci = curW(), ws = ci.s, ww = 156 * U, wx = W - m - ww;
+  pxCard(wx, top, ww, ch);
+  for (let c = 0; c < NSLOT; c++) { const open = c < slotsOpen(), has = !!p.equip[c]; ctx.fillStyle = p.slot === c ? HC.acc : has ? '#8a8578' : open ? '#3a3a3a' : 'rgba(255,255,255,0.05)'; ctx.fillRect(wx + (7 + c * 9) * U, top + 5 * U, 7 * U, 3 * U); }
+  if (ci !== FISTS) drawWeaponArt(ci, wx + 62 * U, top + 9 * U, 88 * U, 26 * U);
+  if (ws.type === 'gun') {
+    const mw = pxNum(ci.mag, wx + 7 * U, top + 13 * U, ci.mag ? 'amber' : 'red');
+    pxNum(p.ammo[ws.ammo], wx + 9 * U + mw, top + 23 * U);
+    if (p.reload > 0) { ctx.fillStyle = HC.acc; ctx.fillRect(wx + 7 * U, top + 33 * U, Math.round(48 * (1 - p.reload / p.reloadMax)) * U, 2 * U); }
+    if (ws.spin) { ctx.fillStyle = '#f84'; ctx.fillRect(wx + 7 * U, top + 36 * U, Math.round(48 * p.spin) * U, U); } // 예열
   }
-  ctx.fillStyle = 'rgba(0,0,0,0.25)';
-  for (let x = 6; x < W; x += 60) { circle(x, y0 + 8, 2, 'rgba(0,0,0,0.3)'); circle(x, H - 6, 2, 'rgba(0,0,0,0.3)'); }
-
-  const TRK = 210, STAT = 270, left = 14, LA = W - TRK - STAT - 30;
-  // 무기 슬롯 1~4 (잠긴 칸은 무기고를 해제하면 열림)
-  const sw = Math.min(170, (LA - (NSLOT - 1) * 10) / NSLOT);
-  const ci = curW(), cw = ci.s;
-  for (let c = 0; c < NSLOT; c++) {
-    const x = left + c * (sw + 10), y = y0 + 12, open = c < slotsOpen(), on = open && p.slot === c, inst = p.equip[c];
-    lcd(x, y, sw, 38, on);
-    ctx.textAlign = 'left'; ctx.font = font(FL, true);
-    ctx.fillStyle = inst ? (on ? '#bfffbf' : '#4f9f5f') : open ? '#1f3f25' : '#2a2a22';
-    ctx.fillText(String(c + 1), x + 6, y + 27);
-    if (inst) {
-      drawWeaponArt(inst, x + 26, y + 2, sw - 30, 22);
-      ctx.font = font(FS); ctx.fillStyle = itemColor(inst); ctx.fillText(fitText(inst.name, sw - 30), x + 26, y + 35);
-    } else { ctx.font = font(FS); ctx.fillStyle = open ? '#3a6a45' : '#4a4a3e'; ctx.fillText(open ? '빈 슬롯' : '잠김', x + 28, y + 23); }
+  if (hudFx.name > 0) {
+    ctx.globalAlpha = Math.min(1, hudFx.name); ctx.textAlign = 'right'; ctx.font = font(FS, true);
+    ctx.fillStyle = '#000'; ctx.fillText(ci.name, wx + ww - 3 * U + 1, top - 4 * U + 1); ctx.fillStyle = itemColor(ci); ctx.fillText(ci.name, wx + ww - 3 * U, top - 4 * U);
+    ctx.globalAlpha = 1;
   }
-  // 현재 무기
-  const by = y0 + 64, wW = Math.min(230, LA * 0.32);
-  lcd(left, by, wW, 56, true);
-  if (ci !== FISTS) drawWeaponArt(ci, left + wW - 92, by + 4, 86, 24);
-  ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = RARITY[ci.rarity].color; ctx.fillText(fitText(ci.name, wW - 104), left + 8, by + 17);
-  if (cw.type === 'gun') {
-    ctx.font = font(FL, true); ctx.fillStyle = ci.mag ? '#bfffbf' : '#f66';
-    ctx.fillText(`${ci.mag}/${cw.mag}`, left + 8, by + 44);
-    ctx.font = font(FS); ctx.fillStyle = '#8fbf8f'; ctx.fillText(`${AMMO[cw.ammo].name} ${p.ammo[cw.ammo]}`, left + wW * 0.55, by + 44);
-    if (p.reload > 0) { ctx.fillStyle = '#ffd27a'; ctx.fillRect(left + 8, by + 49, (wW - 16) * (1 - p.reload / p.reloadMax), 3); }
-    if (cw.spin) { ctx.fillStyle = '#f84'; ctx.fillRect(left + wW - 10, by + 52 - 40 * p.spin, 4, 40 * p.spin); }
-  } else { ctx.font = font(FM); ctx.fillStyle = '#8fbf8f'; ctx.fillText(`근접 무기 (스태미너 ${cw.saw ? `초당 ${Math.round(cw.stamina / cw.rate)}` : cw.stamina})`, left + 8, by + 42); }
-  // 수류탄
-  const gx = left + wW + 14, gW = Math.min(150, LA * 0.2);
-  lcd(gx, by, gW, 56, false);
-  const gr = GRENADES[p.gsel];
-  ctx.font = font(FS, true); ctx.fillStyle = gr.color; ctx.fillText(gr.name, gx + 8, by + 17);
-  ctx.font = font(FL, true); ctx.fillText(`x${p.gren[p.gsel]}`, gx + 8, by + 44);
-  drawIcon('icon_gren_' + p.gsel, gx + gW - 34, by + 20, 26, 30);
-  ctx.font = font(FS); ctx.fillStyle = '#7a9a7a'; ctx.fillText('[G] 교체', gx + 52, by + 44);
-  // 아이템 스트립
-  const ix = gx + gW + 14, keysAll = [...MED_ORDER.slice().reverse(), ...SPECIAL_ITEMS];
-  const iw = Math.max(34, Math.min(52, (left + LA - ix) / keysAll.length - 4));
-  keysAll.forEach((k, n) => {
-    const x = ix + n * (iw + 4);
-    lcd(x, by, iw, 56, false);
-    ctx.textAlign = 'center';
-    ctx.globalAlpha = p.items[k] ? 1 : 0.35; drawIcon(ITEM_ART[k][0], x + 4, by + 3, iw - 8, 18); ctx.globalAlpha = 1;
-    ctx.font = font(FS); ctx.fillStyle = ITEMS[k].color; ctx.fillText(ITEMS[k].short, x + iw / 2, by + 30);
-    ctx.font = font(FM, true); ctx.fillStyle = p.items[k] ? '#dfffd0' : '#2f5f35'; ctx.fillText(p.items[k], x + iw / 2, by + 44);
-    ctx.font = font(FS, true); ctx.fillStyle = '#9fd09f'; ctx.fillText(`[${ITEM_KEY_LABEL[k]}]`, x + iw / 2, by + 54); // 단축키
-  });
-  // 스탯
-  const sx = W - TRK - STAT - 10;
-  ctx.fillStyle = '#2b2a24'; rr(sx, y0 + 10, STAT, HUD_H - 20, 5); ctx.fill();
-  // HP 줄무늬 막대 (원작 스타일)
-  const hx = sx + 10, hy = y0 + 18, hw = 60, hh = 92, n = 12, f = p.hp / p.maxhp;
-  for (let k = 0; k < n; k++) {
-    const yy = hy + hh - (k + 1) * (hh / n), on = (k + 0.5) / n <= f;
-    const t = k / (n - 1);
-    ctx.fillStyle = on ? `rgb(${230 - t * 120 | 0},${30 + t * 20 | 0},${60 + t * 180 | 0})` : '#2a1a22';
-    ctx.fillRect(hx, yy + 1, hw, hh / n - 3);
+  // 아래 가운데: 끼운 스킬 (Z X V B), 소모품 (Q E T), 수류탄 (G) — 작은 칸, 스킬 칸에 마우스를 올리면 설명
+  const S = HUD_SLOT * U, gap = 3 * U, sk = p.shells.map((sh, n) => sh && [sh, n]).filter(Boolean), items = Object.keys(ITEMS);
+  const n = sk.length + items.length + 1, total = n * S + (n - 1) * gap + (sk.length ? 6 * U : 0), y = VH - m - S;
+  let x = Math.round(W / 2 - total / 2), hover = null;
+  const box = (x2, on) => { ctx.fillStyle = on ? HC.acc : HC.edge; ctx.fillRect(x2, y, S, S); ctx.fillStyle = HC.slot; ctx.fillRect(x2 + U, y + U, S - 2 * U, S - 2 * U); };
+  for (const [sh, k] of sk) {
+    const Sk = SKILLS[sh.id], cd = p.scd[sh.id] || 0, left = skillLeft(sh.id);
+    box(x, !!left); drawIcon(Sk.icon, x + 2 * U, y + 2 * U, S - 4 * U, S - 4 * U);
+    if (cd > 0) { const f = clamp(cd / shellVals(sh).cd, 0, 1); ctx.fillStyle = 'rgba(0,0,0,0.66)'; ctx.fillRect(x + U, y + U, S - 2 * U, Math.round((S - 2 * U) * f)); pxNum(Math.ceil(cd), x + S / 2, y + 8 * U, 'small', 'center'); }
+    if (left) { ctx.fillStyle = Sk.color; ctx.fillRect(x + U, y + U, Math.round((S - 2 * U) * clamp(left, 0, 1)), U); }
+    pxGlyph(SHELL_SLOTS[k], x + 2 * U, y + S - 7 * U, HC.acc);
+    if (mouse.x >= x && mouse.x < x + S && mouse.y >= y && mouse.y < y + S) hover = { sh, x };
+    x += S + gap;
   }
-  ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = '#eee';
-  ctx.fillText(`${Math.ceil(p.hp)}/${p.maxhp}`, hx + hw + 10, hy + 14);
-  ctx.textAlign = 'right'; ctx.font = font(FM, true); ctx.fillStyle = '#ffe08a'; ctx.fillText(`Lv ${p.clv}`, sx + STAT - 10, hy + 14); // 캐릭터 레벨
-  ctx.textAlign = 'left';
-  // 아머 / 스태미너 막대
-  const bar = (label, y, frac, col) => {
-    ctx.font = font(FS); ctx.fillStyle = '#9ab'; ctx.fillText(label, hx + hw + 10, y + 9);
-    ctx.fillStyle = '#1a1f2a'; ctx.fillRect(hx + hw + 66, y, 110, 9);
-    ctx.fillStyle = col; ctx.fillRect(hx + hw + 66, y, 110 * frac, 9);
-  };
-  bar('방어', hy + 22, p.armor / 100, '#79f');
-  bar('스태미너', hy + 37, p.stamina / staminaMax(), staminaCol());
-  const ld = load();
-  ctx.fillStyle = '#ccc'; ctx.font = font(FS);
-  ctx.fillText('무게', hx + hw + 10, hy + 64); ctx.fillStyle = ld > maxLoad() ? '#f66' : '#dfffd0'; ctx.font = font(FM, true); ctx.fillText(`${Math.round(ld)} / ${maxLoad()}`, hx + hw + 66, hy + 64);
-  ctx.fillStyle = '#ccc'; ctx.font = font(FS); ctx.fillText('골드', hx + hw + 10, hy + 80);
-  ctx.fillStyle = '#ffd27a'; ctx.font = font(FM, true); ctx.fillText(String(p.gold), hx + hw + 66, hy + 80);
-  ctx.fillStyle = '#ccc'; ctx.font = font(FS); ctx.fillText('처치', hx + hw + 10, hy + 96);
-  ctx.fillStyle = '#dfffd0'; ctx.font = font(FM, true); ctx.fillText(String(kills), hx + hw + 66, hy + 96);
-  if (p.dashCd > 0) { ctx.fillStyle = '#888'; ctx.font = font(FS); ctx.fillText(`회피 ${p.dashCd.toFixed(1)}`, hx + hw + 150, hy + 96); }
-  drawTracker(W - TRK - 4, y0 + 6, TRK, HUD_H - 12);
-}
-function drawTracker(x, y, w, h) {
-  const p = player;
-  ctx.fillStyle = '#3a382e'; rr(x, y, w, h, 10); ctx.fill();
-  ctx.fillStyle = '#081a0e'; rr(x + 8, y + 8, w - 16, h - 16, 8); ctx.fill();
-  ctx.textAlign = 'center'; ctx.font = font(FM, true); ctx.fillStyle = '#7fdf9f'; ctx.fillText('동작 탐지기', x + w / 2, y + 24);
-  const cx = x + w / 2, cy = y + h / 2 + 6, R = Math.min(w, h) / 2 - 22, range = 24;
-  ctx.strokeStyle = 'rgba(100,220,140,0.3)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
-  ctx.beginPath(); ctx.arc(cx, cy, R / 2, 0, Math.PI * 2); ctx.stroke();
-  const sweep = gtime * 2;
-  ctx.strokeStyle = 'rgba(100,255,150,0.4)'; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(sweep) * R, cy + Math.sin(sweep) * R); ctx.stroke();
-  const toR = (dx, dy) => { let rx = (dx - dy) * 0.707, ry = (dx + dy) * 0.707; const l = Math.hypot(rx, ry); const s = R / range; if (l > range) { rx *= range / l; ry *= range / l; } return [cx + rx * s, cy + ry * s]; };
-  let nearest = 1e9, around = 0;
-  for (const e of enemies) {
-    const dx = e.x - p.x, dy = e.y - p.y, d = Math.hypot(dx, dy);
-    nearest = Math.min(nearest, d);
-    if (d > range) continue;
-    around++;
-    const [bx, by] = toR(dx, dy); circle(bx, by, e.d.boss ? 5 : e.elite || e.d.cost >= 4 || e.d.thief ? 3.5 : 2.2, e.d.boss ? '#ff9933' : e.d.nest ? '#e07aff' : e.d.thief ? '#ffd27a' : e.elite ? '#ffcc55' : e.aggro ? '#f66' : '#dfd');
+  if (sk.length) x += 6 * U;
+  for (const k of items) {
+    const c = p.items[k] || 0;
+    box(x, false); ctx.globalAlpha = c ? 1 : 0.3; drawIcon(ITEM_ART[k][0], x + 3 * U, y + 2 * U, S - 6 * U, S - 9 * U); ctx.globalAlpha = 1;
+    pxGlyph(ITEM_KEY_LABEL[k], x + 2 * U, y + S - 7 * U, HC.acc); pxNum(c, x + S - 2 * U, y + S - 8 * U, c ? 'small' : 'grey', 'right');
+    x += S + gap;
   }
-  for (const s of survivors) { // 생존자 (멀면 가장자리에 방향만, 갇힌 생존자는 깜박임)
-    if ((s.state !== 'wait' && s.state !== 'follow') || (s.state === 'wait' && Math.sin(gtime * 6) < -0.3)) continue;
-    const [bx, by] = toR(s.x - p.x, s.y - p.y); circle(bx, by, 3, '#7fc8ff');
-  }
-  const esc = escape && pads.find(pd => pd.kind === 'escape'), hb = !inBase && !esc && nearestHubPad(p.x, p.y); // 탈출정 (자폭 중) 또는 가장 가까운 거점
-  if (esc || hb) { const [ex, ey] = toR((esc ? esc.i : hb.pad.i) + 0.5 - p.x, (esc ? esc.j : hb.pad.j) + 0.5 - p.y); ctx.fillStyle = esc ? '#5f8' : '#4aa8e0'; ctx.fillRect(ex - 3, ey - 3, 6, 6); }
-  circle(cx, cy, 2, '#fff');
-  ctx.font = font(FM, true); ctx.fillStyle = nearest < 5 ? '#f55' : '#7fdf9f';
-  ctx.fillText(nearest < 1e8 ? `${Math.round(nearest)}M` : '--', cx, y + h - 14);
-  ctx.textAlign = 'left'; ctx.font = font(FS); ctx.fillStyle = '#5a9a6a';
-  ctx.fillText(inBase ? '우주 기지' : rift ? `균열 ${rift.tier}단계` : `구역 ${level}/${CAMPAIGN.length}`, x + 14, y + h - 14);
-  ctx.textAlign = 'right'; ctx.fillText(`주변 적 ${around}`, x + w - 14, y + h - 14);
+  const g = p.gren[p.gsel] || 0;
+  box(x, false); ctx.globalAlpha = g ? 1 : 0.3; drawIcon('icon_gren_' + p.gsel, x + 6 * U, y + 2 * U, S - 12 * U, S - 9 * U); ctx.globalAlpha = 1;
+  pxGlyph('G', x + 2 * U, y + S - 7 * U, HC.acc); pxNum(g, x + S - 2 * U, y + S - 8 * U, g ? 'small' : 'grey', 'right');
+  // 경험치: 맨 아래의 가는 줄 (얻은 직후 밝게) + 레벨
+  const xx = m + cw + 12 * U, xw = W - 2 * xx, xy = VH - 3 * U;
+  ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fillRect(xx, xy, xw, U);
+  ctx.globalAlpha = 0.45 + 0.55 * Math.min(1, hudFx.xpT); ctx.fillStyle = '#c9a03a'; ctx.fillRect(xx, xy, Math.round(xw * clamp(p.xp / xpNeed(p.clv), 0, 1)), U); ctx.globalAlpha = 1;
+  pxGlyph('L', xx, VH - 10 * U, HC.dim); pxNum(p.clv, xx + 5 * U, VH - 10 * U, 'grey');
+  if (hover && !held) { const L = shellTooltip(hover.sh); drawTooltip(L, hover.x - 60, y - L.length * 17 - 18, VH); }
 }
 function drawCursor() {
   if (state !== 'play' && state !== 'trade') return;
@@ -8415,11 +8343,20 @@ function saveGame(slot, quiet = false) {
   if (!quiet) Snd.play(ok ? 'save' : 'deny');
   return ok;
 }
+// 소모품 8종·수류탄 5종 시절의 저장: 메디킷 셋·나노봇·아머 패치 → 메디킷, 해독제·절연 패치 → 치료제, 가스·전기·소이 수류탄 → 파편
+function oldItems(it = {}) {
+  const n = k => it[k] || 0;
+  return { med: n('med') + n('medS') + n('medM') + n('medL') + n('nano') + n('armor'), cure: n('cure') + n('antidote') + n('insul'), adren: n('adren') };
+}
+function oldGren(g = {}) {
+  const n = k => g[k] || 0;
+  return { frag: n('frag') + n('gas') + n('shock') + n('fire'), cryo: n('cryo') };
+}
 function loadGame(slot) {
   const d = saveAt(readSaves(), slot);
   if (!d) return;
   const p = newPlayer(), q = d.player;
-  Object.assign(p, { hp: q.hp, armor: q.armor, gold: q.gold, ammo: { ...p.ammo, ...q.ammo }, gren: q.gren, items: q.items, gsel: q.gsel, slot: q.slot,
+  Object.assign(p, { hp: q.hp, armor: q.armor, gold: q.gold, ammo: { ...p.ammo, ...q.ammo }, gren: oldGren(q.gren), items: oldItems(q.items), gsel: GRENADES[q.gsel] ? q.gsel : 'frag', slot: q.slot,
     clv: q.clv || 1, xp: q.xp || 0, pts: q.pts || 0, perks: { ...(q.perks || {}) } }); // 성장 이전 저장은 Lv 1부터
   if (q.shells) p.shells = [0, 1, 2, 3].map(k => unpackWeapon(q.shells[k])); // 스킬 쉘이 생기기 전 저장은 충격파 쉘 하나로 시작
   p.attr = { ...p.attr, ...(q.attr || {}) }; p.apts = q.attr ? q.apts || 0 : ATTR_PER_LEVEL * (p.clv - 1); // 능력치가 생기기 전 저장은 지난 레벨만큼 점수를 줌

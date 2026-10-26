@@ -80,6 +80,8 @@ SPRITES = {
 }
 # Freedoom 스프라이트를 그대로 무기 아이콘으로: 아이콘 이름 -> (스프라이트, 좌우 반전)
 SPRITE_ICONS = {'sawedoff': ('sgn2a0', False), 'plasma': ('plasa0', False), 'launcher': ('launa0', False), 'bfg': ('bfuga0', False)}
+# HUD 숫자: Freedoom 상태 바 그림 (sttnum 큰 빨간 숫자, stysnum 작은 노란 숫자) — 아틀라스 키 hud_이름
+HUD_DIGITS = ['sttminus'] + [f'sttnum{i}' for i in range(10)] + [f'stysnum{i}' for i in range(10)]
 # 같은 그림을 색만 바꾼 변종: 새 접두어 -> (원본 접두어, 색조 이동 0~1[, 바꿀 색조 범위 (lo, hi), 채도·밝기 배율 (s, v)])
 DERIVED = {'bspr': ('bspi', 0.9),   # 질주 크롤러 (붉은 크롤러)
            'cpsh': ('cpos', 0.6),   # 방패 해병 (푸른 감염 해병)
@@ -249,7 +251,7 @@ README = """# assets/ — 그래픽 출처와 라이선스
 이 폴더는 `python tools/build_assets.py` 가 만든 결과물입니다. 직접 고치지 말고 스크립트를 다시 실행하세요.
 
 ## Freedoom — BSD-3-Clause
-- 출처: https://github.com/freedoom/freedoom (스프라이트, 벽 패치, 바닥 텍스처, 효과음, 배경음악)
+- 출처: https://github.com/freedoom/freedoom (스프라이트, 벽 패치, 바닥 텍스처, 상태 바 숫자, 효과음, 배경음악)
 - 라이선스 전문: `LICENSE-freedoom.txt`, 기여자 목록: `CREDITS-freedoom.txt`, 곡별 작곡자: `CREDITS-freedoom-music.txt`
 - 배경음악은 원본 MIDI 그대로(`music/*.mid`), 게임이 Web Audio 신시사이저로 연주
 - 가공: 스프라이트를 `atlas.png` 한 장으로 묶음, 벽 텍스처는 `textures.cfg` 정의대로 패치를 합성(`tex/wall_*.png` — 평균 밝기가 낮은 벽은 감마로 밝힘),
@@ -749,6 +751,10 @@ def main():
             im = im.transpose(Image.FLIP_LEFT_RIGHT)
         images['icon_' + name] = im
         frames['icon_' + name] = [0, 0, im.width, im.height, im.width // 2, im.height // 2]
+    for name in HUD_DIGITS:
+        im = Image.open(fetch(FD_RAW + 'graphics/' + name + '.png', 'gr_' + name + '.png')).convert('RGBA')
+        images['hud_' + name] = im
+        frames['hud_' + name] = [0, 0, im.width, im.height, 0, 0]
     for name, spec in ATTACH_ART.items():  # 무기 파츠: 프레임의 ox·oy가 붙는 점
         im, (ox, oy) = attach_icon(spec)
         images['att_' + name] = im

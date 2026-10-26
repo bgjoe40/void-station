@@ -3,7 +3,7 @@
 이 폴더는 `python tools/build_assets.py` 가 만든 결과물입니다. 직접 고치지 말고 스크립트를 다시 실행하세요.
 
 ## Freedoom — BSD-3-Clause
-- 출처: https://github.com/freedoom/freedoom (스프라이트, 벽 패치, 바닥 텍스처, 효과음, 배경음악)
+- 출처: https://github.com/freedoom/freedoom (스프라이트, 벽 패치, 바닥 텍스처, 상태 바 숫자, 효과음, 배경음악)
 - 라이선스 전문: `LICENSE-freedoom.txt`, 기여자 목록: `CREDITS-freedoom.txt`, 곡별 작곡자: `CREDITS-freedoom-music.txt`
 - 배경음악은 원본 MIDI 그대로(`music/*.mid`), 게임이 Web Audio 신시사이저로 연주
 - 가공: 스프라이트를 `atlas.png` 한 장으로 묶음, 벽 텍스처는 `textures.cfg` 정의대로 패치를 합성(`tex/wall_*.png` — 평균 밝기가 낮은 벽은 감마로 밝힘),

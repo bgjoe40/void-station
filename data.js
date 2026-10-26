@@ -1,7 +1,7 @@
 // ===== 게임 데이터 정의 (무기 / 탄약 / 수류탄 / 아이템 / 적) =====
 
 // 버전: GitHub에 커밋·푸시할 때마다 올림 (새 기능은 가운데 자리, 고침·작은 추가는 끝자리) — 타이틀·일시정지 화면에 표시, git 태그 v<버전>
-const VERSION = '0.7.0';
+const VERSION = '0.8.0';
 
 const CAT_NAMES = ['근접', '권총', '샷건', '라이플', '기관총', '에너지'];
 const MAX_LOAD = 30;   // 장착 + 가방 무기 무게 합이 넘으면 이동속도 감소
@@ -170,30 +170,22 @@ const ELEMS = {
   cryo:   { name: '둔화', prefix: '빙결의',   color: '#bbeeff' },
 };
 
+// 수류탄 두 가지: 피해 (파편), 묶어 두기 (냉동)
 const GRENADES = {
   frag:  { name: '파편 수류탄', short: '파편', color: '#d8c070', price: 60 },
-  gas:   { name: '독가스 수류탄', short: '가스', color: '#8d4', price: 70 },
-  shock: { name: '전기 수류탄', short: '전기', color: '#6cf', price: 70 },
-  fire:  { name: '소이 수류탄', short: '화염', color: '#f73', price: 70 },
   cryo:  { name: '냉동 수류탄', short: '냉동', color: '#bef', price: 70 },
 };
 
+// 소모품 세 가지 (HUD 칸 순서 = 단축키 Q·E·T): 메디킷 (최대 체력의 MED_HEAL만큼), 치료제 (중독·화상·감전), 아드레날린
 const ITEMS = {
-  medS:     { name: '소형 메디킷', short: '메디S', desc: '체력 +40',  price: 40,  color: '#e55' },
-  medM:     { name: '중형 메디킷', short: '메디M', desc: '체력 +90',  price: 85,  color: '#f44' },
-  medL:     { name: '대형 메디킷', short: '메디L', desc: '체력 +200', price: 160, color: '#f22' },
-  nano:     { name: '나노봇 주사', short: '나노',  desc: '10초간 체력 140 지속 회복', price: 110, color: '#6ef' },
-  antidote: { name: '해독제',     short: '해독',  desc: '중독·화상 해제 + 8초 면역', price: 45, color: '#9e4' },
-  insul:    { name: '절연 패치',  short: '절연',  desc: '감전 해제 + 10초 면역',   price: 45, color: '#fd4' },
-  armor:    { name: '아머 패치',  short: '아머',  desc: '방어도 +50 (최대 100)',   price: 90, color: '#79f' },
-  adren:    { name: '아드레날린', short: '아드',  desc: '12초간 이동·공격속도 +35%', price: 90, color: '#f8c' },
+  med:   { name: '메디킷',     short: '메디킷', desc: '최대 체력의 40% 회복',      price: 70, color: '#e55' },
+  cure:  { name: '치료제',     short: '치료제', desc: '중독·화상·감전 해제 + 8초 면역', price: 50, color: '#9e4' },
+  adren: { name: '아드레날린', short: '아드',   desc: '12초간 이동·공격속도 +35%', price: 90, color: '#f8c' },
 };
-const MED_ORDER = ['medL', 'medM', 'medS'];
-const SPECIAL_ITEMS = ['nano', 'antidote', 'insul', 'armor', 'adren'];
-// 소모품 단축키 (HUD 칸 순서): 메디킷 Q·E·T, 보조 아이템 7·8·9·0·- (1~4는 무기 슬롯)
-const ITEM_KEYS = { KeyQ: 'medS', KeyE: 'medM', KeyT: 'medL', Digit7: 'nano', Digit8: 'antidote', Digit9: 'insul', Digit0: 'armor', Minus: 'adren' };
-const ITEM_KEY_LABEL = Object.fromEntries(Object.entries(ITEM_KEYS).map(([code, id]) => [id, code === 'Minus' ? '-' : code.slice(-1)]));
-const ITEM_DROP_WEIGHTS = { medS: 5, medM: 3, medL: 1, nano: 1.5, antidote: 2, insul: 2, armor: 2, adren: 1.5 };
+const MED_HEAL = 0.4;
+const ITEM_KEYS = { KeyQ: 'med', KeyE: 'cure', KeyT: 'adren' };
+const ITEM_KEY_LABEL = Object.fromEntries(Object.entries(ITEM_KEYS).map(([code, id]) => [id, code.slice(-1)]));
+const ITEM_DROP_WEIGHTS = { med: 6, cure: 3, adren: 1.5 };
 
 // ===== 우주 기지 =====
 // 신체 개조 (영구): max 단계까지, 단계마다 비용 = cost x (현재 단계 + 1)
@@ -1020,7 +1012,7 @@ const TIPS = {
   hack:      { title: '임무: 해킹', icon: null, lines: ['단말기 곁을 지키면 해킹이 진행된다'] },
   nest:      { title: '임무: 둥지 파괴', icon: 'col5a0', lines: ['둥지는 계속 몬스터를 낳는다. 서둘러 부숴라'] },
   blackout:  { title: '정전', icon: 'tlmpa0', lines: ['손전등이 비추는 곳만 보인다'] },
-  gas:       { title: '독가스 누출', icon: 'icon_gren_gas', lines: ['해독제 [8]를 쓰거나 방을 벗어나라'] },
+  gas:       { title: '독가스 누출', icon: 'icon_gren_gas', lines: ['치료제 [E]를 쓰거나 방을 벗어나라'] },
   breach:    { title: '선체 파손', icon: null, lines: ['구멍 쪽으로 빨려 간다. 다른 방으로 피하라'] },
   watcher:   { title: '감시자', icon: 'vilea1d1', lines: ['발밑에 붉은 원이 생기면 바로 비켜서라'] },
   gear:      { title: '방어구', icon: 'icon_vest_tac', lines: ['머리, 몸, 다리 방어구가 받는 피해를 줄인다'] },
@@ -1036,10 +1028,10 @@ const TIPS = {
   ach:       { title: '업적', icon: null, lines: ['업적을 이루면 작은 영구 보너스가 붙는다'] },
   set:       { title: '◆ 세트 장비', icon: null, lines: ['같은 세트를 2개 이상 장착하면 세트 효과가 붙는다'] },
   unique:    { title: '★ 고유 전설', icon: null, lines: ['고유 효과가 있는 특별한 장비다'] },
-  poison:    { title: '중독', icon: 'bon1a0', lines: ['해독제 [8]로 풀 수 있다'] },
-  shock:     { title: '감전', icon: 'suita0', lines: ['절연 패치 [9]로 풀 수 있다'] },
+  poison:    { title: '중독', icon: 'bon1a0', lines: ['치료제 [E]로 풀 수 있다'] },
+  shock:     { title: '감전', icon: 'suita0', lines: ['치료제 [E]로 풀 수 있다'] },
   stamina:   { title: '스태미너', icon: 'icon_syringe_blue', lines: ['바닥나면 잠시 달릴 수 없다'] },
-  lowhp:     { title: '체력이 낮다', icon: 'media0', lines: ['메디킷 [Q] [E] [T]로 회복한다'] },
+  lowhp:     { title: '체력이 낮다', icon: 'media0', lines: ['메디킷 [Q]로 회복한다'] },
   bagfull:   { title: '가방이 가득 참', icon: 'bpaka0', lines: ['창고에 맡기거나 회수 자판기에서 팔아라'] },
   noammo:    { title: '탄약이 떨어짐', icon: 'clipa0', lines: ['다른 무기로 바꿔라. 근접 무기는 탄약이 필요 없다'] },
   gem:       { title: '보석과 소켓', icon: 'icon_gem_ruby', lines: ['소켓(◇)이 있는 장비 위에 보석을 끌어다 놓는다'] },
