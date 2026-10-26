@@ -2,7 +2,7 @@
 // ===== 디버그 뷰어 (타이틀·일시정지 메뉴): 캐릭터 동작·소리, 무기 발사 모습·소리, 아이템·스킬 소리, 효과 스프라이트, 효과음 전부, 배경음악 =====
 // 게임 상태는 건드리지 않음 — 미리보기는 따로 그리는 작은 캔버스 (menu.js의 screen·on·img를 씀)
 
-const DBG_TABS = [['chars', '캐릭터', 'CHARACTERS'], ['weapons', '무기', 'WEAPONS'], ['items', '아이템·스킬', 'ITEMS'], ['fx', '효과', 'SPRITES'], ['sfx', '효과음', 'SOUNDS'], ['music', '음악', 'MUSIC']];
+const DBG_TABS = [['chars', '캐릭터'], ['weapons', '무기'], ['items', '아이템·스킬'], ['fx', '효과'], ['sfx', '효과음'], ['music', '음악']];
 const dbg = { tab: 'chars', sel: {}, mode: 'walk', rot: 0, spin: true, speed: 1, auto: false, t: 0, last: 0, raf: 0, music: null, fireT: 0, shotT: 0, cool: 0, sawT: 0, shots: [], fx: [], parts: [], swing: 0, hitT: 0, nade: null };
 
 // --- 소리: 최소 간격 없이 바로 (같은 소리를 여러 번 눌러도 들리게) ---
@@ -21,7 +21,7 @@ const SKILL_SND = { shock: ['skillShock'], charge: ['charge'], saw: ['sawUp', 's
 const NADE_SND = { frag: 'explode', gas: 'gas', shock: 'shock', fire: 'fire', cryo: 'cryo' };
 const SYNTH_ONLY = ['hit', 'gas', 'throw', 'dash', 'alarm', 'wind', 'step', 'heart', 'tip', 'dodge']; // Freedoom 소리가 없어 합성하는 이름
 const MON_SND = [['sight', '발견'], ['attack', '공격'], ['pain', '피격'], ['death', '사망'], ['idle', '기척']];
-const FX_NAME = { play: '주인공 (해병)', sswv: '생존자 (승무원)', bar1: '폭발 드럼통', bexp: '드럼통 폭발', misl: '로켓 · 폭발', fire: '불꽃', tfog: '순간이동 안개', ifog: '아이템 안개',
+const FX_NAME = { play: '주인공 (해병)', sswv: '생존자 (승무원)', bar1: '폭발 드럼통', bexp: '드럼통 폭발', misl: '로켓, 폭발', fire: '불꽃', tfog: '순간이동 안개', ifog: '아이템 안개',
   bal7: '산성 구체', plss: '플라즈마 탄', plse: '플라즈마 명중', puff: '총탄 연기', tlmp: '조명등', stim: '소형 메디킷', medi: '메디킷', bon1: '체력 보너스', suit: '방호복', arm1: '방탄복',
   clip: '탄창', shel: '산탄', ammo: '탄약 상자', brok: '로켓 상자', sgn2: '2연발 샷건', bpak: '배낭', bkey: '파란 키카드', ykey: '노란 키카드', rkey: '빨간 키카드', bosf: '오버마인드 포자',
   manf: '화염탄', blud: '피 튐', plas: '플라즈마 소총', laun: '로켓 발사기', bfug: '분쇄포', cell: '에너지 셀', rock: '로켓', bfs1: '분쇄포 구체', bfe1: '분쇄포 폭발', bfe2: '분쇄포 폭발 2',
@@ -44,16 +44,16 @@ function dbgList(tab) {
   if (tab === 'fx') {
     const mon = {};
     for (const [k, A] of Object.entries(ENEMY_ART)) if (!mon[A.spr]) mon[A.spr] = (ENEMIES[k] && ENEMIES[k].name) || k;
-    return Object.keys(META.sprites).sort().map(p => { const fr = Object.keys(META.sprites[p]).sort(); return { id: p, name: `${p} · ${FX_NAME[p] || mon[p] || '스프라이트'}`, icon: META.sprites[p][fr[0]][0][0], frames: fr.join('') }; });
+    return Object.keys(META.sprites).sort().map(p => { const fr = Object.keys(META.sprites[p]).sort(); return { id: p, name: `${p}, ${FX_NAME[p] || mon[p] || '스프라이트'}`, icon: META.sprites[p][fr[0]][0][0], frames: fr.join('') }; });
   }
   if (tab === 'sfx') return [
-    ...Object.keys(SFX).map(k => ({ id: k, name: `${k} — ${SFX[k][0].join(' · ')}`, key: k, head: '게임 효과음 (이름 — Freedoom 파일)' })),
-    ...SYNTH_ONLY.map(k => ({ id: k, name: `${k} — 합성음`, key: k, head: '합성 효과음 (Freedoom에 없음)' })),
+    ...Object.keys(SFX).map(k => ({ id: k, name: `${k}: ${SFX[k][0].join(', ')}`, key: k, head: '게임 효과음 (이름: Freedoom 파일)' })),
+    ...SYNTH_ONLY.map(k => ({ id: k, name: `${k}: 합성음`, key: k, head: '합성 효과음 (Freedoom에 없음)' })),
     ...(META.sounds || []).map(n => ({ id: 'raw_' + n, name: n, raw: n, head: '원본 효과음 파일 전체' })),
   ];
   const role = { title: '타이틀', base: '보급 거점', escape: '탈출 (자폭)', ending: '엔딩', rift: '차원 균열' };
   return [...Object.entries(role).map(([k, r]) => ({ id: MUSIC[k], role: r })), ...MUSIC.zones.map((m, n) => ({ id: m, role: `구역 ${n + 1} ${CAMPAIGN[n].name}` }))]
-    .map(o => ({ ...o, name: `${o.role} — ${(MUSIC_INFO[o.id] || [o.id])[0]}`, song: o.id }));
+    .map(o => ({ ...o, name: `${o.role}: ${(MUSIC_INFO[o.id] || [o.id])[0]}`, song: o.id }));
 }
 const dbgItem = () => { const L = dbgList(dbg.tab); return L.find(o => o.id === dbg.sel[dbg.tab]) || L[0]; };
 
@@ -64,10 +64,10 @@ function debugScreen(back) {
   let head = '';
   const rows = L.map(o => { const h = o.head && o.head !== head ? `<div class="dbg-h">${escHtml(head = o.head)}</div>` : ''; return `${h}<button class="gi ${o === cur ? 'on' : ''}" data-nav data-d="${escHtml(o.id)}">${o.icon ? img(o.icon, 48) : ''}<span>${escHtml(o.name)}</span></button>`; }).join('');
   screen(`<div class="center" style="position:absolute;inset:0"><div class="frm dbg" style="width:min(1180px,96vw)">
-      <div class="hd"><div class="grow"><div class="eye">DEBUG · 개발자 도구</div><div class="h1">디버그 뷰어</div></div>
-        <div class="tabs">${DBG_TABS.map(([k, t, e]) => `<button class="tab ${k === dbg.tab ? 'on' : ''}" data-nav data-tab="${k}">${t}<span class="e">${e}</span></button>`).join('')}</div></div>
+      <div class="hd"><div class="grow"><div class="h1">디버그 뷰어</div></div>
+        <div class="tabs">${DBG_TABS.map(([k, t]) => `<button class="tab ${k === dbg.tab ? 'on' : ''}" data-nav data-tab="${k}">${t}</button>`).join('')}</div></div>
       <div class="bd"><div class="guide dbg-g"><div class="glist">${rows}</div><div class="gdet" id="dbgDet"></div></div></div>
-      <div class="ft"><span class="note">목록에서 고르면 오른쪽에서 동작을 보고 소리를 들을 수 있습니다 · 게임 진행에는 영향 없음</span><button class="btn" data-nav id="dbgBack">뒤로</button></div>
+      <div class="ft"><span class="note">목록에서 고르면 오른쪽에서 동작을 보고 소리를 들을 수 있습니다, 게임 진행에는 영향 없음</span><button class="btn" data-nav id="dbgBack">뒤로</button></div>
     </div></div>`, { cls: 'dim', back: () => dbgLeave(back), focus: `[data-d="${cur.id}"]` });
   onAll('[data-tab]', b => { if (b.dataset.tab !== dbg.tab) { dbg.tab = b.dataset.tab; debugScreen(back); setFocus(overlay.querySelector(`[data-tab="${dbg.tab}"]`)); } }, 'uiMove');
   onAll('[data-d]', b => dbgPick(b.dataset.d), null);
@@ -101,32 +101,32 @@ function dbgDetail() {
       <div class="dbg-row">${dbgBtn('dRotL', '◀ 방향')}${dbgBtn('dRotR', '방향 ▶')}${dbgBtn('dSpin', '자동 회전', dbg.spin)}${dbgBtn('dSpeed', `속도 ×${dbg.speed}`)}</div>
       <div class="dbg-row">${it.mon ? MON_SND.filter(([k]) => it.mon[k]).map(([k, t]) => dbgBtn('ds_' + k, `♪ ${t}`)).join('') : it.snd.map(([t], n) => dbgBtn('ds_' + n, `♪ ${t}`)).join('')}</div>`;
     const E = it.E;
-    info = E ? `체력 ${E.hp} · 속도 ${E.spd} · 크기 ${E.r}${E.dmg ? ` · 피해 ${E.dmg}` : ''}${E.from ? ` · 구역 ${E.from}부터` : ''}${E.boss ? ' · 보스' : ''}<br>${escHtml(MONSTER_DESC[it.id] || '')}` : '';
-    info += `<br><span class="muted">스프라이트 ${it.A.spr} · 걷기 ${it.A.walk} · 공격 ${it.A.attack} · 피격 ${it.A.pain} · 사망 ${it.A.death}${it.A.scale !== 1 ? ` · 크기 ×${it.A.scale}` : ''}</span>`;
+    info = E ? `체력 ${E.hp}, 속도 ${E.spd}, 크기 ${E.r}${E.dmg ? `, 피해 ${E.dmg}` : ''}${E.from ? `, 구역 ${E.from}부터` : ''}${E.boss ? ', 보스' : ''}<br>${escHtml(MONSTER_DESC[it.id] || '')}` : '';
+    info += `<br><span class="muted">스프라이트 ${it.A.spr}, 걷기 ${it.A.walk}, 공격 ${it.A.attack}, 피격 ${it.A.pain}, 사망 ${it.A.death}${it.A.scale !== 1 ? `, 크기 ×${it.A.scale}` : ''}</span>`;
   } else if (T === 'weapons') {
     const w = it.w, melee = w.type === 'melee';
     ctl = `<div class="dbg-row">${dbgBtn('dFire', melee ? '휘두르기' : '발사')}${dbgBtn('dAuto', '계속 공격', dbg.auto)}${melee ? '' : dbgBtn('dRel', '♪ 재장전')}${w.saw ? dbgBtn('dSaw0', '♪ 시동') + dbgBtn('dSaw1', '♪ 작동') + dbgBtn('dSaw2', '♪ 갈아냄') : melee ? dbgBtn('dHit', '♪ 명중') : ''}</div>`;
-    info = `${CAT_NAMES[w.cat]} · 피해 ${w.dmg}${w.pellets ? ` ×${w.pellets}` : ''} · ${melee ? `공격 간격 ${w.rate}초 · 사거리 ${w.range} · 스태미너 ${w.stamina}` : `발사 간격 ${w.rate}초 · 장탄 ${w.mag} · 재장전 ${w.reload}초 · ${AMMO[w.ammo].name}`}<br>
-      <span class="muted">${melee ? `근접${w.saw ? ' · 체인톱' : w.chain ? ' · 연쇄 번개' : w.reflect ? ' · 탄 되받아치기' : ''}` : `탄: ${w.proj || '총탄'} · 소리: ${w.snd || 'pistol'}${w.blast ? ` · 폭발 반경 ${w.blast}` : ''}`}</span><br>${escHtml(w.desc || '')}`;
+    info = `${CAT_NAMES[w.cat]}, 피해 ${w.dmg}${w.pellets ? ` ×${w.pellets}` : ''}, ${melee ? `공격 간격 ${w.rate}초, 사거리 ${w.range}, 스태미너 ${w.stamina}` : `발사 간격 ${w.rate}초, 장탄 ${w.mag}, 재장전 ${w.reload}초, ${AMMO[w.ammo].name}`}<br>
+      <span class="muted">${melee ? `근접${w.saw ? ', 체인톱' : w.chain ? ', 연쇄 번개' : w.reflect ? ', 탄 되받아치기' : ''}` : `탄: ${w.proj || '총탄'}, 소리: ${w.snd || 'pistol'}${w.blast ? `, 폭발 반경 ${w.blast}` : ''}`}</span><br>${escHtml(w.desc || '')}`;
   } else if (T === 'items') {
-    if (it.nade) { ctl = `<div class="dbg-row">${dbgBtn('dUse', '던지기')}${dbgBtn('dSnd', '♪ 터지는 소리')}</div>`; info = `던지는 소리 throw · 터지는 소리 ${NADE_SND[it.nade]}`; }
+    if (it.nade) { ctl = `<div class="dbg-row">${dbgBtn('dUse', '던지기')}${dbgBtn('dSnd', '♪ 터지는 소리')}</div>`; info = `던지는 소리 throw, 터지는 소리 ${NADE_SND[it.nade]}`; }
     else if (it.item) { ctl = `<div class="dbg-row">${dbgBtn('dUse', '사용')}</div>`; info = escHtml(ITEMS[it.item].desc || ''); }
-    else if (it.ammo) { ctl = `<div class="dbg-row">${dbgBtn('dUse', '줍기')}</div>`; info = `최대 ${AMMO[it.ammo].max} · 한 묶음 ${AMMO[it.ammo].pack}`; }
-    else { ctl = `<div class="dbg-row">${SKILL_SND[it.skill].map((s, n) => dbgBtn('dSk_' + n, `♪ ${n ? '효과' : '사용'} (${s})`)).join('')}</div>`; info = `대기시간 ${SKILLS[it.skill].cd}초 · 그림 ${SKILLS[it.skill].icon}`; }
+    else if (it.ammo) { ctl = `<div class="dbg-row">${dbgBtn('dUse', '줍기')}</div>`; info = `최대 ${AMMO[it.ammo].max}, 한 묶음 ${AMMO[it.ammo].pack}`; }
+    else { ctl = `<div class="dbg-row">${SKILL_SND[it.skill].map((s, n) => dbgBtn('dSk_' + n, `♪ ${n ? '효과' : '사용'} (${s})`)).join('')}</div>`; info = `대기시간 ${SKILLS[it.skill].cd}초, 그림 ${SKILLS[it.skill].icon}`; }
   } else if (T === 'fx') {
     ctl = `<div class="dbg-row">${dbgBtn('dRotL', '◀ 방향')}${dbgBtn('dRotR', '방향 ▶')}${dbgBtn('dSpeed', `속도 ×${dbg.speed}`)}</div>`;
     info = `프레임 ${it.frames} (${it.frames.length}장)`;
   } else if (T === 'sfx') {
     const f = it.key && SFX[it.key];
     ctl = `<div class="dbg-row">${dbgBtn('dPlay', '♪ 다시 듣기')}</div>`;
-    info = it.raw ? `원본 파일 assets/sfx/${it.raw}.wav` : f ? `파일 ${f[0].join(' · ')} · 크기 ${f[1]} · 재생 속도 ${f[2]}${f[3] ? ` · 최소 간격 ${f[3]}초` : ''}` : 'Freedoom에 맞는 소리가 없어 게임 안에서 합성하는 소리';
+    info = it.raw ? `원본 파일 assets/sfx/${it.raw}.wav` : f ? `파일 ${f[0].join(', ')}, 크기 ${f[1]}, 재생 속도 ${f[2]}${f[3] ? `, 최소 간격 ${f[3]}초` : ''}` : 'Freedoom에 맞는 소리가 없어 게임 안에서 합성하는 소리';
   } else {
     const I = MUSIC_INFO[it.song] || [];
     ctl = `<div class="dbg-row">${dbgBtn('dPlay', '▶ 재생')}${dbgBtn('dStop', '■ 정지')}</div>`;
-    info = `${escHtml(I[0] || it.song)} — ${escHtml(I[1] || '')}<br><span class="muted">파일 assets/music/${it.song}.mid · 음량 보정 ×${I[2] || 1}</span>`;
+    info = `${escHtml(I[0] || it.song)}: ${escHtml(I[1] || '')}<br><span class="muted">파일 assets/music/${it.song}.mid, 음량 보정 ×${I[2] || 1}</span>`;
   }
   const big = T === 'sfx' || T === 'music' ? `<div class="dbg-ic">${it.icon ? img(it.icon, 96) : '♪'}</div>` : canvasHTML;
-  det.innerHTML = `<div class="gh">${it.icon ? img(it.icon, 64) : ''}<div><div class="eye">${DBG_TABS.find(t => t[0] === T)[2]}</div><div class="h1" style="font-size:22px">${escHtml(it.name)}</div></div></div>
+  det.innerHTML = `<div class="gh">${it.icon ? img(it.icon, 64) : ''}<div><div class="eye">${DBG_TABS.find(t => t[0] === T)[1]}</div><div class="h1" style="font-size:22px">${escHtml(it.name)}</div></div></div>
     ${big}${ctl}<p>${info}</p>`;
   wireNav(det);
   dbgWire(it);
@@ -216,8 +216,8 @@ function dbgDrawChar(g, it, W2, H2, floor) {
   const s = Math.min(3 * A.scale, (floor - 30) / Math.max(1, seqH)), z = A.z ? (A.z + Math.sin(t * 3) * 3) * s * 0.5 : 0;
   g.fillStyle = 'rgba(0,0,0,0.45)'; g.beginPath(); g.ellipse(W2 / 2, floor, 22 * s * A.scale / 2 + 10, 7 + 2 * s, 0, 0, Math.PI * 2); g.fill();
   dbgFrame(g, key, W2 / 2, floor - z, s, flip);
-  g.fillStyle = '#7f8a96'; g.font = '12px sans-serif'; g.textAlign = 'left';
-  g.fillText(`동작 ${m} · 프레임 ${fr} · 방향 ${rot + 1}/8 · ${key}${flip ? ' (좌우 반전)' : ''}`, 12, H2 - 14);
+  g.fillStyle = '#7f8a96'; g.font = font(FS); g.textAlign = 'left';
+  g.fillText(`동작 ${m}, 프레임 ${fr}, 방향 ${rot + 1}/8, ${key}${flip ? ' (좌우 반전)' : ''}`, 12, H2 - 14);
 }
 // 무기: 왼쪽 해병이 오른쪽 과녁(크롤러)을 쏨 / 근접은 바로 앞을 휘두름
 function dbgDrawWeapon(g, it, W2, H2, floor, dt) {
@@ -294,6 +294,6 @@ function dbgDrawFx(g, it, W2, H2, floor) {
   if (!f) return;
   const s = Math.min(4, (floor - 30) / Math.max(1, f[3]), (W2 - 60) / Math.max(1, f[2]));
   dbgFrame(g, key, W2 / 2, floor - 10, s, fl);
-  g.fillStyle = '#7f8a96'; g.font = '12px sans-serif'; g.textAlign = 'left';
-  g.fillText(`프레임 ${frs[k]} (${k + 1}/${frs.length}) · 방향 ${dbg.rot + 1}/8 · ${key} · ${f[2]}×${f[3]}`, 12, H2 - 14);
+  g.fillStyle = '#7f8a96'; g.font = font(FS); g.textAlign = 'left';
+  g.fillText(`프레임 ${frs[k]} (${k + 1}/${frs.length}), 방향 ${dbg.rot + 1}/8, ${key}, ${f[2]}×${f[3]}`, 12, H2 - 14);
 }

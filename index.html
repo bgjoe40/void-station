@@ -15,7 +15,6 @@
     --line: rgba(150, 182, 205, .14); --line2: rgba(150, 182, 205, .28);
     --f-ui: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
     --f-disp: 'Bahnschrift', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
-    --f-cond: 'Bahnschrift SemiCondensed', 'Bahnschrift', 'Arial Narrow', 'Malgun Gothic', sans-serif;
   }
   html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; font-family: var(--f-ui); color: var(--ink); }
   #game { display: block; cursor: none; }
@@ -48,7 +47,7 @@
   .fade.on { opacity: 1; pointer-events: all; }
 
   /* --- 글자 --- */
-  .eye { font: 600 12px var(--f-cond); letter-spacing: .28em; text-transform: uppercase; color: var(--acc); }
+  .eye { font: 700 12px var(--f-ui); letter-spacing: .04em; color: var(--acc); }
   .eye.cy { color: var(--cy); }
   .h1 { font: 700 30px var(--f-ui); margin: 4px 0 0; letter-spacing: -.01em; }
   .muted { color: var(--dim); }
@@ -104,13 +103,10 @@
   .mi { position: relative; display: flex; align-items: center; gap: 16px; width: 100%; max-width: 440px; padding: 11px 18px 11px 22px; border: 0; background: transparent;
     color: var(--ink2); text-align: left; transition: transform .18s cubic-bezier(.2, .7, .2, 1), color .15s, background .15s; animation: rise .45s cubic-bezier(.2, .7, .2, 1) backwards; animation-delay: calc(var(--i, 0) * 55ms + 120ms); }
   .mi::before { content: ''; position: absolute; left: 0; top: 50%; width: 3px; height: 0; background: var(--acc); box-shadow: 0 0 12px var(--acc); transform: translateY(-50%); transition: height .18s; }
-  .mi .n { font: 600 13px var(--f-disp); color: var(--faint); width: 22px; flex: none; }
   .mi .lb { flex: 1; min-width: 0; }
   .mi .t { font: 700 clamp(19px, 2.3vh, 23px) var(--f-ui); letter-spacing: -.01em; }
-  .mi .e { margin-left: auto; font: 600 11px var(--f-cond); letter-spacing: .26em; color: var(--faint); white-space: nowrap; flex: none; }
   .mi:focus, .mi.f { color: #fff; transform: translateX(12px); background: linear-gradient(90deg, rgba(var(--acc-rgb), .2), rgba(var(--acc-rgb), .04) 60%, transparent); }
   .mi:focus::before, .mi.f::before { height: 64%; }
-  .mi:focus .n, .mi:focus .e, .mi.f .n, .mi.f .e { color: var(--acc); }
   .mi:disabled { opacity: .3; }
   .mi .sub { display: block; font: 12px var(--f-ui); color: var(--dim); margin-top: 3px; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .mi:focus .sub, .mi.f .sub { color: var(--ink2); }
@@ -126,10 +122,7 @@
   .meter.violet i { background: linear-gradient(90deg, #7b4fd0, var(--violet)); }
   .t-foot { position: absolute; left: clamp(28px, 6.5vw, 120px); right: clamp(24px, 4vw, 70px); bottom: 22px; display: flex; align-items: center; gap: 22px; color: var(--dim); font-size: 12px; }
   .t-foot .keys-h { margin-left: auto; display: flex; gap: 18px; }
-  .t-foot .ver { font: 600 11px var(--f-cond); letter-spacing: .2em; color: var(--faint); }
-  .ticker { position: absolute; top: 18px; right: clamp(24px, 4vw, 70px); font: 600 11px var(--f-cond); letter-spacing: .22em; color: rgba(var(--cy-rgb), .65); text-align: right; animation: fadeIn 1.2s .6s backwards; }
-  .ticker .blink { color: var(--bad); animation: blink 1.6s infinite steps(2); }
-  @keyframes blink { 50% { opacity: .2; } }
+  .t-foot .ver { font: 600 11px var(--f-disp); letter-spacing: .1em; color: var(--faint); }
 
   /* 낮은 화면: 타이틀을 촘촘하게 */
   @media (max-height: 780px) {
@@ -146,14 +139,13 @@
   .splash { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
   .splash .logo { width: min(820px, 76vw); margin: 0; }
   .splash .tag { margin-top: 14px; font-size: 15px; }
-  .press { margin-top: 9vh; font: 600 15px var(--f-cond); letter-spacing: .5em; color: var(--ink); animation: pulse 2.2s ease-in-out infinite; }
-  .press small { display: block; margin-top: 8px; letter-spacing: .1em; font: 13px var(--f-ui); color: var(--ink2); }
+  .press { margin-top: 9vh; font: 600 15px var(--f-ui); letter-spacing: .1em; color: var(--ink); animation: pulse 2.2s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: .35; } }
   .load { margin-top: 9vh; width: 320px; }
   .load .meter { height: 3px; }
   .load .meter i { width: 40%; animation: indet 1.2s ease-in-out infinite; }
   @keyframes indet { from { left: -40%; } to { left: 100%; } }
-  .load .muted { margin-top: 10px; font: 600 11px var(--f-cond); letter-spacing: .3em; }
+  .load .muted { margin-top: 10px; font: 600 12px var(--f-ui); letter-spacing: .05em; }
 
   /* --- 힌트 줄 --- */
   .hints { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 20px; color: var(--dim); font-size: 12px; white-space: nowrap; pointer-events: none; }
@@ -162,7 +154,6 @@
   /* --- 탭 --- */
   .tabs { display: flex; gap: 4px; }
   .tab { padding: 9px 18px; background: transparent; border: 1px solid transparent; border-bottom: 2px solid transparent; color: var(--dim); font: 600 14px var(--f-ui); }
-  .tab .e { display: block; font: 600 10px var(--f-cond); letter-spacing: .24em; margin-top: 2px; opacity: .7; }
   .tab:focus, .tab:hover, .tab.f { color: var(--ink); background: rgba(255, 255, 255, .04); }
   .tab.on { color: #fff; border-bottom-color: var(--acc); background: linear-gradient(180deg, transparent, rgba(var(--acc-rgb), .1)); }
   .tab.on .e { color: var(--acc); opacity: 1; }
@@ -183,7 +174,7 @@
   .opt.on .sw { background: rgba(var(--acc-rgb), .3); border-color: var(--acc); }
   .opt.on .sw::after { left: 27px; background: #fff; box-shadow: 0 0 10px var(--acc); }
   .opt.act { grid-template-columns: 230px 1fr auto; }
-  .sect { margin: 20px 0 6px; font: 600 11px var(--f-cond); letter-spacing: .28em; color: var(--dim); }
+  .sect { margin: 20px 0 6px; font: 700 12px var(--f-ui); letter-spacing: .04em; color: var(--dim); }
   .sect:first-child { margin-top: 0; }
 
   /* --- 저장 슬롯 카드 --- */
@@ -193,7 +184,7 @@
   .sl:focus, .sl:hover:not(:disabled), .sl.f { border-color: rgba(var(--acc-rgb), .7); background: linear-gradient(90deg, rgba(var(--acc-rgb), .14), rgba(var(--acc-rgb), .02)); transform: translateX(4px); }
   .sl .no { font: 700 40px var(--f-disp); color: var(--faint); line-height: 1; }
   .sl:focus .no, .sl.f .no { color: var(--acc); }
-  .sl .no small { display: block; font: 600 10px var(--f-cond); letter-spacing: .25em; margin-top: 4px; }
+  .sl .no small { display: block; font: 600 11px var(--f-ui); letter-spacing: .04em; margin-top: 4px; }
   .sl .t1 { font: 700 18px var(--f-ui); color: var(--ink); }
   .sl .t2 { margin-top: 6px; color: var(--ink2); font-size: 13px; display: flex; gap: 14px; flex-wrap: wrap; }
   .sl .t2 b { color: var(--ink); font-family: var(--f-disp); font-weight: 600; }
@@ -252,7 +243,7 @@
   /* --- 디버그 뷰어 (debug.js): 목록 + 미리보기 캔버스 + 작은 단추 줄 --- */
   .dbg-g { grid-template-columns: 290px 1fr; height: min(620px, 66vh); }
   .dbg .gi span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .dbg-h { font: 600 11px var(--f-cond); letter-spacing: .2em; color: var(--acc); padding: 12px 10px 4px; }
+  .dbg-h { font: 700 12px var(--f-ui); letter-spacing: .04em; color: var(--acc); padding: 12px 10px 4px; }
   .dbg-c { display: block; width: 100%; height: clamp(180px, 32vh, 300px); margin-top: 14px; border: 1px solid var(--line); image-rendering: pixelated; }
   .dbg-ic { display: flex; align-items: center; justify-content: center; height: 140px; margin-top: 14px; border: 1px solid var(--line); font-size: 64px; color: var(--dim); }
   .dbg-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
@@ -281,7 +272,7 @@
     transition: background .15s, border-color .15s, transform .15s; }
   .wr .rn { font: 700 30px var(--f-disp); color: var(--cy); line-height: 1; text-align: center; }
   .wr .w1 { font-weight: 700; font-size: 15px; } .wr .w2 { color: var(--dim); font-size: 12px; margin-top: 3px; }
-  .wr .go { font: 600 11px var(--f-cond); letter-spacing: .24em; color: var(--dim); }
+  .wr .go { font: 600 12px var(--f-ui); letter-spacing: .04em; color: var(--dim); }
   .wr:focus, .wr:hover:not(:disabled), .wr.f { border-color: rgba(var(--cy-rgb), .7); background: linear-gradient(90deg, rgba(var(--cy-rgb), .14), transparent); transform: translateX(4px); }
   .wr:focus .go, .wr.f .go { color: var(--cy); }
   .wr.here { border-color: rgba(var(--cy-rgb), .35); } .wr.here .go { color: var(--cy); }
