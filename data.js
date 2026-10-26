@@ -1,7 +1,7 @@
 // ===== 게임 데이터 정의 (무기 / 탄약 / 수류탄 / 아이템 / 적) =====
 
 // 버전: GitHub에 커밋·푸시할 때마다 올림 (새 기능은 가운데 자리, 고침·작은 추가는 끝자리) — 타이틀·일시정지 화면에 표시, git 태그 v<버전>
-const VERSION = '0.9.0';
+const VERSION = '0.9.1';
 
 const CAT_NAMES = ['근접', '권총', '샷건', '라이플', '기관총', '에너지'];
 const MAX_LOAD = 30;   // 장착 + 가방 무기 무게 합이 넘으면 이동속도 감소
@@ -217,9 +217,9 @@ const ARMORS = {
   boots:   { name: '전투화',          slot: 'legs', def: 5,  weight: 1,   size: [2, 2], price: 150,  minLvl: 1, icon: 'icon_boots',      desc: '발목을 감싸는 강화 전투화.' },
   greaves: { name: '보강 하의',       slot: 'legs', def: 9,  weight: 2,   size: [2, 2], price: 400,  minLvl: 3, icon: 'icon_pants',      desc: '무릎과 허벅지에 장갑판을 덧댄 하의.' },
   neonleg: { name: '네온 강화 하의',  slot: 'legs', def: 13, weight: 1.5, size: [2, 2], price: 900,  minLvl: 6, icon: 'icon_pants_neon', desc: '근력 보조 장치가 달린 시제품 하의.' },
-  gauntlet: { name: '전투 건틀릿',    slot: 'arm',  def: 5,  weight: 1,   size: [2, 2], price: 150,  minLvl: 1, icon: 'icon_arm_dark',   desc: '손등과 팔뚝을 덮는 강화 장갑.' },
-  servo:    { name: '서보 건틀릿',    slot: 'arm',  def: 8,  weight: 1,   size: [2, 2], price: 400,  minLvl: 3, icon: 'icon_arm_silver', desc: '관절마다 서보 모터가 달려 손이 떨리지 않는다.' },
-  neonarm:  { name: '네온 건틀릿',    slot: 'arm',  def: 12, weight: 1,   size: [2, 2], price: 900,  minLvl: 6, icon: 'icon_arm_neon',   desc: '연구동 시제품. 가볍고 단단하다.' },
+  gauntlet: { name: '전투 건틀릿',    slot: 'arm',  def: 3,  weight: 1,   size: [2, 2], price: 150,  minLvl: 1, icon: 'icon_arm_dark',   desc: '손등과 팔뚝을 덮는 강화 장갑.' },
+  servo:    { name: '서보 건틀릿',    slot: 'arm',  def: 5,  weight: 1,   size: [2, 2], price: 400,  minLvl: 3, icon: 'icon_arm_silver', desc: '관절마다 서보 모터가 달려 손이 떨리지 않는다.' },
+  neonarm:  { name: '네온 건틀릿',    slot: 'arm',  def: 8,  weight: 1,   size: [2, 2], price: 900,  minLvl: 6, icon: 'icon_arm_neon',   desc: '연구동 시제품. 가볍고 단단하다.' },
   // 강화칩: 능력치마다 보조·증폭·코어 (몸 능력 옵션)
   chipS1: { name: '근력 보조 칩', slot: 'chip', attr: ['str', 2], def: 0, weight: 0, size: [1, 1], price: 200, minLvl: 1, icon: 'icon_chip_str1', desc: '근섬유 신호를 조금 키운다.' },
   chipS2: { name: '근력 증폭 칩', slot: 'chip', attr: ['str', 4], def: 0, weight: 0, size: [1, 1], price: 450, minLvl: 3, icon: 'icon_chip_str2', desc: '근섬유 신호를 크게 키운다.' },
@@ -249,6 +249,7 @@ const ARMORS = {
 };
 // 방어구 옵션: slots가 있으면 그 종류에만, stat: 능력치 (type: str·agi·tec·psi)
 // 강화칩은 몸 능력 옵션, 강화장신구는 line 옵션 (type이 그 장신구의 계열 — 그 계열 스킬에만)
+// 팔 옵션은 두 팔에서 겹치므로 한 팔 범위를 작게
 const ARMOR_PIECES = ['head', 'body', 'legs', 'arm'];
 const BODY_GEAR = ['head', 'body', 'legs', 'arm', 'chip'];
 const ARMOR_AFFIXES = {
@@ -258,12 +259,12 @@ const ARMOR_AFFIXES = {
   res:    { prefix: '면역의',   min: 0.15, max: 0.45, slots: BODY_GEAR, text: v => `중독·화상·감전 시간 -${pct(v)}` },
   stam:   { prefix: '지구력의', min: 10, max: 35, int: true, slots: BODY_GEAR, text: v => `최대 스태미너 +${v}` },
   spd:    { prefix: '날쌘',     min: 0.03, max: 0.10, slots: ['legs', 'chip'], text: v => `이동 속도 +${pct(v)}` },
-  cdr:    { prefix: '집중의',   min: 0.04, max: 0.12, slots: ['head', 'acc'], text: v => `스킬 대기시간 -${pct(v)}` },
+  cdr:    { prefix: '집중의',   min: 0.04, max: 0.12, slots: ['head'], text: v => `스킬 대기시간 -${pct(v)}` },
   dash:   { prefix: '재빠른',   min: 0.08, max: 0.25, slots: ['chip'], text: v => `회피 대기시간 -${pct(v)}` },
-  reload: { prefix: '능숙한',   min: 0.05, max: 0.15, slots: ['arm'], text: v => `재장전 시간 -${pct(v)}` },
-  melee:  { prefix: '강타하는', min: 0.08, max: 0.25, slots: ['arm'], text: v => `근접 피해 +${pct(v)}` },
+  reload: { prefix: '능숙한',   min: 0.03, max: 0.08, slots: ['arm'], text: v => `재장전 시간 -${pct(v)}` },
+  melee:  { prefix: '강타하는', min: 0.05, max: 0.15, slots: ['arm'], text: v => `근접 피해 +${pct(v)}` },
   stat:   { min: 2, max: 7, int: true, text: (v, t) => `${ATTRS[t].name} +${v}` },
-  spow:   { prefix: '공명하는', min: 0.06, max: 0.20, slots: ['acc'], line: true, text: (v, t) => `${ATTRS[t].name} 스킬 위력 +${pct(v)}` },
+  spow:   { prefix: '공명하는', min: 0.04, max: 0.12, slots: ['acc'], line: true, text: (v, t) => `${ATTRS[t].name} 스킬 위력 +${pct(v)}` },
   scd:    { prefix: '가속하는', min: 0.05, max: 0.15, slots: ['acc'], line: true, text: (v, t) => `${ATTRS[t].name} 스킬 대기시간 -${pct(v)}` },
   sr:     { prefix: '광역의',   min: 0.08, max: 0.25, slots: ['acc'], line: true, text: (v, t) => `${ATTRS[t].name} 스킬 범위 +${pct(v)}` },
   sdur:   { prefix: '지속하는', min: 0.10, max: 0.30, slots: ['acc'], line: true, text: (v, t) => `${ATTRS[t].name} 스킬 지속 +${pct(v)}` },

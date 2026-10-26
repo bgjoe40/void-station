@@ -5301,9 +5301,9 @@ const entryAt = (cx, cy) => tradeEntries().find(o => cx >= o.gx && cx < o.gx + o
 function tradeMouseDown(button) {
   const vh = tradeHit(mouse.x, mouse.y);
   if (held) { if (button === 0) placeHeld(); return; }
+  if (perkOpen && perkHit(mouse.x, mouse.y)) { perkMouseDown(button); return; } // 스킬 창 (맨 위에 그려짐, 개조 자판기: 장착한 쉘 고르기)
   if (vh && vh.area === 'grid' && trade.mode === 'stash') { stashClick(vh, button); return; }
   if (vh) { vendorClick(vh); return; }
-  if (perkOpen && perkHit(mouse.x, mouse.y)) { perkMouseDown(button); return; } // 스킬 창 (개조 자판기: 장착한 쉘 고르기)
   const ih = invHit(mouse.x, mouse.y);
   if (!ih) return;
   if (ih.area === 'close' || ih.area === 'attrUp') { invMouseDown(button); return; }
@@ -5670,9 +5670,9 @@ canvas.addEventListener('mousedown', e => {
   if (state === 'intro') { if (e.button === 0) mouse.down = true; return; } // 컷신: 누르고 있으면 건너뜀 (introTick)
   if ((state === 'play' || state === 'trade') && hudMenuClick(e.button)) return; // HUD 메뉴 아이콘
   if (state === 'trade') { tradeMouseDown(e.button); return; }
+  if (state === 'play' && perkOpen && !held && perkMouseDown(e.button)) return; // 스킬 창이 인벤토리 위에 그려지므로 겹친 곳은 스킬 창 먼저 (들고 있는 것은 placeHeld)
   if (state === 'play' && invOpen && invMouseDown(e.button)) return;
   if (state === 'play' && codexOpen && codexMouseDown(e.button)) return;
-  if (state === 'play' && perkOpen && perkMouseDown(e.button)) return;
   if (e.button === 0) { mouse.down = true; mouse.pressed = true; }
   if (e.button === 2) throwGrenade();
 });
