@@ -1792,7 +1792,7 @@ function newPlayer() {
     ammo: { pistol: 36, shell: 0, rifle: 0, belt: 0, cell: 0, rocket: 0 },
     charging: 0, // 분쇄포처럼 모았다가 쏘는 무기의 남은 충전 시간
     clv: 1, xp: 0, pts: 0, perks: {}, // 캐릭터 레벨, 경험치, 남은 특성 점수, 특성별 단계
-    gear: { head: null, body: makeArmor('vest'), legs: null }, parts: 0, // 방어구 (머리·몸·다리), 분해로 모은 부품
+    gear: { chip: null, head: null, acc: null, larm: null, body: makeArmor('vest'), rarm: null, legs: null }, parts: 0, // 장비 칸 (GEAR_SLOTS), 분해로 모은 부품
     shells: [makeShell('shock'), null, null, null], attr: { str: 0, agi: 0, tec: 0, psi: 0 }, apts: 0, // 스킬 칸 Z X V B의 쉘, 투자한 능력치, 남은 능력치 점수
     scd: {}, sk: {}, inv: 0, // 스킬별 남은 대기시간, 지속 중인 스킬 효과, 무적 시간 (순간 이동·돌진)
     cool: 0, reload: 0, reloadMax: 1, spin: 0,
@@ -3371,9 +3371,10 @@ const buff = k => { const b = player.sk[k]; return b && b.t > 0 ? b : null; }; /
 // --- 능력치: 투자한 점수 + 장착한 쉘의 능력치 옵션 ---
 const ATTR_KEYS = Object.keys(ATTRS);
 function affixSum(sh, k, type) { let s = 0; for (const a of sh.affixes) if (a.k === k && (!type || a.type === type)) s += a.v; return s; }
-const gearAttr = k => player.shells.reduce((s, sh) => s + (sh ? affixSum(sh, 'stat', k) : 0), 0) + gearV('stat', k); // 쉘 + 방어구
+const gearAttr = k => player.shells.reduce((s, sh) => s + (sh ? affixSum(sh, 'stat', k) : 0), 0) + gearV('stat', k) // 쉘 + 방어구 옵션
+  + GEAR_KEYS.reduce((s, g) => { const it = player.gear[g]; return s + (it && it.s.attr && it.s.attr[0] === k ? it.s.attrN : 0); }, 0); // + 강화칩·강화장신구 기본 능력치
 const attrV = k => (player.attr[k] || 0) + gearAttr(k);
-// 장착한 스킬에 이 능력치가 주는 효과 (성장 창 설명)
+// 장착한 스킬에 이 능력치가 주는 효과 (인벤토리 능력치 툴팁)
 function attrEffects(k) {
   const v = attrV(k), out = [];
   for (const sh of player.shells) {
@@ -3428,14 +3429,17 @@ function randomLootShell(bonus = 0) {
   return makeShell(pick(Object.keys(SKILLS).filter(k => SKILLS[k].from <= level + 1)), rollRarity(bonus));
 }
 // 쉘의 지금 수치: 기본 x 등급·옵션(위력·범위·지속·제어) x 능력치, 개수는 더하기, 피해는 구역 배율. cd: 대기시간
+// 강화장신구 옵션 (그 장신구 계열의 스킬에만): 쉘 수치 종류 → 장신구 옵션
+const ACC_LINE = { r: 'sr', dur: 'sdur', cc: 'scc' };
+const accV = (k, stat) => { const a = player.gear.acc; return a ? affixSum(a, k, stat) : 0; };
 function shellVals(sh) {
   const S = SKILLS[sh.id], out = {}, rt = resTier(S.stat);
   for (const k in S.v) {
     const kind = SKILL_PARAM[k], st = S.st[k];
     let x = S.v[k];
-    if (kind === 'pow') x *= (1 + SHELL_POW[sh.rarity]) * (1 + affixSum(sh, 'pow')) * (1 + (rt ? RESONANCE.pow[rt - 1] : 0)); // 계열 공명: 위력
-    else if (kind === 'n') x += affixSum(sh, 'n');
-    else if (kind) x *= 1 + affixSum(sh, kind);
+    if (kind === 'pow') x *= (1 + SHELL_POW[sh.rarity]) * (1 + affixSum(sh, 'pow')) * (1 + (rt ? RESONANCE.pow[rt - 1] : 0)) * (1 + accV('spow', S.stat)); // 계열 공명·강화장신구: 위력
+    else if (kind === 'n') x += affixSum(sh, 'n') + accV('sn', S.stat);
+    else if (kind) x *= 1 + affixSum(sh, kind) + accV(ACC_LINE[kind], S.stat);
     if (st) x = kind === 'n' ? x + Math.floor(attrV(st[0]) * st[1]) : x * (1 + attrV(st[0]) * st[1]);
     if (k === 'dmg' || k === 'hp') x *= skillScale(); // 피해·포탑 내구도는 구역이 깊을수록 큼
     if (kind === 'dur' && S.stat === 'tec') x *= 1 + resV('tec'); // 기술 공명: 지속
@@ -3443,7 +3447,7 @@ function shellVals(sh) {
     out[k] = x;
   }
   out.uq = !!sh.uq; // 고유 전설: 스킬마다 바뀌는 동작 (SKILL_CAST)
-  out.cd = S.cd * (1 - affixSum(sh, 'cd')) * (1 - gearV('cdr')); // 쉘 옵션, 헬멧 옵션
+  out.cd = S.cd * (1 - affixSum(sh, 'cd')) * (1 - gearV('cdr')) * (1 - accV('scd', S.stat)); // 쉘 옵션, 헬멧·장신구 옵션
   return out;
 }
 // 설명용 반올림: 위력·개수는 정수, 범위·시간은 소수 한 자리, 비율(치명타·기습·흡수)은 그대로
@@ -3898,7 +3902,7 @@ function meleeSwing(w) {
   if (saw) p.sawAt = gtime;
   p.swing = p.swingMax = saw ? 0.15 : 0.18; p.fireT = 0.14;
   const cmb = w.combo && gtime - (p.comboAt ?? -9) < 1 ? p.combo || 0 : 0; // 강철 너클: 1초 안에 다시 맞히면 연타가 쌓임
-  const mul = (p.fx.adren > 0 ? 1.2 : 1) * (1 + perkV('blade')) * takeAmbush() * (1 + cmb * (w.combo ? w.combo.step : 0)); // 아드레날린, 검술, 은신 기습, 연타
+  const mul = (p.fx.adren > 0 ? 1.2 : 1) * (1 + perkV('blade') + gearV('melee')) * takeAmbush() * (1 + cmb * (w.combo ? w.combo.step : 0)); // 아드레날린, 검술·팔 옵션, 은신 기습, 연타
   let hit = false, hitN = 0, near = null, nd = 1e9;
   const struck = [];
   for (const e of enemies) {
@@ -4000,7 +4004,7 @@ function fireGun(w) {
 function startReload() {
   const p = player, wi = curW(), w = wi.s;
   if (w.type !== 'gun' || p.reload > 0 || wi.mag >= w.mag || p.ammo[w.ammo] < (w.cost || 1)) return false;
-  p.reload = p.reloadMax = w.reload * (1 - perkV('reload')); p.charging = 0; Snd.play('reload'); return true;
+  p.reload = p.reloadMax = w.reload * (1 - perkV('reload')) * (1 - gearV('reload')); // 빠른 손, 팔 옵션 p.charging = 0; Snd.play('reload'); return true;
 }
 function finishReload() {
   const p = player, wi = curW(), w = wi.s, cost = w.cost || 1; // cost: 한 발에 드는 탄약 (분쇄포는 셀 40)
@@ -4256,7 +4260,7 @@ const bagFindSpot = inst => gridFindSpot(player.bag, inst, BAG_W, bagH());
 const bagItemAt = (cx, cy) => player.bag.find(o => cx >= o.gx && cx < o.gx + o.s.size[0] && cy >= o.gy && cy < o.gy + o.s.size[1]);
 const removeFromBag = inst => { player.bag = player.bag.filter(o => o !== inst); };
 // 가방 정렬: 큰 장비부터 (같으면 무기 분류·방어구·쉘 순, 높은 등급 먼저) 왼쪽 위부터 다시 놓음 — 몇 가지 순서로 해 보고, 다 들어가지 않으면 그대로
-const bagRank = o => o.kind === 'attach' ? 30 : o.kind === 'shell' ? 20 : o.kind === 'armor' ? 10 + GEAR_KEYS.indexOf(o.s.slot) : o.s.cat;
+const bagRank = o => o.kind === 'attach' ? 30 : o.kind === 'shell' ? 20 : o.kind === 'armor' ? 10 + Object.keys(ARMOR_SLOTS).indexOf(o.s.slot) : o.s.cat;
 const bagTie = (a, b) => bagRank(a) - bagRank(b) || b.rarity - a.rarity || String(a.id).localeCompare(String(b.id));
 const BAG_ORDERS = [(a, b) => b.s.size[1] - a.s.size[1] || b.s.size[0] - a.s.size[0] || bagTie(a, b),
   (a, b) => b.s.size[0] * b.s.size[1] - a.s.size[0] * a.s.size[1] || bagTie(a, b),
@@ -4336,19 +4340,22 @@ function throwGrenade() {
   Snd.play('throw');
 }
 
-// ===== 방어구 (머리·몸·다리 칸): ARMORS, ARMOR_AFFIXES =====
-const GEAR_KEYS = Object.keys(ARMOR_SLOTS);
+// ===== 방어구·강화칩·강화장신구 (인체 모양 장비 칸 GEAR_SLOTS): ARMORS, ARMOR_AFFIXES =====
+const GEAR_KEYS = Object.keys(GEAR_SLOTS);
+const isAug = it => it.s.slot === 'chip' || it.s.slot === 'acc'; // 강화칩·강화장신구: 방어 대신 기본 능력치
 const armorPool = id => Object.keys(ARMOR_AFFIXES).filter(k => !ARMOR_AFFIXES[k].slots || ARMOR_AFFIXES[k].slots.includes(ARMORS[id].slot));
 // 옵션 하나 굴리기 (others: 같은 장비의 다른 옵션 — 능력치 종류는 겹치지 않게)
 function rollArmorAffix(id, rarity, k, others = []) {
   const A = ARMOR_AFFIXES[k], q = clamp(Math.random() * 0.7 + rarity * 0.1, 0, 1), v = A.min + (A.max - A.min) * q, a = { k, v: A.int ? Math.round(v) : v };
   if (k === 'stat') { const used = others.filter(b => b.k === 'stat').map(b => b.type); a.type = pick(ATTR_KEYS.filter(t => !used.includes(t))); }
+  if (A.line) a.type = ARMORS[id].attr[0]; // 강화장신구: 그 계열
   return a;
 }
 function makeArmor(id, rarity = 0) {
   const pool = armorPool(id), affixes = [], [lo, hi] = RARITY[rarity].affixes;
   for (let n = irnd(lo, hi); n > 0 && pool.length; n--) affixes.push(rollArmorAffix(id, rarity, pool.splice(Math.floor(Math.random() * pool.length), 1)[0], affixes));
-  return rollSockets(buildArmor(id, rarity, affixes));
+  const it = buildArmor(id, rarity, affixes);
+  return canSocket(it) ? rollSockets(it) : it; // 강화칩·강화장신구는 소켓 없음
 }
 function buildArmor(id, rarity, affixes, plus = 0, sockets = 0, gems = []) {
   const inst = { uid: uidSeq++, kind: 'armor', id, rarity, affixes, plus, gx: 0, gy: 0, sockets, gems };
@@ -4359,10 +4366,16 @@ function buildArmor(id, rarity, affixes, plus = 0, sockets = 0, gems = []) {
 function refreshArmor(inst) {
   const b = ARMORS[inst.id], top = inst.affixes[0];
   inst.rw = runewordOf(inst); // 보석 조합
-  inst.s = { ...b, def: b.def * (1 + ARMOR_RARITY_DEF * inst.rarity) * (1 + affixSum(inst, 'def')) * (1 + ENHANCE_DMG * (inst.plus || 0)) + gemSum(inst, 'armor', 'defN') + rwStat(inst, 'defN') };
+  inst.s = { ...b, def: b.def * (1 + ARMOR_RARITY_DEF * inst.rarity) * (1 + affixSum(inst, 'def')) * (1 + ENHANCE_DMG * (inst.plus || 0)) + gemSum(inst, 'armor', 'defN') + rwStat(inst, 'defN'), attrN: b.attr ? b.attr[1] + (inst.plus || 0) : 0 }; // 강화칩·강화장신구: 강화 단계마다 능력치 +1
   inst.name = (inst.plus ? `+${inst.plus} ` : '') + (inst.set ? SET_ITEMS[inst.set].name : inst.rw ? RUNEWORDS[inst.rw].name : (top ? `${top.k === 'stat' ? ATTRS[top.type].prefix : ARMOR_AFFIXES[top.k].prefix} ` : '') + b.name);
 }
-const randomLootArmor = (bonus = 0) => makeArmor(pick(Object.keys(ARMORS).filter(k => ARMORS[k].minLvl <= level + 1)), rollRarity(bonus));
+// 방어구 바탕 고르기: 종류(ARMOR_SLOT_DROP)를 먼저, 그 안에서 이 구역까지 나오는 바탕
+function pickArmorBase() {
+  const by = {};
+  for (const k of Object.keys(ARMORS)) if (ARMORS[k].minLvl <= level + 1) (by[ARMORS[k].slot] ||= []).push(k);
+  return pick(by[weighted(Object.fromEntries(Object.keys(by).map(t => [t, ARMOR_SLOT_DROP[t]])))]);
+}
+const randomLootArmor = (bonus = 0) => makeArmor(pickArmorBase(), rollRarity(bonus));
 // 떨어지는 장비: ARMOR_DROP 확률로 방어구, 아니면 무기 (heavy: 에너지·중화기가 나올 확률)
 const randomLoot = (bonus = 0, heavy = 0) => Math.random() < ARMOR_DROP ? randomLootArmor(bonus) : randomLootWeapon(bonus, heavy);
 // 보상용: 일반 등급이면 같은 장비의 '고급'으로
@@ -4372,18 +4385,22 @@ const gearV = (k, type, p = player) => GEAR_KEYS.reduce((s, g) => s + (p.gear[g]
 const gearDef = (p = player) => GEAR_KEYS.reduce((s, g) => s + (p.gear[g] ? p.gear[g].s.def : 0), 0) + setSum('defN', p) + achSum('defN');
 const defCut = def => def / (def + ARMOR_K);
 const gearChanged = () => applyUpgrades(player); // 체력 옵션 → 최대 체력
+// 그 장비를 끼울 수 있는 칸 (팔 장비는 왼팔·오른팔 두 칸), 그중 빈 칸, 우클릭으로 낄 칸 (빈 칸, 없으면 방어가 낮은 쪽)
+const gearKeysFor = it => GEAR_KEYS.filter(g => GEAR_SLOTS[g] === it.s.slot);
+const emptyGearFor = it => gearKeysFor(it).find(g => !player.gear[g]);
+const gearTargetFor = it => emptyGearFor(it) || gearKeysFor(it).reduce((a, b) => (player.gear[b].s.def < player.gear[a].s.def ? b : a));
 // 새로 얻은 방어구: 그 칸이 비었으면 장착, 아니면 가방. 실패하면 null
 function addArmor(inst) {
-  const p = player, g = inst.s.slot;
-  if (!p.gear[g]) { p.gear[g] = inst; gearChanged(); tip('gear'); return 'equip'; }
+  const p = player, g = emptyGearFor(inst), t = isAug(inst) ? 'augment' : 'gear';
+  if (g) { p.gear[g] = inst; gearChanged(); tip(t); return 'equip'; }
   const spot = bagFit(inst);
   if (!spot) return null;
-  inst.gx = spot.gx; inst.gy = spot.gy; p.bag.push(inst); tip('gear');
+  inst.gx = spot.gx; inst.gy = spot.gy; p.bag.push(inst); tip(t);
   return 'bag';
 }
 // 가방의 방어구 우클릭: 같은 칸의 방어구와 바꿔 낌 (빠진 것은 그 자리나 빈 자리로, 없으면 바닥)
 function equipArmorFromBag(inst) {
-  const p = player, g = inst.s.slot, old = p.gear[g];
+  const p = player, g = gearTargetFor(inst), old = p.gear[g];
   removeFromBag(inst); p.gear[g] = inst; gearChanged(); Snd.play('pickup');
   if (!old) return;
   const spot = inBag(old, inst.gx, inst.gy) && !bagOverlaps(old, inst.gx, inst.gy).length ? { gx: inst.gx, gy: inst.gy } : bagFindSpot(old);
@@ -4397,21 +4414,22 @@ function unequipArmor(g) {
   p.gear[g] = null; inst.gx = spot.gx; inst.gy = spot.gy; p.bag.push(inst); gearChanged();
 }
 function armorTooltip(inst) {
-  const s = inst.s, R = RARITY[inst.rarity], L = [], eq = player.gear[s.slot];
+  const s = inst.s, R = RARITY[inst.rarity], L = [], aug = isAug(inst), eq = isEquipped(inst) ? null : player.gear[gearTargetFor(inst)];
   L.push({ t: inst.name, c: itemColor(inst), b: true });
-  L.push({ t: `${inst.rw ? '보석 조합' : R.name} 방어구, ${ARMOR_SLOTS[s.slot]}, ${s.size[0]}x${s.size[1]}칸, 무게 ${s.weight}`, c: '#9a9' });
+  L.push({ t: aug ? `${R.name} ${ARMOR_SLOTS[s.slot]}` : `${inst.rw ? '보석 조합' : R.name} 방어구, ${ARMOR_SLOTS[s.slot]}, ${s.size[0]}x${s.size[1]}칸, 무게 ${s.weight}`, c: '#9a9' });
   for (const t of wrapWords(s.desc || '', 30)) L.push({ t, c: '#d8c89a' });
-  L.push({ t: `방어 ${Math.round(s.def)}${inst.plus ? ` (강화 +${inst.plus})` : ''}, 받는 피해 -${pct(defCut(s.def))}`, c: '#eee' });
+  if (aug) { const A = ATTRS[s.attr[0]]; L.push({ t: `${A.name} +${s.attrN}${inst.plus ? ` (강화 +${inst.plus})` : ''}${s.slot === 'acc' ? `, ${A.name} 계열 스킬 강화` : ''}`, c: A.color }); }
+  else L.push({ t: `방어 ${Math.round(s.def)}${inst.plus ? ` (강화 +${inst.plus})` : ''}, 받는 피해 -${pct(defCut(s.def))}`, c: '#eee' });
   for (const a of inst.affixes) L.push({ t: ARMOR_AFFIXES[a.k].text(a.v, a.type), c: a.k === 'stat' ? ATTRS[a.type].color : '#8af' });
   setLines(inst, L);
   rwLines(inst, L);
   socketLines(inst, L);
-  if (eq && eq !== inst) {
+  if (eq && aug) L.push({ t: `장착 중: ${eq.name}`, c: '#9a9' });
+  else if (eq) {
     const d = Math.round(s.def - eq.s.def);
     L.push({ t: `장착 중: ${eq.name} (방어 ${Math.round(eq.s.def)})  ${d >= 0 ? '▲ +' + d : '▼ ' + d}`, c: d >= 0 ? '#7f7' : '#f77' });
   }
-  const all = gearDef();
-  L.push({ t: `지금 방어 합 ${Math.round(all)}, 받는 피해 -${pct(defCut(all))}`, c: '#9cf' });
+  if (!aug) { const all = gearDef(); L.push({ t: `지금 방어 합 ${Math.round(all)}, 받는 피해 -${pct(defCut(all))}`, c: '#9cf' }); }
   return L;
 }
 // 플레이어 상태 이상 (중독·화상·감전): 면역 중이면 무시, 방어구 저항만큼 짧게. 걸렸으면 true
@@ -4445,7 +4463,7 @@ const itemColor = it => it.kind === 'gem' ? GEMS[it.id].color : it.rw ? RW_COLOR
 const SET_COLOR = RARITY[5].color;
 // 소켓 최대 수: 큰 무기 3·보통 2·작은 무기 1 / 몸 방어구 3·머리·다리 2
 const socketMax = it => it.kind === 'armor' ? (it.s.slot === 'body' ? 3 : 2) : it.s.size[0] * it.s.size[1] >= 8 ? 3 : it.s.size[0] * it.s.size[1] >= 4 ? 2 : 1;
-const canSocket = it => !!it && (it.kind === 'armor' || !it.kind); // 무기·방어구만
+const canSocket = it => !!it && ((it.kind === 'armor' && !isAug(it)) || !it.kind); // 무기·방어구만 (강화칩·강화장신구는 없음)
 // 새로 만든 장비: 등급별 확률로 소켓 1~최대 개 (일반 장비에 잘 붙음)
 function rollSockets(it) { it.sockets = Math.random() < SOCKET_ROLL[Math.min(3, it.rarity)] ? irnd(1, socketMax(it)) : 0; it.gems = []; return it; }
 // 끼운 보석 효과의 합 (part: 'weapon' | 'armor', k: 옵션 키)
@@ -4701,38 +4719,40 @@ function useItem(id) {
   for (let k = 0; k < 14; k++) parts.push({ x: p.x + rnd(-.3, .3), y: p.y + rnd(-.3, .3), z: rnd(0, 20), vx: 0, vy: 0, vz: rnd(30, 70), g: 0, life: rnd(0.4, 0.8), max: 0.8, col: ITEMS[id].color, size: 3, glow: true });
 }
 
-// ===== 캐릭터 성장 창 [K] (실시간): 왼쪽 능력치 4개 + 계열 3개 x 특성 4개 카드, 클릭하면 1점씩 투자 =====
+// ===== 스킬 창 [K] (실시간, 화면 왼쪽 — 거래 중에는 가운데): 장착한 스킬 쉘 (Z X V B) + 특성 (계열 3개 x 4개) =====
+// 설명은 마우스를 올렸을 때 툴팁으로. 특성은 클릭하면 1점, 스킬 칸은 왼쪽 클릭으로 집고 (가방이 열림) 우클릭으로 가방에 뺌
 let perkOpen = false;
 function perkGeom() {
-  const aw = 236, gap = 10, ch = 80, cw = clamp(Math.floor((W - 24 - aw - 5 * gap) / 3), 170, 236);
-  const pw = aw + 3 * cw + 5 * gap, ph = 76 + 4 * (ch + gap) + 44;
-  return { x: Math.max(4, Math.round((W - pw) / 2)), y: Math.max(8, Math.round((VH - ph) / 2)), pw, ph, cw, ch, gap, aw };
+  const cw = 150, gap = 10, pw = 3 * cw + 2 * gap + 24, nodeH = 52, y = 8;
+  return { x: trade ? Math.round(W / 2 - pw / 2) : 12, y, pw, ph: 204 + 4 * nodeH, cw, gap, nodeH, ay: y + 52, aw: (pw - 24 - 3 * 8) / 4, ah: 62, ty: y + 154 };
 }
-const attrCard = (g, n) => ({ x: g.x + g.gap, y: g.y + 76 + n * (g.ch + g.gap) });
-const perkCard = (g, t, n) => ({ x: g.x + 2 * g.gap + g.aw + t * (g.cw + g.gap), y: g.y + 76 + n * (g.ch + g.gap) });
-const respecBtn = g => ({ x: g.x + g.pw - 216, y: g.y + g.ph - 36, w: 204, h: 26 });
+const shellRect = (g, k) => [g.x + 12 + k * (g.aw + 8), g.ay, g.aw, g.ah];
+const perkRect = (g, t, n) => [g.x + 12 + t * (g.cw + g.gap), g.ty + 18 + n * g.nodeH, g.cw, g.nodeH - 6];
+const respecBtn = g => [g.x + g.pw - 136, g.y + g.ph - 30, 124, 20];
 function perkHit(mx, my) {
   const g = perkGeom();
   if (mx < g.x || mx > g.x + g.pw || my < g.y || my > g.y + g.ph) return null;
-  for (let n = 0; n < ATTR_KEYS.length; n++) { const c = attrCard(g, n); if (mx >= c.x && mx <= c.x + g.aw && my >= c.y && my <= c.y + g.ch) return { attr: ATTR_KEYS[n] }; }
-  for (let t = 0; t < PERK_ORDER.length; t++) for (let n = 0; n < PERK_ORDER[t].length; n++) {
-    const c = perkCard(g, t, n);
-    if (mx >= c.x && mx <= c.x + g.cw && my >= c.y && my <= c.y + g.ch) return { k: PERK_ORDER[t][n] };
-  }
-  const b = respecBtn(g);
-  if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) return { respec: true };
+  if (inRect(closeBtn(g.x, g.y, g.pw), mx, my)) return { close: true };
+  for (let k = 0; k < 4; k++) if (inRect(shellRect(g, k), mx, my)) return { skill: k };
+  for (let t = 0; t < PERK_ORDER.length; t++) for (let n = 0; n < PERK_ORDER[t].length; n++) if (inRect(perkRect(g, t, n), mx, my)) return { k: PERK_ORDER[t][n] };
+  if (inRect(respecBtn(g), mx, my)) return { respec: true };
   return { panel: true };
 }
-// 창 위를 클릭했으면 true (창 밖 클릭은 그대로 공격)
+// 창 위를 클릭했으면 true (창 밖 클릭은 그대로 공격). 들고 있는 쉘을 스킬 칸에 놓는 것은 placeHeld
 function perkMouseDown(button) {
   const h = perkHit(mouse.x, mouse.y), p = player;
   if (!h) return false;
+  if (h.close) { if (button === 0) { perkOpen = false; Snd.play('menu'); } return true; }
+  if (h.skill !== undefined) { // 스킬 칸: 개조 자판기에서는 고르기, 그 밖에는 왼쪽 집기 · 우클릭 빼기
+    const sh = p.shells[h.skill];
+    if (!sh) return true;
+    if (trade && trade.mode === 'upgrade') { trade.sel = sh; trade.note = ''; Snd.play('menu'); }
+    else if (button === 0) { p.shells[h.skill] = null; holdItem(sh, 'skill', { ok: h.skill }); invOpen = true; }
+    else if (button === 2) unequipShell(h.skill);
+    return true;
+  }
   if (button !== 0) return true;
-  if (h.attr) { // 능력치: 클릭 1점, Shift+클릭 5점
-    const A = ATTRS[h.attr], n = Math.min(p.apts, keys.ShiftLeft || keys.ShiftRight ? 5 : 1);
-    if (n <= 0) { msg('능력치 점수가 없다', '#a99'); Snd.play('deny'); }
-    else { p.attr[h.attr] += n; p.apts -= n; Snd.play('buy'); msg(`${A.name} +${n} → ${attrV(h.attr)}`, A.color); }
-  } else if (h.k) {
+  if (h.k) {
     const P = PERKS[h.k], r = p.perks[h.k] || 0;
     if (r >= P.max) { msg(`${P.name}: 이미 최고 단계입니다`, '#a99'); Snd.play('deny'); }
     else if (p.pts <= 0) { msg('특성 점수가 없다', '#a99'); Snd.play('deny'); }
@@ -4749,65 +4769,60 @@ function perkMouseDown(button) {
   return true;
 }
 function drawPerks() {
-  const g = perkGeom(), p = player, h = perkHit(mouse.x, mouse.y);
-  ctx.fillStyle = 'rgba(18,16,12,0.95)'; rr(g.x, g.y, g.pw, g.ph, 8); ctx.fill();
-  ctx.strokeStyle = '#8c8574'; ctx.lineWidth = 2; ctx.stroke(); ctx.lineWidth = 1;
-  ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = '#ff8a5a'; ctx.fillText('캐릭터 성장', g.x + 14, g.y + 24);
-  ctx.textAlign = 'right'; ctx.font = font(FS); ctx.fillStyle = '#887'; ctx.fillText('[K] 닫기', g.x + g.pw - 14, g.y + 24);
-  // 레벨·경험치 막대·남은 점수
-  const need = xpNeed(p.clv), bx = g.x + 120, bw = g.pw - 330;
-  ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = '#ffe08a'; ctx.fillText(`Lv ${p.clv}`, g.x + 14, g.y + 50);
-  ctx.fillStyle = '#1a1712'; ctx.fillRect(bx - 50, g.y + 40, bw, 12);
-  ctx.fillStyle = '#c9a03a'; ctx.fillRect(bx - 50, g.y + 40, bw * p.xp / need, 12);
-  ctx.strokeStyle = '#5a5040'; ctx.strokeRect(bx - 49.5, g.y + 40.5, bw - 1, 11);
-  ctx.font = font(FS); ctx.fillStyle = '#eee'; ctx.textAlign = 'center'; ctx.fillText(`경험치 ${p.xp} / ${need}`, bx - 50 + bw / 2, g.y + 50);
-  ctx.textAlign = 'right'; ctx.font = font(FM, true);
-  ctx.fillStyle = p.pts > 0 || p.apts > 0 ? (Math.sin(gtime * 6) > 0 ? '#fff2a0' : '#ffd060') : '#887'; ctx.fillText(`남은 점수: 특성 ${p.pts}, 능력치 ${p.apts}`, g.x + g.pw - 14, g.y + 50);
-  // 능력치 (왼쪽): 값 = 투자 + 장착한 쉘 옵션, 아래에 장착한 스킬에 주는 효과
-  const a0 = attrCard(g, 0);
-  ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = '#9fd28f'; ctx.fillText('능력치', a0.x + 2, a0.y - 6);
-  ATTR_KEYS.forEach((k, n) => {
-    const A = ATTRS[k], c = attrCard(g, n), hover = h && h.attr === k, gear = gearAttr(k), v = attrV(k), fx = attrEffects(k);
-    ctx.fillStyle = v ? '#1b1a22' : '#121410'; ctx.fillRect(c.x, c.y, g.aw, g.ch);
-    ctx.strokeStyle = hover ? '#ffd27a' : p.apts > 0 ? A.color : '#3a3a30'; ctx.lineWidth = hover ? 2 : 1;
-    ctx.strokeRect(c.x + 0.5, c.y + 0.5, g.aw - 1, g.ch - 1); ctx.lineWidth = 1;
-    ctx.fillStyle = '#0a0b08'; ctx.fillRect(c.x + 8, c.y + 12, 56, 56);
-    ctx.textAlign = 'center'; ctx.font = font(FL, true); ctx.fillStyle = v ? A.color : '#5a5648'; ctx.fillText(v, c.x + 36, c.y + 47);
-    if (gear) { ctx.font = font(FS); ctx.fillStyle = '#8af'; ctx.fillText(`장비 +${gear}`, c.x + 36, c.y + 63); }
-    ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = A.color; ctx.fillText(A.name, c.x + 74, c.y + 22);
-    if (p.apts > 0) { ctx.textAlign = 'right'; ctx.font = font(FS, true); ctx.fillStyle = hover ? '#fff2a0' : '#ffd27a'; ctx.fillText('+ 투자', c.x + g.aw - 10, c.y + 22); ctx.textAlign = 'left'; }
-    ctx.font = font(FS);
-    if (fx.length) wrapPx(fx.join(', '), g.aw - 82).slice(0, 3).forEach((l, m) => { ctx.fillStyle = '#dfffd0'; ctx.fillText(fitText(l, g.aw - 82), c.x + 74, c.y + 40 + m * 14); });
-    else {
-      const uses = Object.keys(SKILLS).filter(id => Object.values(SKILLS[id].st).some(s => s[0] === k)).map(id => SKILLS[id].name);
-      ctx.fillStyle = '#6a6658'; ctx.fillText(fitText(`장착한 스킬 중 ${A.name} 스킬 없음`, g.aw - 82), c.x + 74, c.y + 42);
-      wrapPx(uses.join(', '), g.aw - 82).slice(0, 2).forEach((l, m) => ctx.fillText(fitText(l, g.aw - 82), c.x + 74, c.y + 58 + m * 13));
-    }
-  });
-  // 계열 이름 + 카드
+  const g = perkGeom(), p = player, h = perkHit(mouse.x, mouse.y), blink = Math.sin(gtime * 6) > 0;
+  winCard(g.x, g.y, g.pw, g.ph); winHeader(g.x, g.y, g.pw, '스킬', 'K', h && h.close);
+  // 장착한 스킬 (Z X V B): 그림, 이름, 계열, 대기시간
+  ctx.textAlign = 'left'; ctx.font = font(FS); ctx.fillStyle = HC.dim; ctx.fillText('장착', g.x + 12, g.ay - 8);
+  const fits = held && held.inst.kind === 'shell';
+  for (let k = 0; k < 4; k++) {
+    const r = shellRect(g, k), sh = p.shells[k], sel = trade && sh && trade.sel === sh;
+    pxWell(r, (h && h.skill === k) || sel || (fits && blink), sh && sh.rarity > 0 ? RARITY[sh.rarity].glow : null);
+    winGlyph(SHELL_SLOTS[k], r[0] + 4, r[1] + 4, HC.acc);
+    if (sh) {
+      const S = SKILLS[sh.id], cd = p.scd[sh.id] || 0;
+      drawIcon(S.icon, r[0] + 8, r[1] + 14, 40, 40);
+      ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = itemColor(sh); ctx.fillText(fitText(S.name, r[2] - 58), r[0] + 52, r[1] + 22);
+      ctx.font = font(FS); ctx.fillStyle = ATTRS[S.stat].color; ctx.fillText(ATTRS[S.stat].name, r[0] + 52, r[1] + 38);
+      ctx.fillStyle = HC.dim; ctx.fillText(cd > 0 ? `${Math.ceil(cd)}초 남음` : `대기 ${+shellVals(sh).cd.toFixed(1)}초`, r[0] + 52, r[1] + 54);
+      rarityLine(r, sh.rarity);
+    } else { ctx.globalAlpha = 0.1; drawIcon('bfe1d0', r[0] + 10, r[1] + 16, 36, 36); ctx.globalAlpha = 1; }
+  }
+  // 계열 공명 (같은 계열 쉘 2·3·4개)
+  ctx.textAlign = 'left'; ctx.font = font(FS);
+  let rx = g.x + 12;
+  for (const k of ATTR_KEYS.filter(k => resTier(k))) { const t = `${ATTRS[k].name} 공명 ${RES_LABEL[resTier(k)]}`; ctx.fillStyle = ATTRS[k].color; ctx.fillText(t, rx, g.ay + g.ah + 18); rx += ctx.measureText(t).width + 14; }
+  ctx.fillStyle = '#26282e'; ctx.fillRect(g.x + 12, g.ty - 12, g.pw - 24, 1);
+  // 특성: 계열마다 그림 칸, 이름, 단계 칸 (점수가 있으면 칸 모서리에 깜박이는 점)
   PERK_ORDER.forEach((keys, t) => {
-    const c0 = perkCard(g, t, 0);
-    ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = '#9fd28f'; ctx.fillText(PERK_TREES[t], c0.x + 2, c0.y - 6);
+    const cx = g.x + 12 + t * (g.cw + g.gap), spent = keys.reduce((a, k) => a + (p.perks[k] || 0), 0);
+    ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = INK; ctx.fillText(PERK_TREES[t], cx, g.ty + 6);
+    ctx.textAlign = 'right'; ctx.font = font(FS); ctx.fillStyle = spent ? HC.acc : HC.dim; ctx.fillText(spent, cx + g.cw, g.ty + 6);
     keys.forEach((k, n) => {
-      const P = PERKS[k], r = p.perks[k] || 0, c = perkCard(g, t, n), hover = h && h.k === k, maxed = r >= P.max;
-      ctx.fillStyle = r ? '#1c2216' : '#121410'; ctx.fillRect(c.x, c.y, g.cw, g.ch);
-      ctx.strokeStyle = hover ? '#ffd27a' : maxed ? '#7c7' : r ? '#a8904a' : '#3a3a30'; ctx.lineWidth = hover ? 2 : 1;
-      ctx.strokeRect(c.x + 0.5, c.y + 0.5, g.cw - 1, g.ch - 1); ctx.lineWidth = 1;
-      ctx.fillStyle = '#0a0b08'; ctx.fillRect(c.x + 8, c.y + 12, 56, 56);
-      ctx.globalAlpha = r ? 1 : 0.45; drawIcon(P.icon, c.x + 12, c.y + 16, 48, 48); ctx.globalAlpha = 1;
-      ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = r ? '#ffe9b0' : '#aaa59a'; ctx.fillText(fitText(P.name, g.cw - 82 - P.max * 11), c.x + 74, c.y + 22);
-      for (let s = 0; s < P.max; s++) { ctx.fillStyle = s < r ? '#ffc850' : '#2e2a22'; ctx.fillRect(c.x + g.cw - 12 - (P.max - s) * 11, c.y + 13, 8, 8); } // 단계 칸
-      ctx.font = font(FS);
-      ctx.fillStyle = r ? '#dfffd0' : '#6a6658'; ctx.fillText(fitText(r ? P.fmt(P.per * r) : '아직 배우지 않음', g.cw - 82), c.x + 74, c.y + 44);
-      ctx.fillStyle = maxed ? '#7c7' : '#8fc4ff'; ctx.fillText(fitText(maxed ? '최고 단계' : `다음: ${P.fmt(P.per * (r + 1))}`, g.cw - 82), c.x + 74, c.y + 62);
+      const P = PERKS[k], rk = p.perks[k] || 0, r = perkRect(g, t, n), hot = h && h.k === k, can = p.pts > 0 && rk < P.max;
+      if (hot) { ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fillRect(r[0], r[1], r[2], r[3]); }
+      pxWell([r[0], r[1], 44, 44], hot && can, rk ? '216,154,58' : null);
+      ctx.globalAlpha = rk ? 1 : 0.35; drawIcon(P.icon, r[0] + 6, r[1] + 6, 32, 32); ctx.globalAlpha = 1;
+      ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = rk ? INK : HC.dim; ctx.fillText(fitText(P.name, g.cw - 52), r[0] + 52, r[1] + 18);
+      for (let q = 0; q < P.max; q++) { ctx.fillStyle = q < rk ? HC.acc : '#26282e'; ctx.fillRect(r[0] + 52 + q * 9, r[1] + 28, 7, 7); }
+      if (can) { ctx.fillStyle = blink ? '#ffe08a' : HC.acc; ctx.fillRect(r[0] + 37, r[1] + 3, 4, 4); }
     });
   });
-  // 초기화 버튼 + 안내
-  const b = respecBtn(g), cost = RESPEC_COST * p.clv, hoverB = h && h.respec;
-  ctx.fillStyle = hoverB ? '#3a352c' : '#2a2620'; ctx.fillRect(b.x, b.y, b.w, b.h);
-  ctx.strokeStyle = hoverB ? '#ffd27a' : '#8c8574'; ctx.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
-  ctx.textAlign = 'center'; ctx.font = font(FS); ctx.fillStyle = p.gold >= cost ? '#e8dcc0' : '#a77'; ctx.fillText(`점수 초기화 (${cost}G)`, b.x + b.w / 2, b.y + 17);
-  ctx.textAlign = 'left'; ctx.fillStyle = '#887'; ctx.fillText(fitText('클릭: 1점 투자 (능력치는 Shift+클릭: 5점)', g.pw - 250), g.x + 14, b.y + 17);
+  // 아래: 남은 특성 점수 + 초기화
+  const b = respecBtn(g), cost = RESPEC_COST * p.clv;
+  ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = p.pts > 0 ? (blink ? '#ffe08a' : HC.acc) : HC.dim; ctx.fillText(`특성 점수 ${p.pts}`, g.x + 12, b[1] + 14);
+  pxBtn(b, `초기화 ${cost.toLocaleString()}G`, h && h.respec, p.gold >= cost);
+  // 툴팁
+  if (held || !h) return;
+  if (h.skill !== undefined) {
+    const sh = p.shells[h.skill];
+    if (sh) { const L = shellTooltip(sh); if (trade && trade.mode === 'upgrade') L.push({ t: '클릭: 고르기', c: HC.acc, b: true }); queueTip(L, mouse.x + 18, mouse.y + 18); }
+    else queueTip([{ t: `[${SHELL_SLOTS[h.skill]}] 스킬 칸`, c: INK, b: true }, { t: '가방의 스킬 쉘을 끌어다 놓는다', c: HC.dim }], mouse.x + 18, mouse.y + 18);
+  } else if (h.k) {
+    const P = PERKS[h.k], rk = p.perks[h.k] || 0, L = [{ t: P.name, c: INK, b: true }, { t: rk ? `지금: ${P.fmt(P.per * rk)}` : '아직 배우지 않음', c: rk ? '#dfffd0' : HC.dim }];
+    L.push(rk < P.max ? { t: `다음: ${P.fmt(P.per * (rk + 1))}`, c: '#8fc4ff' } : { t: '최고 단계', c: '#7c7' });
+    if (p.pts > 0 && rk < P.max) L.push({ t: '클릭: 1점 투자', c: HC.acc });
+    queueTip(L, mouse.x + 18, mouse.y + 18);
+  } else if (h.respec) queueTip([{ t: '점수 초기화', c: INK, b: true }, { t: '특성과 능력치 점수를 모두 돌려받는다', c: '#ccc' }], mouse.x - 160, mouse.y + 18);
 }
 
 // ===== 수집 도감 [J] (실시간): 처치한 몬스터·보스·고유 정예, 찾은 고유 전설 (무기·쉘), 만든 보석 조합 =====
@@ -5002,37 +5017,44 @@ function drawCodex() {
   if (h && h.card !== undefined && cards[h.card]) drawTooltip(cards[h.card].tip, mouse.x + 18, mouse.y + 18, VH);
 }
 
-// ===== 인벤토리 창 (실시간, 화면 오른쪽) =====
+// ===== 인벤토리 창 (실시간, 화면 오른쪽): 위 왼쪽 능력치 · 위 오른쪽 인체 모양 장비 칸, 무기 4칸, 가방, 보석 주머니 =====
 const CELL = 34;
-let invOpen = false, held = null; // held: 커서로 들고 있는 무기 { inst, from, ogx, ogy, sx, sy }
+let invOpen = false, held = null; // held: 커서로 들고 있는 아이템 { inst, from, ogx, ogy, sx, sy, gk: 뺀 장비 칸, ok: 뺀 스킬 칸 }
+const inRect = (r, mx = mouse.x, my = mouse.y) => mx >= r[0] && mx < r[0] + r[2] && my >= r[1] && my < r[1] + r[3]; // r: [x, y, w, h]
+const WU = () => Math.max(2, Z); // 창 안의 픽셀 글자·숫자 배율 (작은 화면에서도 읽히게 2배 이상)
+// 장비 칸: 인형 왼쪽 위 기준 [x, y, w, h] — 위 강화칩·머리·강화장신구, 가운데 왼팔·몸통·오른팔, 아래 다리
+const DOLL = { chip: [8, 8, 40, 40], head: [62, 0, 56, 56], acc: [132, 8, 40, 40], larm: [0, 70, 56, 56], body: [62, 62, 56, 84], rarm: [124, 70, 56, 56], legs: [62, 152, 56, 56] };
+const DOLL_W = 180, DOLL_H = 208;
 function invGeom() {
-  const pw = BAG_W * CELL + 24, x = W - pw - 12, y = 12;
-  const slotW = (pw - 24 - (NSLOT - 1) * 6) / NSLOT, slotH = 58, slotY = y + 34;
-  const arW = (pw - 24 - 2 * 6) / 3, arH = 44, arY = slotY + slotH + 8; // 방어구 칸 3개 (머리·몸·다리)
-  const skW = (pw - 24 - 3 * 6) / 4, skH = 40, skY = arY + arH + 8;     // 스킬 칸 4개 (Z X V B)
-  const gx = x + 12, gy = skY + skH + 26; // 스킬 칸과 가방 사이: 계열 공명 한 줄 (오른쪽 끝에 정렬 단추)
-  const py = gy + bagH() * CELL + 24;     // 가방 아래: 보석 주머니 (이름 한 줄 + 2줄 x 9칸)
-  return { x, y, pw, ph: py - y + 2 * CELL + 46, slotW, slotH, slotY, arW, arH, arY, skW, skH, skY, gx, gy, py };
+  const pw = BAG_W * CELL + 24, x = W - pw - 12, y = 8, top = y + 30, dx = x + pw - 12 - DOLL_W;
+  const wy = top + DOLL_H + 10, slotW = (pw - 24 - (NSLOT - 1) * 6) / NSLOT, slotH = 48;
+  const gx = x + 12, gy = wy + slotH + 22, py = gy + bagH() * CELL + 22, fy = py + 2 * CELL;
+  return { x, y, pw, ph: fy + 24 - y, top, dx, wy, slotW, slotH, gx, gy, py, fy, sx: x + 14, sw: dx - 30 - x };
 }
+const gearRect = (g, k) => { const r = DOLL[k]; return [g.dx + r[0], g.top + r[1], r[2], r[3]]; };
+const slotRect = (g, c) => [g.x + 12 + c * (g.slotW + 6), g.wy, g.slotW, g.slotH];
+const attrRow = (g, n) => [g.sx - 4, g.top + 42 + n * 22, g.sw + 8, 20];
+const attrBtn = (g, n) => [g.sx + g.sw - 16, g.top + 44 + n * 22, 16, 16];
+const sortBtn = g => [g.gx + BAG_W * CELL - 44, g.gy - 20, 44, 17]; // 가방 정렬 단추
+const closeBtn = (x, y, w) => [x + w - 12 - 3 * WU() - 4, y + 5, 3 * WU() + 8, 5 * WU() + 8]; // 창 오른쪽 위 닫기
 // 보석 주머니 칸 n (0~17): 보석 종류마다 등급 3칸씩 (조각난·보통·완벽한), 한 줄에 세 종류 (종류 사이는 조금 띄움)
 function pouchCell(g, n) {
   const t = Math.floor(n / 3), grade = n % 3;
   return { id: GEM_KEYS[t], grade, x: g.gx + ((t % 3) * 3 + grade) * CELL + (t % 3) * 8, y: g.py + Math.floor(t / 3) * CELL };
 }
-const sortBtn = g => ({ x: g.gx + BAG_W * CELL - 46, y: g.gy - 21, w: 46, h: 17 }); // 가방 정렬 단추
-const arSlotX = (g, n) => g.x + 12 + n * (g.arW + 6);
-const slotX = (g, c) => g.x + 12 + c * (g.slotW + 6);
-const skSlotX = (g, k) => g.x + 12 + k * (g.skW + 6);
 function invHit(mx, my) {
   const g = invGeom();
   if (mx < g.x || mx > g.x + g.pw || my < g.y || my > g.y + g.ph) return null;
-  for (let c = 0; c < NSLOT; c++) if (mx >= slotX(g, c) && mx <= slotX(g, c) + g.slotW && my >= g.slotY && my <= g.slotY + g.slotH) return { area: 'slot', c };
-  for (let k = 0; k < 4; k++) if (mx >= skSlotX(g, k) && mx <= skSlotX(g, k) + g.skW && my >= g.skY && my <= g.skY + g.skH) return { area: 'skill', k };
-  for (let n = 0; n < GEAR_KEYS.length; n++) if (mx >= arSlotX(g, n) && mx <= arSlotX(g, n) + g.arW && my >= g.arY && my <= g.arY + g.arH) return { area: 'gear', g: GEAR_KEYS[n] };
+  if (inRect(closeBtn(g.x, g.y, g.pw), mx, my)) return { area: 'close' };
+  for (const k of GEAR_KEYS) if (inRect(gearRect(g, k), mx, my)) return { area: 'gear', g: k };
+  for (let c = 0; c < NSLOT; c++) if (inRect(slotRect(g, c), mx, my)) return { area: 'slot', c };
+  for (let n = 0; n < ATTR_KEYS.length; n++) {
+    if (player.apts > 0 && inRect(attrBtn(g, n), mx, my)) return { area: 'attrUp', k: ATTR_KEYS[n] };
+    if (inRect(attrRow(g, n), mx, my)) return { area: 'attr', k: ATTR_KEYS[n] };
+  }
   if (mx >= g.gx && mx < g.gx + BAG_W * CELL && my >= g.gy && my < g.gy + bagH() * CELL)
     return { area: 'grid', cx: Math.floor((mx - g.gx) / CELL), cy: Math.floor((my - g.gy) / CELL) };
-  const sb = sortBtn(g);
-  if (mx >= sb.x && mx < sb.x + sb.w && my >= sb.y && my < sb.y + sb.h) return { area: 'sort' };
+  if (inRect(sortBtn(g), mx, my)) return { area: 'sort' };
   for (let n = 0; n < 18; n++) { const c = pouchCell(g, n); if (mx >= c.x && mx < c.x + CELL - 2 && my >= c.y && my < c.y + CELL - 2) return { area: 'pouch', id: c.id, grade: c.grade }; }
   return { area: 'panel' };
 }
@@ -5042,16 +5064,17 @@ function heldTarget(inst) {
   return { gx: clamp(Math.round((mouse.x - g.gx) / CELL - w / 2), 0, BAG_W - w), gy: clamp(Math.round((mouse.y - g.gy) / CELL - h / 2), 0, bagH() - h) };
 }
 function holdItem(inst, from, extra = {}) { held = { inst, from, sx: mouse.x, sy: mouse.y, ...extra }; }
-// 들고 있는 무기 놓기: 창 밖이면 바닥에 버림, 슬롯이면 장착, 격자면 배치 (한 개와 겹치면 서로 교체)
+// 들고 있는 아이템 놓기: 창 밖이면 바닥에 버림, 슬롯이면 장착, 격자면 배치 (한 개와 겹치면 서로 교체), 스킬 창의 스킬 칸이면 쉘 장착
 function placeHeld() {
-  const p = player, inst = held.inst, hit = invHit(mouse.x, mouse.y), th = trade && tradeHit(mouse.x, mouse.y);
+  const p = player, inst = held.inst, hit = invHit(mouse.x, mouse.y), th = trade && tradeHit(mouse.x, mouse.y), kh = perkOpen && perkHit(mouse.x, mouse.y);
+  if (kh) { if (kh.skill !== undefined) placeShell(kh.skill); return; } // 스킬 창 위: 스킬 칸에만 (다른 곳은 그대로 들고 있음)
   if (th && trade.mode === 'stash') { if (th.area === 'grid') placeInStash(); return; } // 창고 격자에 놓으면 보관
   if (th && trade.mode !== 'upgrade') { held = null; sellWeapon(inst); return; } // 거래 창에 놓으면 판매
   if (th) { if (!(inst.kind === 'attach' && dropAttachAt(inst, th, hit))) stowHeld(); return; } // 개조 자판기 창 위: 파츠는 고른 무기에 끼움, 그 밖에는 제자리로
   if (inst.kind === 'attach' && hit) { // 파츠: 개조 자판기의 파츠 개조 탭이면 놓은 무기에 끼움, 그 밖에는 가방에만
     if (dropAttachAt(inst, null, hit)) return;
     const under = hit.area === 'grid' ? bagItemAt(hit.cx, hit.cy) : null;
-    if (['slot', 'gear', 'skill'].includes(hit.area) || (under && !under.kind)) { msg('파츠는 거점의 개조 자판기에서 끼운다', '#f99'); Snd.play('deny'); return; }
+    if (['slot', 'gear'].includes(hit.area) || (under && !under.kind)) { msg('파츠는 거점의 개조 자판기에서 끼운다', '#f99'); Snd.play('deny'); return; }
   }
   if (inst.kind === 'gem' && hit) { // 보석: 무기·방어구 위에 놓으면 빈 소켓에 끼움
     const target = hit.area === 'grid' ? bagItemAt(hit.cx, hit.cy) : hit.area === 'slot' ? p.equip[hit.c] : hit.area === 'gear' ? p.gear[hit.g] : null;
@@ -5059,7 +5082,7 @@ function placeHeld() {
       if (socketGem(target, inst)) { held = null; return; }
       msg(target.sockets ? '빈 소켓이 없습니다' : '소켓이 없는 장비다', '#f99'); Snd.play('deny'); return;
     }
-    if (hit.area === 'slot' || hit.area === 'gear' || hit.area === 'skill') { msg('보석은 소켓이 있는 장비 위에 놓는다', '#f99'); return; }
+    if (hit.area === 'slot' || hit.area === 'gear') { msg('보석은 소켓이 있는 장비 위에 놓는다', '#f99'); return; }
     held = null; pouchAdd(inst, true); Snd.play('pickup'); return; // 창 안의 다른 자리: 주머니로 되돌림
   }
   if (!hit) {
@@ -5067,27 +5090,20 @@ function placeHeld() {
     held = null; dropWeapon(p.x, p.y, inst); pickups[pickups.length - 1].wait = true; msg(`${inst.name} 버림`, '#a99'); return; // 버린 보석은 한 번 멀어졌다 와야 다시 저절로 주움
   }
   if (hit.area === 'slot') {
-    if (inst.kind === 'shell') { msg('스킬 쉘은 아래의 스킬 칸(Z X V B)에 끼웁니다', '#f99'); return; }
-    if (inst.kind === 'armor') { msg('방어구는 방어구 칸에 끼운다', '#f99'); return; }
+    if (inst.kind === 'shell') { msg('스킬 쉘은 스킬 창 [K]의 칸에 끼운다', '#f99'); return; }
+    if (inst.kind === 'armor') { msg('방어구는 인형의 장비 칸에 끼운다', '#f99'); return; }
     if (hit.c >= slotsOpen()) { msg(`${hit.c + 1}번 슬롯은 잠겨 있다`, '#f99'); tip('armory'); return; }
     const old = p.equip[hit.c];
     p.equip[hit.c] = inst; held = null;
     if (old) holdItem(old, 'equip');
     if (hit.c === p.slot) onActiveWeaponChanged();
     Snd.play('pickup');
-  } else if (hit.area === 'gear') { // 방어구 칸: 그 부위 방어구만 (끼어 있던 것은 커서로)
-    if (inst.kind !== 'armor' || inst.s.slot !== hit.g) { msg(`${ARMOR_SLOTS[hit.g]} 칸에는 ${ARMOR_SLOTS[hit.g]} 방어구만 끼울 수 있습니다`, '#f99'); return; }
+  } else if (hit.area === 'gear') { // 장비 칸: 그 종류만 (끼어 있던 것은 커서로)
+    const want = GEAR_SLOTS[hit.g];
+    if (inst.kind !== 'armor' || inst.s.slot !== want) { msg(`${GEAR_NAMES[hit.g]} 칸에는 ${ARMOR_SLOTS[want]} 장비만 끼울 수 있습니다`, '#f99'); return; }
     const old = p.gear[hit.g];
     p.gear[hit.g] = inst; held = null; gearChanged();
-    if (old) holdItem(old, 'gear');
-    Snd.play('pickup');
-  } else if (hit.area === 'skill') { // 스킬 칸: 쉘만, 같은 스킬은 한 칸에만 (끼어 있던 쉘은 커서로)
-    if (inst.kind !== 'shell') { msg('스킬 칸에는 스킬 쉘만 끼울 수 있습니다', '#f99'); return; }
-    const j = shellSlotOf(inst.id);
-    if (j >= 0 && j !== hit.k) { msg(`${SKILLS[inst.id].name}은(는) 이미 [${SHELL_SLOTS[j]}] 칸에 있다`, '#f99'); return; }
-    const old = p.shells[hit.k];
-    p.shells[hit.k] = inst; held = null;
-    if (old) holdItem(old, 'skill', { ok: hit.k });
+    if (old) holdItem(old, 'gear', { gk: hit.g });
     Snd.play('pickup');
   } else if (hit.area === 'grid') {
     const t = heldTarget(inst), ov = bagOverlaps(inst, t.gx, t.gy);
@@ -5098,22 +5114,41 @@ function placeHeld() {
     Snd.play('pickup');
   }
 }
-// 창을 닫을 때 들고 있던 무기 정리: 원래 자리 → 빈 슬롯/빈 자리 → 바닥
+// 스킬 창의 스킬 칸 k에 들고 있는 쉘 끼우기: 같은 스킬은 한 칸에만 (끼어 있던 쉘은 커서로)
+function placeShell(k) {
+  const p = player, inst = held.inst;
+  if (inst.kind !== 'shell') { msg('스킬 칸에는 스킬 쉘만 끼울 수 있습니다', '#f99'); return; }
+  const j = shellSlotOf(inst.id);
+  if (j >= 0 && j !== k) { msg(`${SKILLS[inst.id].name}은(는) 이미 [${SHELL_SLOTS[j]}] 칸에 있다`, '#f99'); return; }
+  const old = p.shells[k];
+  p.shells[k] = inst; held = null;
+  if (old) holdItem(old, 'skill', { ok: k });
+  Snd.play('pickup');
+}
+// 창을 닫을 때 들고 있던 아이템 정리: 원래 자리 → 빈 슬롯/빈 자리 → 바닥
 function stowHeld() {
   if (!held) return;
   const h = held; held = null;
   if (h.from === 'bag' && inBag(h.inst, h.ogx, h.ogy) && !bagOverlaps(h.inst, h.ogx, h.ogy).length) { h.inst.gx = h.ogx; h.inst.gy = h.ogy; player.bag.push(h.inst); return; }
   if (h.from === 'stash' && !gridOverlaps(stash, h.inst, h.ogx, h.ogy).length) { h.inst.gx = h.ogx; h.inst.gy = h.ogy; stash.push(h.inst); return; } // 창고에서 꺼낸 것은 창고 제자리로
   if (h.from === 'skill' && !player.shells[h.ok] && shellSlotOf(h.inst.id) < 0) { player.shells[h.ok] = h.inst; return; } // 스킬 칸에서 뺀 쉘은 그 칸으로
-  if (h.from === 'gear' && !player.gear[h.inst.s.slot]) { player.gear[h.inst.s.slot] = h.inst; gearChanged(); return; } // 방어구 칸에서 뺀 것은 그 칸으로
+  if (h.from === 'gear' && h.gk && !player.gear[h.gk]) { player.gear[h.gk] = h.inst; gearChanged(); return; } // 장비 칸에서 뺀 것은 그 칸으로
   if (!addWeapon(h.inst)) { dropWeapon(player.x, player.y, h.inst); msg(`가방이 가득 차 ${h.inst.name}을(를) 바닥에 내려놓았습니다`, '#f99'); }
 }
 function closeInventory() { stowHeld(); invOpen = false; }
+// 능력치 투자: 클릭 1점, Shift+클릭 5점
+function investAttr(k) {
+  const p = player, A = ATTRS[k], n = Math.min(p.apts, keys.ShiftLeft || keys.ShiftRight ? 5 : 1);
+  if (n <= 0) { msg('능력치 점수가 없다', '#a99'); Snd.play('deny'); return; }
+  p.attr[k] += n; p.apts -= n; Snd.play('buy'); msg(`${A.name} +${n} → ${attrV(k)}`, A.color);
+}
 // 인벤토리가 클릭을 처리했으면 true (그 클릭으로는 사격하지 않음)
 function invMouseDown(button) {
   const p = player, hit = invHit(mouse.x, mouse.y);
   if (held) { if (button === 0) placeHeld(); return true; }
   if (!hit) return false;
+  if (hit.area === 'close') { if (button === 0) { if (trade) closeTrade(); else closeInventory(); } return true; }
+  if (hit.area === 'attrUp') { if (button === 0) investAttr(hit.k); return true; }
   if (hit.area === 'sort') { if (button === 0) sortBag(); return true; }
   if (hit.area === 'pouch') { const g = button === 0 && pouchTake(hit.id, hit.grade); if (g) { holdItem(g, 'pouch'); Snd.play('pickup'); } return true; } // 주머니에서 하나 집기
   if (hit.area === 'grid') {
@@ -5128,11 +5163,8 @@ function invMouseDown(button) {
     if (button === 0) { const inst = p.equip[hit.c]; p.equip[hit.c] = null; if (hit.c === p.slot) onActiveWeaponChanged(); holdItem(inst, 'equip'); }
     else if (button === 2) unequipToBag(hit.c);
   } else if (hit.area === 'gear' && p.gear[hit.g]) {
-    if (button === 0) { const inst = p.gear[hit.g]; p.gear[hit.g] = null; gearChanged(); holdItem(inst, 'gear'); }
+    if (button === 0) { const inst = p.gear[hit.g]; p.gear[hit.g] = null; gearChanged(); holdItem(inst, 'gear', { gk: hit.g }); }
     else if (button === 2) unequipArmor(hit.g);
-  } else if (hit.area === 'skill' && p.shells[hit.k]) {
-    if (button === 0) { const sh = p.shells[hit.k]; p.shells[hit.k] = null; holdItem(sh, 'skill', { ok: hit.k }); }
-    else if (button === 2) unequipShell(hit.k);
   }
   return true;
 }
@@ -5164,9 +5196,8 @@ function rollStock() {
     const spot = gridFindSpot(stock, w, VG_W, VG_H);
     if (spot) { w.gx = spot.gx; w.gy = spot.gy; stock.push(w); }
   }
-  const aids = Object.keys(ARMORS).filter(k => ARMORS[k].minLvl <= level + 1); // 방어구 진열대
-  armorStock = [];
-  for (const a of Array.from({ length: ARMOR_STOCK }, () => makeArmor(pick(aids), Math.random() < 0.12 ? 2 : Math.random() < 0.4 ? 1 : 0))) {
+  armorStock = []; // 방어구 진열대 (팔·강화칩·강화장신구 포함)
+  for (const a of Array.from({ length: ARMOR_STOCK }, () => makeArmor(pickArmorBase(), Math.random() < 0.12 ? 2 : Math.random() < 0.4 ? 1 : 0))) {
     const spot = gridFindSpot(armorStock, a, VG_W, VG_H);
     if (spot) { a.gx = spot.gx; a.gy = spot.gy; armorStock.push(a); }
   }
@@ -5183,13 +5214,13 @@ function openTrade(mode) {
   invOpen = true; state = 'trade'; mouse.down = false;
   Snd.play('menu');
 }
-function closeTrade() { stowHeld(); trade = null; invOpen = false; state = 'play'; mouse.down = false; Snd.play('menu'); }
+function closeTrade() { stowHeld(); trade = null; invOpen = false; perkOpen = false; state = 'play'; mouse.down = false; Snd.play('menu'); }
 
 function tradeGeom() {
   const x = 12, y = 12, pw = VG_W * CELL + 24, tabY = y + 38, gx = x + 12, gy = tabY + 32;
   return { x, y, pw, ph: gy - y + VG_H * CELL + 52, tabY, gx, gy, footY: gy + VG_H * CELL + 8 };
 }
-const TRADE_TABS = { shop: [['weapons', '무기'], ['armor', '방어구'], ['shells', '스킬 쉘'], ['attach', '파츠'], ['goods', '소모품'], ['gamble', '도박']], sell: [['sell', '판매·되사기']], upgrade: [['upgrade', '개조·강화'], ['attach', '파츠 개조'], ['forge', '분해·재련'], ['socket', '소켓·보석'], ['rune', '보석 조합']], stash: [['stash', '보관함']] };
+const TRADE_TABS = { shop: [['weapons', '무기'], ['armor', '장비'], ['shells', '스킬 쉘'], ['attach', '파츠'], ['goods', '소모품'], ['gamble', '도박']], sell: [['sell', '판매·되사기']], upgrade: [['upgrade', '개조·강화'], ['attach', '파츠 개조'], ['forge', '분해·재련'], ['socket', '소켓·보석'], ['rune', '보석 조합']], stash: [['stash', '보관함']] };
 const tabW = n => Math.min(154, Math.floor((VG_W * CELL - (n - 1) * 6) / n)); // 탭 너비 (탭이 많으면 좁게)
 function tradeButtons() {
   const g = tradeGeom(), p = player, B = [{ id: 'close', x: g.x + g.pw - 96, y: g.footY + 12, w: 84, h: 26, label: '닫기 (Esc)', on: true }];
@@ -5272,15 +5303,17 @@ function tradeMouseDown(button) {
   if (held) { if (button === 0) placeHeld(); return; }
   if (vh && vh.area === 'grid' && trade.mode === 'stash') { stashClick(vh, button); return; }
   if (vh) { vendorClick(vh); return; }
+  if (perkOpen && perkHit(mouse.x, mouse.y)) { perkMouseDown(button); return; } // 스킬 창 (개조 자판기: 장착한 쉘 고르기)
   const ih = invHit(mouse.x, mouse.y);
   if (!ih) return;
+  if (ih.area === 'close' || ih.area === 'attrUp') { invMouseDown(button); return; }
   if (ih.area === 'sort') { if (button === 0) sortBag(); return; }
   if (ih.area === 'pouch') { // 보석 주머니: 보급·회수 자판기에서 우클릭은 하나 판매, 그 밖에는 하나 집기
     if (button === 2 && (trade.mode === 'shop' || trade.mode === 'sell')) { const g = pouchTake(ih.id, ih.grade); if (g) sellWeapon(g); }
     else invMouseDown(button);
     return;
   }
-  const inst = ih.area === 'grid' ? bagItemAt(ih.cx, ih.cy) : ih.area === 'slot' ? player.equip[ih.c] : ih.area === 'skill' ? player.shells[ih.k] : ih.area === 'gear' ? player.gear[ih.g] : null;
+  const inst = ih.area === 'grid' ? bagItemAt(ih.cx, ih.cy) : ih.area === 'slot' ? player.equip[ih.c] : ih.area === 'gear' ? player.gear[ih.g] : null;
   if (trade.mode === 'upgrade' && inst && inst.kind === 'gem') { invMouseDown(button); return; } // 보석은 집어 들기 (장비 위에 놓아 끼움)
   if (trade.mode === 'upgrade' && inst && inst.kind === 'attach') { // 파츠: 우클릭은 고른 무기에 바로 끼움, 왼쪽은 집어 들기 (무기 위에 놓아 끼움)
     if (button === 2 && trade.tab === 'attach') { const w = attW(); if (w) installAttach(w, inst); else { trade.note = '먼저 인벤토리에서 파츠를 끼울 무기를 클릭하세요'; Snd.play('deny'); } }
@@ -5608,6 +5641,7 @@ function drawUpgradeArea(g) {
   ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = RARITY[w.rarity].color; ctx.fillText(fitText(w.name, 200), g.gx + 150, ey + 17);
   ctx.font = font(FS); ctx.fillStyle = '#ccc';
   if (w.kind === 'shell' || w.kind === 'attach') { ctx.fillText(w.kind === 'shell' ? '스킬 쉘은 강화할 수 없다' : '파츠는 강화할 수 없다', g.gx + 150, ey + 31); return; }
+  if (w.kind === 'armor' && isAug(w)) { ctx.fillText(`강화 ${w.plus}/${ENHANCE_MAX}, ${ATTRS[w.s.attr[0]].name} +${w.s.attrN}${w.plus < ENHANCE_MAX ? ` → +${w.s.attrN + 1}` : ''}`, g.gx + 150, ey + 31); return; }
   const key = w.kind === 'armor' ? 'def' : 'dmg', next = Math.round(w.s[key] / (1 + ENHANCE_DMG * w.plus) * (1 + ENHANCE_DMG * (w.plus + 1)));
   ctx.fillText(`강화 ${w.plus}/${ENHANCE_MAX}, ${key === 'def' ? '방어' : '피해'} ${Math.round(w.s[key])}${w.plus < ENHANCE_MAX ? ` → ${next}` : ''}`, g.gx + 150, ey + 31);
 }
@@ -5634,6 +5668,7 @@ canvas.addEventListener('mousedown', e => {
   Snd.init();
   mouse.x = e.clientX; mouse.y = e.clientY;
   if (state === 'intro') { if (e.button === 0) mouse.down = true; return; } // 컷신: 누르고 있으면 건너뜀 (introTick)
+  if ((state === 'play' || state === 'trade') && hudMenuClick(e.button)) return; // HUD 메뉴 아이콘
   if (state === 'trade') { tradeMouseDown(e.button); return; }
   if (state === 'play' && invOpen && invMouseDown(e.button)) return;
   if (state === 'play' && codexOpen && codexMouseDown(e.button)) return;
@@ -5649,6 +5684,16 @@ addEventListener('mouseup', e => {
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('wheel', e => { if (state === 'play') cycleWeapon(Math.sign(e.deltaY || e.deltaX)); }, { passive: true });
 
+// 인벤토리 [I]·스킬 창 [K] 열고 닫기 (둘은 함께 열 수 있고, 도감은 닫음)
+function toggleInv() { if (invOpen) closeInventory(); else { invOpen = true; codexOpen = false; } Snd.play('menu'); }
+function toggleSkills() { perkOpen = !perkOpen; if (perkOpen) codexOpen = false; Snd.play('menu'); }
+// HUD 메뉴 아이콘을 눌렀으면 true (거래 중에는 인벤토리가 늘 열려 있음)
+function hudMenuClick(button) {
+  const m = hudMenu.find(o => inRect(o.r));
+  if (!m) return false;
+  if (button === 0) { if (m.id === 'skill') toggleSkills(); else if (!trade) toggleInv(); }
+  return true;
+}
 function onKey(code) {
   if (state === 'intro') return; // 컷신: 누르고 있으면 건너뜀 (introTick)
   if (code === 'Escape') {
@@ -5661,12 +5706,13 @@ function onKey(code) {
     else if (state === 'trade') closeTrade();
     return;
   }
+  if (state === 'trade' && code === 'KeyK') { toggleSkills(); return; } // 거래 중에도 스킬 창 (개조 자판기에서 장착한 쉘 고르기)
   if (state !== 'play') return;
   const p = player;
   if (code in ITEM_KEYS) useItem(ITEM_KEYS[code]); // 소모품 (메디킷 Q, 치료제 E, 아드레날린 T)
   else if (code.startsWith('Digit')) { const n = +code.slice(5); if (n >= 1 && n <= NSLOT) selectSlot(n - 1); }
-  else if (code === 'KeyI' || code === 'Tab') { if (invOpen) closeInventory(); else { invOpen = true; perkOpen = false; codexOpen = false; } }
-  else if (code === 'KeyK') { perkOpen = !perkOpen; if (perkOpen) { closeInventory(); codexOpen = false; } Snd.play('menu'); } // 캐릭터 성장 창
+  else if (code === 'KeyI' || code === 'Tab') toggleInv();
+  else if (code === 'KeyK') toggleSkills(); // 스킬 창
   else if (code === 'KeyJ') { codexOpen = !codexOpen; if (codexOpen) { closeInventory(); perkOpen = false; } Snd.play('menu'); } // 수집 도감
   else if (code === 'KeyF') { const t = nearestTerminal(), o = !t && !inBase && nearestSpot(); if (t) useTerminal(t); else if (o) useSpot(o); else if (!inBase) pickUpWeapon(); } // 단말기 / 금고 보물함·필드 사건 / 무기 줍기
   else if (code === 'KeyR') startReload();
@@ -7230,7 +7276,7 @@ function fitText(t, maxW) {
 // 발밑의 주울 수 있는 무기에는 [F] 줍기 안내만 작게
 const HOVER_R = 4;
 function hoverPickup() {
-  if ((invOpen && invHit(mouse.x, mouse.y)) || codexOpen) return null;
+  if ((invOpen && invHit(mouse.x, mouse.y)) || (perkOpen && perkHit(mouse.x, mouse.y)) || codexOpen) return null;
   let best = null, bd = 28; // 커서와 그림 가운데 사이 (화면 픽셀)
   for (const it of pickups) {
     if (it.dead || it.kind === 'gold' || lootHidden(it) || Math.hypot(it.x - player.x, it.y - player.y) > HOVER_R || !canSee(it.x, it.y)) continue;
@@ -7296,122 +7342,138 @@ function drawMissionLabels() {
   }
 }
 
+// ===== 창 그리기 부품: HUD와 같은 픽셀 테두리, 강조색은 호박색 하나, 설명은 툴팁으로 =====
+const INK = '#e8e2d6', WIN_FILL = 'rgba(9,10,13,0.95)', WELL_FILL = '#0d0e12';
+let tipQ = null; // 창의 툴팁은 모든 창을 그린 뒤에 (다른 창에 가리지 않게)
+const queueTip = (L, x, y) => { tipQ = [L, x, y]; };
+function winCard(x, y, w, h) { const f = HC.fill; HC.fill = WIN_FILL; pxCard(x, y, w, h, true); HC.fill = f; }
+// 오목한 칸 r = [x, y, w, h]: 테두리 (hot: 호박색), 위·왼쪽 그림자, 아래·오른쪽 밝은 선, glow: 등급 빛 'r,g,b'
+function pxWell(r, hot, glow) {
+  const U = Z, [x, y, w, h] = r.map(Math.round);
+  ctx.fillStyle = hot ? HC.acc : '#26282e'; ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = WELL_FILL; ctx.fillRect(x + U, y + U, w - 2 * U, h - 2 * U);
+  ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(x + U, y + U, w - 2 * U, U); ctx.fillRect(x + U, y + U, U, h - 2 * U);
+  ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(x + U, y + h - 2 * U, w - 2 * U, U); ctx.fillRect(x + w - 2 * U, y + U, U, h - 2 * U);
+  if (glow) { ctx.fillStyle = `rgba(${glow},0.10)`; ctx.fillRect(x + 2 * U, y + 2 * U, w - 4 * U, h - 4 * U); }
+}
+function rarityLine(r, rarity) { if (rarity > 0) { ctx.fillStyle = RARITY[rarity].color; ctx.fillRect(Math.round(r[0]) + Z, Math.round(r[1] + r[3]) - 2 * Z, Math.round(r[2]) - 2 * Z, Z); } } // 등급: 칸 아래 한 줄
+function pxBtn(r, label, hot, on = true) { pxWell(r, hot && on); ctx.textAlign = 'center'; ctx.font = font(FS, true); ctx.fillStyle = !on ? HC.dim : hot ? '#fff' : INK; ctx.fillText(label, r[0] + r[2] / 2, r[1] + r[3] / 2 + 4); }
+function winGlyph(ch, x, y, col) { const z = Z; Z = WU(); pxGlyph(ch, x, y, col); Z = z; }
+function winNum(n, x, y, set, align) { const z = Z; Z = WU(); const w = pxNum(n, x, y, set, align); Z = z; return w; }
+// 창 제목 + 오른쪽 위 단축키 글자와 닫기 X
+function winHeader(x, y, w, title, key, hot) {
+  ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = INK; ctx.fillText(title, x + 12, y + 20);
+  const c = closeBtn(x, y, w);
+  winGlyph('X', c[0] + 4, c[1] + 4, hot ? '#fff' : HC.dim); winGlyph(key, c[0] + 4 - 7 * WU(), c[1] + 4, HC.acc);
+}
+let dollSil = null; // 인형 뒤의 플레이어 그림자 (Freedoom 정면 그림을 한 색으로)
+function dollSilhouette() {
+  if (dollSil || !ART.ready) return dollSil;
+  const f = META.frames.playa1, c = document.createElement('canvas'); c.width = f[2]; c.height = f[3];
+  const g = c.getContext('2d'); g.drawImage(ART.atlas, f[0], f[1], f[2], f[3], 0, 0, f[2], f[3]);
+  g.globalCompositeOperation = 'source-in'; g.fillStyle = '#1e232c'; g.fillRect(0, 0, c.width, c.height);
+  return dollSil = c;
+}
+const GEAR_GHOST = { chip: 'icon_chip_str1', head: 'icon_helm_black', acc: 'icon_acc_psi1', larm: 'icon_arm_dark', body: 'icon_vest_tac', rarm: 'icon_arm_dark', legs: 'icon_pants' }; // 빈 칸의 흐린 그림
+
 // ===== 인벤토리 창 그리기 =====
 function drawInventory() {
-  const g = invGeom(), p = player, hit = invHit(mouse.x, mouse.y);
-  ctx.fillStyle = 'rgba(18,16,12,0.94)'; rr(g.x, g.y, g.pw, g.ph, 8); ctx.fill();
-  ctx.strokeStyle = '#8c8574'; ctx.lineWidth = 2; ctx.stroke();
+  const g = invGeom(), p = player, hit = invHit(mouse.x, mouse.y), blink = Math.sin(gtime * 6) > 0, sel = trade && trade.mode === 'upgrade' && trade.sel;
+  winCard(g.x, g.y, g.pw, g.ph);
   const fk = 1 - (performance.now() - rwFlash) / 1500; // 보석 조합 완성: 테두리가 잠깐 청록으로
-  if (fk > 0) { ctx.strokeStyle = `rgba(95,224,200,${fk})`; ctx.lineWidth = 5; ctx.stroke(); ctx.lineWidth = 1; }
-  ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = '#ff8a5a'; ctx.fillText('인벤토리', g.x + 12, g.y + 22);
-  ctx.textAlign = 'right'; ctx.font = font(FS); ctx.fillStyle = '#887'; ctx.fillText(trade ? '거래 중' : '[I / Tab] 닫기', g.x + g.pw - 12, g.y + 22);
-  // 장착 슬롯
-  for (let c = 0; c < NSLOT; c++) { // 무기 슬롯 (어떤 무기든) — 잠긴 칸은 무기고를 해제하면 열림
-    const sx = slotX(g, c), inst = p.equip[c], open = c < slotsOpen(), canDrop = open && held && !held.inst.kind;
-    ctx.fillStyle = open ? '#0c1a10' : '#0b0a08'; ctx.fillRect(sx, g.slotY, g.slotW, g.slotH);
-    ctx.strokeStyle = canDrop ? '#ffd27a' : p.slot === c && open ? '#8f8' : open ? '#3a4a3a' : '#2a2620'; ctx.lineWidth = canDrop || (p.slot === c && open) ? 2 : 1;
-    ctx.strokeRect(sx + 0.5, g.slotY + 0.5, g.slotW - 1, g.slotH - 1); ctx.lineWidth = 1;
-    ctx.textAlign = 'left'; ctx.font = font(FS); ctx.fillStyle = open ? '#6a9a70' : '#5a5448'; ctx.fillText(`${c + 1}번 ${open ? (inst ? CAT_NAMES[inst.s.cat] : '빈 슬롯') : '잠김'}`, sx + 4, g.slotY + 12);
-    if (inst) drawItemFit(inst, sx + 3, g.slotY + 15, g.slotW - 6, g.slotH - 18);
-    else if (!open) { ctx.textAlign = 'center'; ctx.fillStyle = '#6a6458'; ctx.fillText(fitText('무기고 해제 시 열림', g.slotW - 6), sx + g.slotW / 2, g.slotY + 38); }
+  if (fk > 0) { ctx.strokeStyle = `rgba(95,224,200,${fk})`; ctx.lineWidth = 3; ctx.strokeRect(g.x + 1.5, g.y + 1.5, g.pw - 3, g.ph - 3); ctx.lineWidth = 1; }
+  winHeader(g.x, g.y, g.pw, '인벤토리', 'I', hit && hit.area === 'close');
+  // 인형: 플레이어 그림자 위의 장비 칸 (빈 칸은 그 종류의 흐린 그림)
+  const sil = dollSilhouette();
+  if (sil) { const w = Math.round(sil.width * DOLL_H / sil.height); ctx.imageSmoothingEnabled = false; ctx.drawImage(sil, Math.round(g.dx + DOLL_W / 2 - w / 2), g.top, w, DOLL_H); ctx.imageSmoothingEnabled = true; }
+  for (const k of GEAR_KEYS) {
+    const r = gearRect(g, k), it = p.gear[k], fits = held && held.inst.kind === 'armor' && held.inst.s.slot === GEAR_SLOTS[k];
+    pxWell(r, (hit && hit.area === 'gear' && hit.g === k) || (it && it === sel) || (fits && blink), it && it.rarity > 0 ? RARITY[it.rarity].glow : null);
+    if (it) { drawIcon(ARMORS[it.id].icon, r[0] + 5, r[1] + 5, r[2] - 10, r[3] - 10); if (it.sockets) drawSockets(it, r[0], r[1], r[2], r[3]); rarityLine(r, it.rarity); }
+    else { ctx.globalAlpha = 0.12; drawIcon(GEAR_GHOST[k], r[0] + 7, r[1] + 7, r[2] - 14, r[3] - 14); ctx.globalAlpha = 1; }
   }
-  // 방어구 칸 (머리·몸·다리)
-  GEAR_KEYS.forEach((gk, n) => {
-    const sx = arSlotX(g, n), it = p.gear[gk], canDrop = held && held.inst.kind === 'armor' && held.inst.s.slot === gk;
-    ctx.fillStyle = '#14120d'; ctx.fillRect(sx, g.arY, g.arW, g.arH);
-    ctx.strokeStyle = canDrop ? '#ffd27a' : it ? RARITY[it.rarity].color : '#3a3a30'; ctx.lineWidth = canDrop ? 2 : 1;
-    ctx.strokeRect(sx + 0.5, g.arY + 0.5, g.arW - 1, g.arH - 1); ctx.lineWidth = 1;
-    ctx.textAlign = 'left'; ctx.font = font(FS); ctx.fillStyle = '#8a8270'; ctx.fillText(ARMOR_SLOTS[gk], sx + 4, g.arY + 12);
-    if (it) {
-      drawIcon(ARMORS[it.id].icon, sx + 4, g.arY + 14, 28, 28);
-      ctx.font = font(FS, true); ctx.fillStyle = RARITY[it.rarity].color; ctx.fillText(fitText(ARMORS[it.id].name, g.arW - 40), sx + 36, g.arY + 26);
-      ctx.font = font(FS); ctx.fillStyle = '#9cf'; ctx.fillText(`방어 ${Math.round(it.s.def)}`, sx + 36, g.arY + 39);
-    }
+  // 능력치 (인형 왼쪽): 레벨·경험치, 능력치 4개 (점수가 있으면 + 단추), 체력·방어·기력·무게
+  const sx = g.sx, sw = g.sw, need = xpNeed(p.clv);
+  ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = HC.acc; ctx.fillText(`Lv ${p.clv}`, sx, g.top + 14);
+  ctx.textAlign = 'right'; ctx.font = font(FS); ctx.fillStyle = HC.dim; ctx.fillText(`${p.xp} / ${need}`, sx + sw, g.top + 13);
+  ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(sx, g.top + 20, sw, 2); ctx.fillStyle = '#c9a03a'; ctx.fillRect(sx, g.top + 20, Math.round(sw * clamp(p.xp / need, 0, 1)), 2);
+  ctx.textAlign = 'left'; ctx.font = font(FS, p.apts > 0); ctx.fillStyle = p.apts > 0 ? (blink ? '#ffe08a' : HC.acc) : HC.dim; ctx.fillText(p.apts > 0 ? `능력치 점수 ${p.apts}` : '능력치', sx, g.top + 36);
+  ATTR_KEYS.forEach((k, n) => {
+    const A = ATTRS[k], r = attrRow(g, n), v = attrV(k), gear = gearAttr(k), y = r[1] + 15, vx = sx + sw - (p.apts > 0 ? 22 : 0);
+    if (hit && hit.area === 'attr' && hit.k === k) { ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(r[0], r[1], r[2], r[3]); }
+    ctx.fillStyle = A.color; ctx.fillRect(sx, r[1] + 6, 3, 9);
+    ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = INK; ctx.fillText(A.name, sx + 9, y);
+    ctx.textAlign = 'right'; ctx.font = font(FM, true); ctx.fillStyle = v ? A.color : HC.dim; ctx.fillText(v, vx, y + 1);
+    if (gear) { ctx.font = font(FS); ctx.fillStyle = '#8af'; ctx.fillText(`+${gear}`, vx - 24, y); }
+    if (p.apts > 0) { const b = attrBtn(g, n), bh = hit && hit.area === 'attrUp' && hit.k === k; pxWell(b, bh); ctx.fillStyle = bh ? '#fff' : HC.acc; ctx.fillRect(b[0] + 5, b[1] + 7, 6, 2); ctx.fillRect(b[0] + 7, b[1] + 5, 2, 6); }
   });
-  // 스킬 칸 (Z X V B): 스킬 쉘을 끼움 — 같은 스킬은 한 칸에만
-  for (let k = 0; k < 4; k++) {
-    const sx = skSlotX(g, k), sh = p.shells[k], canDrop = held && held.inst.kind === 'shell';
-    ctx.fillStyle = '#0d0c18'; ctx.fillRect(sx, g.skY, g.skW, g.skH);
-    ctx.strokeStyle = canDrop ? '#ffd27a' : sh ? RARITY[sh.rarity].color : '#34344a'; ctx.lineWidth = canDrop ? 2 : 1;
-    ctx.strokeRect(sx + 0.5, g.skY + 0.5, g.skW - 1, g.skH - 1); ctx.lineWidth = 1;
-    ctx.textAlign = 'left';
-    if (sh) { // 그림 + 이름 (띄어쓰기에서 두 줄로, 등급색)
-      drawIcon(SKILLS[sh.id].icon, sx + 4, g.skY + 4, 32, 32);
-      const words = SKILLS[sh.id].name.split(' ');
-      ctx.font = font(FS, true); ctx.fillStyle = RARITY[sh.rarity].color;
-      words.forEach((w, n) => ctx.fillText(fitText(w, g.skW - 42), sx + 39, g.skY + (words.length > 1 ? 17 + n * 13 : 24)));
-    } else { ctx.font = font(FS); ctx.fillStyle = '#4a4a5e'; ctx.fillText('스킬 쉘', sx + 40, g.skY + 24); }
-    ctx.font = font(FS, true); ctx.fillStyle = '#000'; ctx.fillRect(sx + 1, g.skY + g.skH - 14, 13, 13);
-    ctx.fillStyle = '#ffd27a'; ctx.fillText(SHELL_SLOTS[k], sx + 3.5, g.skY + g.skH - 3);
+  let y = g.top + 140;
+  ctx.fillStyle = '#26282e'; ctx.fillRect(sx, y, sw, 1);
+  const ld = load(), def = gearDef();
+  for (const [l, v, c] of [['체력', p.maxhp], ['방어', `${Math.round(def)}  -${pct(defCut(def))}`], ['기력', Math.round(staminaMax())], ['무게', `${Math.round(ld)} / ${maxLoad()}`, ld > maxLoad() ? '#f66' : null]]) {
+    y += 17; ctx.textAlign = 'left'; ctx.font = font(FS); ctx.fillStyle = HC.dim; ctx.fillText(l, sx, y);
+    ctx.textAlign = 'right'; ctx.font = font(FS, true); ctx.fillStyle = c || INK; ctx.fillText(v, sx + sw, y);
   }
-  // 계열 공명 (같은 계열 쉘 2·3·4개)
-  const res = ATTR_KEYS.filter(k => resTier(k));
-  ctx.textAlign = 'left'; ctx.font = font(FS);
-  if (res.length) { let rx = g.x + 12; for (const k of res) { const t = `${ATTRS[k].name} 공명 ${RES_LABEL[resTier(k)]}`; ctx.fillStyle = ATTRS[k].color; ctx.fillText(t, rx, g.skY + g.skH + 15); rx += ctx.measureText(t).width + 12; } }
-  else { ctx.fillStyle = '#5a5648'; ctx.fillText('계열 공명: 같은 계열 쉘 2개부터', g.x + 12, g.skY + g.skH + 15); }
-  const sb = sortBtn(g), sbh = hit && hit.area === 'sort'; // 가방 정렬 단추
-  ctx.fillStyle = sbh ? '#34452f' : '#23211b'; rr(sb.x, sb.y, sb.w, sb.h, 3); ctx.fill();
-  ctx.strokeStyle = sbh ? '#cfe8c8' : '#5a5448'; ctx.lineWidth = 1; ctx.stroke();
-  ctx.textAlign = 'center'; ctx.font = font(FS); ctx.fillStyle = sbh ? '#fff' : '#cfe8c8'; ctx.fillText('정렬', sb.x + sb.w / 2, sb.y + 13);
-  // 격자
-  ctx.fillStyle = '#0b0a08'; ctx.fillRect(g.gx, g.gy, BAG_W * CELL, bagH() * CELL);
-  ctx.strokeStyle = '#26231c'; ctx.lineWidth = 1; ctx.beginPath();
+  // 무기 칸 (1~4): 잠긴 칸은 어둡게, 손에 든 무기는 호박색 테두리
+  for (let c = 0; c < NSLOT; c++) {
+    const r = slotRect(g, c), inst = p.equip[c], open = c < slotsOpen(), cur = open && p.slot === c, fits = open && held && !held.inst.kind;
+    pxWell(r, (open && hit && hit.area === 'slot' && hit.c === c) || cur || (inst && inst === sel) || (fits && blink), inst && inst.rarity > 0 ? RARITY[inst.rarity].glow : null);
+    if (!open) { ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(r[0] + Z, r[1] + Z, r[2] - 2 * Z, r[3] - 2 * Z); }
+    if (inst) { drawWeaponArt(inst, r[0] + 6, r[1] + 8, r[2] - 12, r[3] - 14); if (inst.sockets) drawSockets(inst, r[0], r[1], r[2], r[3]); rarityLine(r, inst.rarity); }
+    winNum(c + 1, r[0] + 4, r[1] + 4, cur ? 'small' : 'grey');
+  }
+  // 가방
+  ctx.textAlign = 'left'; ctx.font = font(FS); ctx.fillStyle = HC.dim; ctx.fillText('가방', g.gx, g.gy - 7);
+  pxBtn(sortBtn(g), '정렬', hit && hit.area === 'sort');
+  ctx.fillStyle = WELL_FILL; ctx.fillRect(g.gx, g.gy, BAG_W * CELL, bagH() * CELL);
+  ctx.strokeStyle = '#1c1e24'; ctx.lineWidth = 1; ctx.beginPath();
   for (let i = 0; i <= BAG_W; i++) { ctx.moveTo(g.gx + i * CELL + 0.5, g.gy); ctx.lineTo(g.gx + i * CELL + 0.5, g.gy + bagH() * CELL); }
   for (let j = 0; j <= bagH(); j++) { ctx.moveTo(g.gx, g.gy + j * CELL + 0.5); ctx.lineTo(g.gx + BAG_W * CELL, g.gy + j * CELL + 0.5); }
   ctx.stroke();
   for (const inst of p.bag) drawItemBox(inst, g.gx + inst.gx * CELL, g.gy + inst.gy * CELL, inst.s.size[0] * CELL, inst.s.size[1] * CELL);
-  // 개조실에서 고른 강화 대상 표시
-  const sel = trade && trade.mode === 'upgrade' && trade.sel;
-  if (sel) {
-    ctx.strokeStyle = '#ffd27a'; ctx.lineWidth = 2;
-    const c = p.equip.indexOf(sel), k = p.shells.indexOf(sel), gn = GEAR_KEYS.findIndex(gk => p.gear[gk] === sel);
-    if (c >= 0) ctx.strokeRect(slotX(g, c) + 1, g.slotY + 1, g.slotW - 2, g.slotH - 2);
-    else if (k >= 0) ctx.strokeRect(skSlotX(g, k) + 1, g.skY + 1, g.skW - 2, g.skH - 2);
-    else if (gn >= 0) ctx.strokeRect(arSlotX(g, gn) + 1, g.arY + 1, g.arW - 2, g.arH - 2);
-    else ctx.strokeRect(g.gx + sel.gx * CELL + 1, g.gy + sel.gy * CELL + 1, sel.s.size[0] * CELL - 2, sel.s.size[1] * CELL - 2);
-  }
-  // 놓을 자리 미리보기 (초록: 빈 자리, 노랑: 교체, 빨강: 불가)
-  if (held && hit && hit.area === 'grid') {
+  if (sel && p.bag.includes(sel)) { ctx.strokeStyle = HC.acc; ctx.lineWidth = 2; ctx.strokeRect(g.gx + sel.gx * CELL + 1, g.gy + sel.gy * CELL + 1, sel.s.size[0] * CELL - 2, sel.s.size[1] * CELL - 2); ctx.lineWidth = 1; } // 개조실에서 고른 것
+  if (held && hit && hit.area === 'grid') { // 놓을 자리 미리보기 (초록: 빈 자리, 노랑: 교체, 빨강: 불가)
     const t = heldTarget(held.inst), n = bagOverlaps(held.inst, t.gx, t.gy).length;
     ctx.fillStyle = n === 0 ? 'rgba(80,255,120,0.22)' : n === 1 ? 'rgba(255,220,80,0.22)' : 'rgba(255,60,60,0.25)';
     ctx.fillRect(g.gx + t.gx * CELL, g.gy + t.gy * CELL, held.inst.s.size[0] * CELL, held.inst.s.size[1] * CELL);
   }
   // 보석 주머니: 종류마다 조각난·보통·완벽한 칸 (없으면 흐린 그림), 개수
-  ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = '#9fd28f'; ctx.fillText('보석 주머니', g.gx, g.py - 7);
-  ctx.font = font(FS); ctx.fillStyle = '#6a6458'; ctx.fillText(fitText('클릭해 집어서 장비의 소켓(◇)에', BAG_W * CELL - 84), g.gx + 80, g.py - 7);
+  ctx.textAlign = 'left'; ctx.font = font(FS); ctx.fillStyle = HC.dim; ctx.fillText('보석', g.gx, g.py - 7);
   for (let n = 0; n < 18; n++) {
     const c = pouchCell(g, n), cnt = p.gemBag[c.id][c.grade], hov = hit && hit.area === 'pouch' && hit.id === c.id && hit.grade === c.grade, sz = [16, 21, 26][c.grade];
-    ctx.fillStyle = cnt ? 'rgba(255,255,255,0.07)' : '#0b0a08'; ctx.fillRect(c.x, c.y, CELL - 2, CELL - 2);
-    ctx.strokeStyle = hov ? '#fff' : cnt ? GEMS[c.id].color : '#26231c'; ctx.lineWidth = 1; ctx.strokeRect(c.x + 0.5, c.y + 0.5, CELL - 3, CELL - 3);
-    ctx.globalAlpha = cnt ? 1 : 0.15; drawIcon(GEMS[c.id].icon, c.x + (CELL - 2 - sz) / 2, c.y + (CELL - 2 - sz) / 2, sz, sz); ctx.globalAlpha = 1;
-    if (cnt) { ctx.font = font(FS, true); ctx.textAlign = 'right'; ctx.fillStyle = '#000'; ctx.fillText(cnt, c.x + CELL - 4, c.y + CELL - 4); ctx.fillStyle = '#fff'; ctx.fillText(cnt, c.x + CELL - 5, c.y + CELL - 5); }
+    pxWell([c.x, c.y, CELL - 2, CELL - 2], hov);
+    ctx.globalAlpha = cnt ? 1 : 0.12; drawIcon(GEMS[c.id].icon, c.x + (CELL - 2 - sz) / 2, c.y + (CELL - 2 - sz) / 2, sz, sz); ctx.globalAlpha = 1;
+    if (cnt) winNum(cnt, c.x + CELL - 5, c.y + CELL - 5 - 6 * WU(), 'small', 'right');
   }
-  // 하단 정보
-  const ld = load(), fy = g.py + 2 * CELL;
-  ctx.textAlign = 'left'; ctx.font = font(FS);
-  ctx.fillStyle = ld > maxLoad() ? '#f66' : '#cfe8c8'; ctx.fillText(`무게 ${Math.round(ld)} / ${maxLoad()}`, g.gx, fy + 18);
-  ctx.fillStyle = '#ffd27a'; ctx.fillText(`골드 ${p.gold}`, g.gx + 110, fy + 18);
-  ctx.fillStyle = '#c8b090'; ctx.fillText(`부품 ${p.parts}`, g.gx + 200, fy + 18);
-  ctx.fillStyle = '#9cf'; ctx.fillText(`방어 ${Math.round(gearDef())} (-${pct(defCut(gearDef()))})`, g.gx + 260, fy + 18);
-  ctx.font = font(FS); ctx.fillStyle = '#887';
-  ctx.fillText(!trade ? '끌어서 이동, 우클릭: 장착/해제, 창 밖에 놓으면 버리기'
-    : trade.mode === 'upgrade' ? '클릭: 장비 선택' : trade.mode === 'stash' ? '우클릭: 창고에 보관' : '우클릭: 판매', g.gx, fy + 36);
-  // 툴팁 (거래 중이면 판매가 표시)
-  if (!held && hit) {
-    const inst = hit.area === 'grid' ? bagItemAt(hit.cx, hit.cy) : hit.area === 'slot' ? p.equip[hit.c] : hit.area === 'skill' ? p.shells[hit.k] : hit.area === 'gear' ? p.gear[hit.g] : null;
-    if (inst) {
-      const L = itemLines(inst);
-      if (trade && trade.mode !== 'upgrade' && trade.mode !== 'stash') L.push({ t: `판매가 ${sellPrice(inst)}G`, c: '#ffd27a', b: true });
-      drawTooltip(L, mouse.x - 300, mouse.y + 18);
+  // 골드·부품
+  ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = '#e8c060'; ctx.fillText(`${p.gold.toLocaleString()} G`, g.gx, g.fy + 16);
+  ctx.font = font(FS); ctx.fillStyle = HC.dim; ctx.fillText(`부품 ${p.parts}`, g.gx + 110, g.fy + 16);
+  // 툴팁 (거래 중이면 할 수 있는 일)
+  if (held || !hit) return;
+  const inst = hit.area === 'grid' ? bagItemAt(hit.cx, hit.cy) : hit.area === 'slot' ? p.equip[hit.c] : hit.area === 'gear' ? p.gear[hit.g] : null;
+  if (inst) {
+    const L = itemLines(inst);
+    if (trade && trade.mode === 'upgrade') L.push({ t: '클릭: 고르기', c: HC.acc, b: true });
+    else if (trade && trade.mode === 'stash') { if (hit.area === 'grid') L.push({ t: '우클릭: 창고에 보관', c: HC.acc, b: true }); }
+    else if (trade) L.push({ t: hit.area === 'grid' ? `우클릭: 판매 ${sellPrice(inst)}G` : `판매가 ${sellPrice(inst)}G`, c: '#ffd27a', b: true });
+    queueTip(L, mouse.x - 300, mouse.y + 18);
+  } else if (hit.area === 'gear') queueTip([{ t: GEAR_NAMES[hit.g], c: INK, b: true }, { t: `${ARMOR_SLOTS[GEAR_SLOTS[hit.g]]} 장비를 끼운다`, c: HC.dim }], mouse.x - 180, mouse.y + 18);
+  else if (hit.area === 'slot' && hit.c >= slotsOpen()) queueTip([{ t: `${hit.c + 1}번 무기 칸`, c: INK, b: true }, { t: '무기고를 해제하면 열린다', c: HC.dim }], mouse.x - 180, mouse.y + 18);
+  else if (hit.area === 'attr' || hit.area === 'attrUp') {
+    const A = ATTRS[hit.k], fx = attrEffects(hit.k), L = [{ t: `${A.name} ${attrV(hit.k)}`, c: A.color, b: true }];
+    if (fx.length) for (const t of fx) L.push({ t, c: '#dfffd0' });
+    else {
+      L.push({ t: `장착한 ${A.name} 스킬이 없다`, c: HC.dim });
+      for (const t of wrapWords('쓰는 스킬: ' + Object.keys(SKILLS).filter(id => Object.values(SKILLS[id].st).some(q => q[0] === hit.k)).map(id => SKILLS[id].name).join(', '), 30)) L.push({ t, c: HC.dim });
     }
-    if (hit.area === 'pouch') { // 보석 주머니 칸
-      const n = p.gemBag[hit.id][hit.grade], gi = gemInfo(hit.id, hit.grade), L = gemTooltip(gi), sell = trade && (trade.mode === 'shop' || trade.mode === 'sell');
-      L.splice(1, 0, { t: `보석 주머니에 ${n}개`, c: n ? '#cfe8c8' : '#777' });
-      if (n) L.push({ t: sell ? `클릭: 집기, 우클릭: 판매 (${sellPrice(gi)}G)` : '클릭: 하나 집기 → 소켓이 있는 장비 위에 놓기', c: '#ffd27a', b: true });
-      drawTooltip(L, mouse.x - 300, mouse.y - L.length * 17 - 24); // 주머니는 창 아래쪽이라 커서 위에
-    }
-    if (hit.area === 'sort') drawTooltip([{ t: '가방 정렬', c: '#cfe8c8', b: true }, { t: '큰 장비부터 왼쪽 위로 빈틈없이 다시 놓는다', c: '#ccc' }], mouse.x - 260, mouse.y + 18);
-  }
+    if (p.apts > 0) L.push({ t: '+ 클릭: 1점, Shift+클릭: 5점', c: HC.acc });
+    queueTip(L, mouse.x + 18, mouse.y + 18);
+  } else if (hit.area === 'pouch') { // 보석 주머니 칸
+    const n = p.gemBag[hit.id][hit.grade], gi = gemInfo(hit.id, hit.grade), L = gemTooltip(gi), sell = trade && (trade.mode === 'shop' || trade.mode === 'sell');
+    L.splice(1, 0, { t: `보석 주머니에 ${n}개`, c: n ? '#cfe8c8' : '#777' });
+    if (n) L.push({ t: sell ? `클릭: 집기, 우클릭: 판매 (${sellPrice(gi)}G)` : '클릭: 하나 집기 → 소켓이 있는 장비 위에 놓기', c: '#ffd27a', b: true });
+    queueTip(L, mouse.x - 300, mouse.y - L.length * 17 - 24); // 주머니는 창 아래쪽이라 커서 위에
+  } else if (hit.area === 'sort') queueTip([{ t: '가방 정렬', c: INK, b: true }, { t: '큰 장비부터 왼쪽 위로 빈틈없이 다시 놓는다', c: '#ccc' }], mouse.x - 260, mouse.y + 18);
 }
 
 function drawParticle(q) {
@@ -7628,8 +7690,9 @@ function render() {
   drawHUD();
   if (state === 'trade') drawTrade();
   if (invOpen && (state === 'play' || state === 'trade')) drawInventory();
-  if (perkOpen && state === 'play') drawPerks();
+  if (perkOpen && (state === 'play' || state === 'trade')) drawPerks();
   if (codexOpen && state === 'play') drawCodex();
+  if (tipQ) { drawTooltip(...tipQ); tipQ = null; } // 창의 툴팁은 모든 창 위에
   drawCursor();
   if (state === 'ending') drawEnding();
 }
@@ -8093,10 +8156,11 @@ function drawTopInfo() {
 
 function rr(x, y, w, h, r) { ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h); }
 // ===== HUD: 판 없이 모서리의 작은 픽셀 카드 (게임 그림과 같은 픽셀 크기 Z) =====
-// 왼쪽 아래 체력·방어·기력, 오른쪽 아래 무기·장탄, 아래 가운데 스킬·소모품·수류탄. 숫자는 Freedoom 상태 바 숫자 (hud_sttnum 큰 빨간 숫자, hud_stysnum 작은 노란 숫자)
+// 왼쪽 아래 체력·방어·기력, 오른쪽 아래 무기·장탄, 아래 가운데 스킬·소모품·수류탄·메뉴 아이콘. 숫자는 Freedoom 상태 바 숫자 (hud_sttnum 큰 빨간 숫자, hud_stysnum 작은 노란 숫자)
 const HC = { acc: '#d89a3a', edge: '#3a3d44', fill: 'rgba(7,8,11,0.8)', slot: 'rgba(16,17,21,0.9)', dim: '#6f6b62' };
 const HUD_CARD_H = 42, HUD_SLOT = 22, HUD_M = 8; // 카드 높이, 가운데 칸 크기, 화면 가장자리 여백 (확대 전 픽셀)
 const hudBottom = () => VH - (HUD_M + HUD_CARD_H) * Z; // 아래 카드들의 윗변 (안내 카드·이름표는 이보다 위에)
+const hudMenu = []; // 이번 화면의 메뉴 아이콘 자리 { id, r } (클릭 판정)
 let digCache = null; // 숫자 그림: 큰 숫자는 빨강 + 호박색으로 바꾼 것, 작은 숫자는 노랑 + 회색으로 바꾼 것
 function digits() {
   if (digCache || !ART.ready) return digCache;
@@ -8122,7 +8186,7 @@ function pxNum(n, x, y, set = 'small', align) {
   return w;
 }
 // 3x5 픽셀 글자 (단축키·레벨 표시), 픽셀 모양 (# 채움)
-const GLYPH = { Z: '111001010100111', X: '101101010101101', V: '101101101101010', B: '110101110101110', Q: '010101101110011', E: '111100110100111', T: '111010010010010', G: '011100101101011', K: '101110100110101', L: '100100100100111' };
+const GLYPH = { I: '111010010010111', Z: '111001010100111', X: '101101010101101', V: '101101101101010', B: '110101110101110', Q: '010101101110011', E: '111100110100111', T: '111010010010010', G: '011100101101011', K: '101110100110101', L: '100100100100111' };
 function pxGlyph(ch, x, y, col) { const g = GLYPH[ch]; if (!g) return; ctx.fillStyle = col; for (let k = 0; k < 15; k++) if (g[k] === '1') ctx.fillRect(x + (k % 3) * Z, y + Math.floor(k / 3) * Z, Z, Z); }
 function pxShape(rows, x, y, col) { ctx.fillStyle = col; rows.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (r[i] === '#') ctx.fillRect(x + i * Z, y + j * Z, Z, Z); }); }
 const SH_CROSS = ['..###..', '..###..', '#######', '#######', '#######', '..###..', '..###..'];
@@ -8148,7 +8212,7 @@ function hudTick(dt) {
 }
 function drawHUD() {
   const p = player, U = Z, m = HUD_M * U, ch = HUD_CARD_H * U, top = hudBottom();
-  // 왼쪽 아래: 체력 (큰 숫자, 칸 막대), 방어 (방패, 작은 숫자), 기력 (가는 막대), 남은 성장 점수 (K)
+  // 왼쪽 아래: 체력 (큰 숫자, 칸 막대), 방어 (방패, 작은 숫자), 기력 (가는 막대)
   const cw = 132 * U, cx = m;
   pxCard(cx, top, cw, ch);
   pxShape(SH_CROSS, cx + 7 * U, top + 8 * U, p.hp < p.maxhp * 0.3 && Math.sin(gtime * 8) > 0 ? '#ffffff' : '#c8202a');
@@ -8157,7 +8221,6 @@ function drawHUD() {
   if (p.armor > 0) { pxShape(SH_SHIELD, cx + cw - 30 * U, top + 6 * U, '#5a8fe0'); pxNum(Math.round(p.armor), cx + cw - 20 * U, top + 7 * U); }
   ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(cx + 7 * U, top + 32 * U, 107 * U, 2 * U);
   ctx.fillStyle = p.exhausted ? HC.dim : '#4f8fe8'; ctx.fillRect(cx + 7 * U, top + 32 * U, Math.round(107 * clamp(p.stamina / staminaMax(), 0, 1)) * U, 2 * U);
-  if (p.pts > 0 || p.apts > 0) { pxGlyph('K', cx + cw - 22 * U, top + 31 * U, Math.sin(gtime * 6) > 0 ? '#ffe08a' : HC.acc); pxNum(p.pts + p.apts, cx + cw - 17 * U, top + 30 * U); }
   // 오른쪽 아래: 무기 (슬롯 표시, 끼운 파츠까지 그린 무기, 장탄 큰 숫자, 남은 탄). 무기 이름은 바꾼 직후에만
   const ci = curW(), ws = ci.s, ww = 156 * U, wx = W - m - ww;
   pxCard(wx, top, ww, ch);
@@ -8198,12 +8261,24 @@ function drawHUD() {
   const g = p.gren[p.gsel] || 0;
   box(x, false); ctx.globalAlpha = g ? 1 : 0.3; drawIcon('icon_gren_' + p.gsel, x + 6 * U, y + 2 * U, S - 12 * U, S - 9 * U); ctx.globalAlpha = 1;
   pxGlyph('G', x + 2 * U, y + S - 7 * U, HC.acc); pxNum(g, x + S - 2 * U, y + S - 8 * U, g ? 'small' : 'grey', 'right');
+  // 메뉴 아이콘: 인벤토리 [I] (능력치 점수가 있으면 점), 스킬 [K] (특성 점수가 있으면 점) — 눌러도 열림
+  let mx = x + S + 10 * U, menuHover = null;
+  hudMenu.length = 0;
+  for (const [id, icon, key, on, dot, name] of [['inv', 'bpaka0', 'I', invOpen, p.apts > 0, '인벤토리'], ['skill', 'icon_brain', 'K', perkOpen, p.pts > 0, '스킬']]) {
+    const r = [mx, y, S, S], hot = inRect(r);
+    box(mx, on || hot); drawIcon(icon, mx + 3 * U, y + 2 * U, S - 6 * U, S - 8 * U);
+    pxGlyph(key, mx + 2 * U, y + S - 7 * U, HC.acc);
+    if (dot) { ctx.fillStyle = Math.sin(gtime * 6) > 0 ? '#ffe08a' : HC.acc; ctx.fillRect(mx + S - 5 * U, y + 2 * U, 3 * U, 3 * U); }
+    if (hot) menuHover = { x: mx, L: [{ t: `${name} [${key}]`, c: '#e8e2d6', b: true }, ...(dot ? [{ t: id === 'inv' ? `능력치 점수 ${p.apts}` : `특성 점수 ${p.pts}`, c: '#ffe08a' }] : [])] };
+    hudMenu.push({ id, r }); mx += S + gap;
+  }
   // 경험치: 맨 아래의 가는 줄 (얻은 직후 밝게) + 레벨
   const xx = m + cw + 12 * U, xw = W - 2 * xx, xy = VH - 3 * U;
   ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fillRect(xx, xy, xw, U);
   ctx.globalAlpha = 0.45 + 0.55 * Math.min(1, hudFx.xpT); ctx.fillStyle = '#c9a03a'; ctx.fillRect(xx, xy, Math.round(xw * clamp(p.xp / xpNeed(p.clv), 0, 1)), U); ctx.globalAlpha = 1;
   pxGlyph('L', xx, VH - 10 * U, HC.dim); pxNum(p.clv, xx + 5 * U, VH - 10 * U, 'grey');
   if (hover && !held) { const L = shellTooltip(hover.sh); drawTooltip(L, hover.x - 60, y - L.length * 17 - 18, VH); }
+  if (menuHover && !held) drawTooltip(menuHover.L, menuHover.x - 20, y - menuHover.L.length * 17 - 18, VH);
 }
 function drawCursor() {
   if (state !== 'play' && state !== 'trade') return;

@@ -8,6 +8,8 @@
       https://opengameart.org/content/futuristic-guns-weapons-and-items
   - MELLE 보석 아이콘 (CC0, AntumDeluge의 "CC0 Gem Icons" 모음): 보석 6종
       https://opengameart.org/content/cc0-gem-icons
+  - knekko "Cybericons"·"Microchips" (CC0): 팔 장비·강화칩·강화장신구·스킬 메뉴 아이콘
+      https://opengameart.org/content/cybericons, https://opengameart.org/content/microchips-cpus-ics
 
 결과물 (assets/):
   atlas.png   스프라이트·아이콘 아틀라스
@@ -242,6 +244,23 @@ GEM_ICONS = {
     'gem_amethyst': ('32x32/gem_04_violet.png', None),
     'gem_diamond':  ('32x32/gem_01_blue.png', ('gray', (1.1, 1.15, 1.25))),
 }
+# 팔 장비·강화칩·강화장신구·스킬 메뉴 그림: knekko "Cybericons"·"Microchips" (CC0, zip 안의 32x32) — 이름 -> (묶음, 파일, 후처리)
+# 강화칩은 능력치마다 보조·증폭·코어 3단계 (작은 칩 → 큰 칩 → CPU), 강화장신구는 계열마다 3단계
+CYBER_ZIPS = {'cyber': ('cybericons.zip', 'knekko_cybericons.zip'), 'chips': ('microchips.zip', 'knekko_microchips.zip')}
+CYBER_ICONS = {
+    'arm_dark':   ('cyber', 'Hands-extention.png', None),
+    'arm_silver': ('cyber', 'Hands.png', None),
+    'arm_neon':   ('cyber', 'Hands.png', ('tint', (0.55, 1.2, 1.25))),  # 연구동 시제품: 은색 손을 청록으로
+    'chip_str1': ('chips', '10.png', None), 'chip_str2': ('chips', '05.png', None), 'chip_str3': ('chips', '04.png', None),
+    'chip_agi1': ('chips', '11.png', None), 'chip_agi2': ('chips', '06.png', None), 'chip_agi3': ('chips', '03.png', None),
+    'chip_tec1': ('chips', '07.png', None), 'chip_tec2': ('chips', '08.png', None), 'chip_tec3': ('chips', '01.png', None),
+    'chip_psi1': ('chips', '09.png', None), 'chip_psi2': ('chips', '12.png', None), 'chip_psi3': ('chips', '02.png', None),
+    'acc_str1': ('cyber', 'PaceMaker.png', None), 'acc_str2': ('cyber', 'Heart.png', None), 'acc_str3': ('cyber', 'Spine.png', None),
+    'acc_agi1': ('cyber', 'displayglas.png', None), 'acc_agi2': ('cyber', 'optics.png', None), 'acc_agi3': ('cyber', 'optics-2.png', None),
+    'acc_tec1': ('cyber', 'Explant.png', None), 'acc_tec2': ('cyber', 'Module2.png', None), 'acc_tec3': ('cyber', 'VR2.png', None),
+    'acc_psi1': ('cyber', 'EEG.png', None), 'acc_psi2': ('cyber', 'Neural-implant.png', None), 'acc_psi3': ('cyber', 'Neural-implant-2.png', None),
+    'brain':      ('cyber', 'Brain.png', None),  # 스킬 창 메뉴 아이콘
+}
 # 핏자국 (바닥 데칼): AlejandroHaibi "Liquid Splatter Pixel Texture" (CC0) — 흰 스플래터(8px 픽셀 덩어리)를 덩어리별로 나눠 변형을 만들고 1/4로 줄임
 # 게임에서 몬스터 체액 색으로 칠해 바닥에 눕혀 그림. 이름 -> 쓸 큰 덩어리 번호 (큰 것부터 0, 1, ...; 'all'은 전부) — 가까운 작은 방울은 함께
 SPLAT_FILE = 'blood_splatter_0.png'
@@ -269,6 +288,11 @@ README = """# assets/ — 그래픽 출처와 라이선스
   (무기 파츠 그림은 시트의 무기에서 부품만 잘라 씀 — 스코프·총열·개머리판은 저격소총, 탄창·소염기·접이식 개머리판은 M4, 곡선 탄창·앞손잡이는 MP5,
   상자 탄창은 중기관총, 광학 조준기는 P90, 소음기는 진압봉 끝, 모듈·레이저는 테이저 카트리지(색을 바꿈), 근접 파츠는 마체테·해머·카타나·총검·진압봉에서)
   (소드오프 아이콘은 Freedoom의 2연발 샷건 스프라이트, 칼날 부채 스킬 그림은 총검 세 자루를 부채꼴로 겹침)
+
+## knekko "Cybericons"·"Microchips" — CC0 (퍼블릭 도메인)
+- 출처: https://opengameart.org/content/cybericons, https://opengameart.org/content/microchips-cpus-ics
+- 32x32 아이콘을 그대로 씀: 팔 장비(기계 손), 강화칩(마이크로칩), 강화장신구(인공 심장·척추·의안·바이저·단말기·뇌파 머리띠·신경 이식체), 스킬 메뉴(뇌).
+  네온 건틀릿은 은색 손을 청록으로 칠함
 
 ## MELLE 보석 아이콘 — CC0 (퍼블릭 도메인)
 - 출처: https://opengameart.org/content/cc0-gem-icons (AntumDeluge가 모은 CC0 보석 아이콘, MELLE 묶음 — 원작 https://opengameart.org/node/89286)
@@ -421,6 +445,15 @@ def gem_icon(path, post):
         im = hue_shift(im, post[1])
     elif post and post[0] == 'gray':
         im = gray(im, post[1])
+    return trim(im)
+
+
+def cyber_icon(spec):
+    pack, path, post = spec
+    src, cache = CYBER_ZIPS[pack]
+    im = Image.open(io.BytesIO(zipfile.ZipFile(fetch(OGA + src, cache)).read(path))).convert('RGBA')
+    if post and post[0] == 'tint':
+        im = tint(im, post[1])
     return trim(im)
 
 
@@ -740,6 +773,10 @@ def main():
         frames[key] = [0, 0, im.width, im.height, im.width // 2, im.height // 2]
     for name, (path, post) in GEM_ICONS.items():  # 보석 (MELLE)
         im = gem_icon(path, post)
+        images['icon_' + name] = im
+        frames['icon_' + name] = [0, 0, im.width, im.height, im.width // 2, im.height // 2]
+    for name, spec in CYBER_ICONS.items():  # 팔 장비·강화칩·강화장신구·스킬 메뉴 (knekko Cybericons·Microchips)
+        im = cyber_icon(spec)
         images['icon_' + name] = im
         frames['icon_' + name] = [0, 0, im.width, im.height, im.width // 2, im.height // 2]
     for name, im in splat_icons().items():  # 핏자국 (AlejandroHaibi, CC0) — 흰색: 게임에서 칠함

@@ -22,6 +22,11 @@
   상자 탄창은 중기관총, 광학 조준기는 P90, 소음기는 진압봉 끝, 모듈·레이저는 테이저 카트리지(색을 바꿈), 근접 파츠는 마체테·해머·카타나·총검·진압봉에서)
   (소드오프 아이콘은 Freedoom의 2연발 샷건 스프라이트, 칼날 부채 스킬 그림은 총검 세 자루를 부채꼴로 겹침)
 
+## knekko "Cybericons"·"Microchips" — CC0 (퍼블릭 도메인)
+- 출처: https://opengameart.org/content/cybericons, https://opengameart.org/content/microchips-cpus-ics
+- 32x32 아이콘을 그대로 씀: 팔 장비(기계 손), 강화칩(마이크로칩), 강화장신구(인공 심장·척추·의안·바이저·단말기·뇌파 머리띠·신경 이식체), 스킬 메뉴(뇌).
+  네온 건틀릿은 은색 손을 청록으로 칠함
+
 ## MELLE 보석 아이콘 — CC0 (퍼블릭 도메인)
 - 출처: https://opengameart.org/content/cc0-gem-icons (AntumDeluge가 모은 CC0 보석 아이콘, MELLE 묶음 — 원작 https://opengameart.org/node/89286)
 - 32x32 보석 5색을 그대로 씀. 사파이어는 루비를 파란 색조로, 다이아몬드는 하늘색 보석을 무채색으로 바꿈

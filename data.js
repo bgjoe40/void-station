@@ -1,7 +1,7 @@
 // ===== 게임 데이터 정의 (무기 / 탄약 / 수류탄 / 아이템 / 적) =====
 
 // 버전: GitHub에 커밋·푸시할 때마다 올림 (새 기능은 가운데 자리, 고침·작은 추가는 끝자리) — 타이틀·일시정지 화면에 표시, git 태그 v<버전>
-const VERSION = '0.8.0';
+const VERSION = '0.9.0';
 
 const CAT_NAMES = ['근접', '권총', '샷건', '라이플', '기관총', '에너지'];
 const MAX_LOAD = 30;   // 장착 + 가방 무기 무게 합이 넘으면 이동속도 감소
@@ -196,10 +196,14 @@ const UPGRADES = {
   load:    { name: '외골격 프레임', desc: '최대 적재량 +5',         max: 4, cost: 300 },
   ammo:    { name: '탄약 벨트',     desc: '탄약 최대치 +25%',       max: 3, cost: 250 },
 };
-// ===== 방어구 =====
-// 머리·몸·다리 칸에 하나씩. def: 방어 (받는 피해 감소 = 방어 / (방어 + ARMOR_K)), 등급마다 방어 +ARMOR_RARITY_DEF, 강화 단계마다 +ENHANCE_DMG
+// ===== 방어구 · 강화칩 · 강화장신구 =====
+// 인벤토리의 인체 모양 장비 칸 (GEAR_SLOTS: 칸 → 끼우는 종류, 팔 장비는 왼팔·오른팔 어디든)
+// def: 방어 (받는 피해 감소 = 방어 / (방어 + ARMOR_K)), 등급마다 방어 +ARMOR_RARITY_DEF, 강화 단계마다 +ENHANCE_DMG
+// attr: 강화칩·강화장신구의 기본 능력치 [종류, 수치] (강화 단계마다 +1). 강화장신구는 이 계열의 스킬을 키움 (옵션의 line)
 // weight: 무게 (무기와 함께 적재량), size: 가방 칸, minLvl: 이 구역부터 드롭·상점, icon: 아틀라스 그림 (knekko)
-const ARMOR_SLOTS = { head: '머리', body: '몸', legs: '다리' };
+const ARMOR_SLOTS = { head: '머리', body: '몸통', legs: '다리', arm: '팔', chip: '강화칩', acc: '강화장신구' };
+const GEAR_SLOTS = { chip: 'chip', head: 'head', acc: 'acc', larm: 'arm', body: 'body', rarm: 'arm', legs: 'legs' };
+const GEAR_NAMES = { chip: '강화칩', head: '머리', acc: '강화장신구', larm: '왼팔', body: '몸통', rarm: '오른팔', legs: '다리' };
 const ARMOR_K = 100;
 const ARMOR_RARITY_DEF = 0.15;
 const ARMORS = {
@@ -213,20 +217,62 @@ const ARMORS = {
   boots:   { name: '전투화',          slot: 'legs', def: 5,  weight: 1,   size: [2, 2], price: 150,  minLvl: 1, icon: 'icon_boots',      desc: '발목을 감싸는 강화 전투화.' },
   greaves: { name: '보강 하의',       slot: 'legs', def: 9,  weight: 2,   size: [2, 2], price: 400,  minLvl: 3, icon: 'icon_pants',      desc: '무릎과 허벅지에 장갑판을 덧댄 하의.' },
   neonleg: { name: '네온 강화 하의',  slot: 'legs', def: 13, weight: 1.5, size: [2, 2], price: 900,  minLvl: 6, icon: 'icon_pants_neon', desc: '근력 보조 장치가 달린 시제품 하의.' },
+  gauntlet: { name: '전투 건틀릿',    slot: 'arm',  def: 5,  weight: 1,   size: [2, 2], price: 150,  minLvl: 1, icon: 'icon_arm_dark',   desc: '손등과 팔뚝을 덮는 강화 장갑.' },
+  servo:    { name: '서보 건틀릿',    slot: 'arm',  def: 8,  weight: 1,   size: [2, 2], price: 400,  minLvl: 3, icon: 'icon_arm_silver', desc: '관절마다 서보 모터가 달려 손이 떨리지 않는다.' },
+  neonarm:  { name: '네온 건틀릿',    slot: 'arm',  def: 12, weight: 1,   size: [2, 2], price: 900,  minLvl: 6, icon: 'icon_arm_neon',   desc: '연구동 시제품. 가볍고 단단하다.' },
+  // 강화칩: 능력치마다 보조·증폭·코어 (몸 능력 옵션)
+  chipS1: { name: '근력 보조 칩', slot: 'chip', attr: ['str', 2], def: 0, weight: 0, size: [1, 1], price: 200, minLvl: 1, icon: 'icon_chip_str1', desc: '근섬유 신호를 조금 키운다.' },
+  chipS2: { name: '근력 증폭 칩', slot: 'chip', attr: ['str', 4], def: 0, weight: 0, size: [1, 1], price: 450, minLvl: 3, icon: 'icon_chip_str2', desc: '근섬유 신호를 크게 키운다.' },
+  chipS3: { name: '근력 코어 칩', slot: 'chip', attr: ['str', 6], def: 0, weight: 0, size: [1, 1], price: 900, minLvl: 5, icon: 'icon_chip_str3', desc: '근육 제어를 통째로 맡는 코어.' },
+  chipA1: { name: '민첩 보조 칩', slot: 'chip', attr: ['agi', 2], def: 0, weight: 0, size: [1, 1], price: 200, minLvl: 1, icon: 'icon_chip_agi1', desc: '반사 신경 신호를 조금 앞당긴다.' },
+  chipA2: { name: '민첩 증폭 칩', slot: 'chip', attr: ['agi', 4], def: 0, weight: 0, size: [1, 1], price: 450, minLvl: 3, icon: 'icon_chip_agi2', desc: '반사 신경 신호를 크게 앞당긴다.' },
+  chipA3: { name: '민첩 코어 칩', slot: 'chip', attr: ['agi', 6], def: 0, weight: 0, size: [1, 1], price: 900, minLvl: 5, icon: 'icon_chip_agi3', desc: '생각보다 몸이 먼저 움직인다.' },
+  chipT1: { name: '기술 보조 칩', slot: 'chip', attr: ['tec', 2], def: 0, weight: 0, size: [1, 1], price: 200, minLvl: 1, icon: 'icon_chip_tec1', desc: '손끝 신경을 정밀하게 다듬는다.' },
+  chipT2: { name: '기술 증폭 칩', slot: 'chip', attr: ['tec', 4], def: 0, weight: 0, size: [1, 1], price: 450, minLvl: 3, icon: 'icon_chip_tec2', desc: '장비 조작을 연산으로 돕는다.' },
+  chipT3: { name: '기술 코어 칩', slot: 'chip', attr: ['tec', 6], def: 0, weight: 0, size: [1, 1], price: 900, minLvl: 5, icon: 'icon_chip_tec3', desc: '전술 연산을 통째로 맡는 코어.' },
+  chipP1: { name: '정신 보조 칩', slot: 'chip', attr: ['psi', 2], def: 0, weight: 0, size: [1, 1], price: 200, minLvl: 1, icon: 'icon_chip_psi1', desc: '뇌파를 조금 증폭한다.' },
+  chipP2: { name: '정신 증폭 칩', slot: 'chip', attr: ['psi', 4], def: 0, weight: 0, size: [1, 1], price: 450, minLvl: 3, icon: 'icon_chip_psi2', desc: '뇌파를 크게 증폭한다.' },
+  chipP3: { name: '정신 코어 칩', slot: 'chip', attr: ['psi', 6], def: 0, weight: 0, size: [1, 1], price: 900, minLvl: 5, icon: 'icon_chip_psi3', desc: '의식의 대역폭을 넓히는 코어.' },
+  // 강화장신구: 계열마다 3단계 (그 계열 스킬 옵션)
+  pump:    { name: '아드레날린 펌프', slot: 'acc', attr: ['str', 2], def: 0, weight: 0, size: [1, 1], price: 250,  minLvl: 1, icon: 'icon_acc_str1', desc: '위급할 때 아드레날린을 밀어 넣는다.' },
+  heart:   { name: '강화 심장',       slot: 'acc', attr: ['str', 4], def: 0, weight: 0, size: [1, 1], price: 550,  minLvl: 3, icon: 'icon_acc_str2', desc: '두 사람 몫을 뛰는 인공 심장.' },
+  spine:   { name: '전투 척추',       slot: 'acc', attr: ['str', 6], def: 0, weight: 0, size: [1, 1], price: 1100, minLvl: 5, icon: 'icon_acc_str3', desc: '충격을 받아내는 합금 척추.' },
+  lens:    { name: '반응 렌즈',       slot: 'acc', attr: ['agi', 2], def: 0, weight: 0, size: [1, 1], price: 250,  minLvl: 1, icon: 'icon_acc_agi1', desc: '움직임을 미리 그려 보여 주는 안경.' },
+  eye:     { name: '추적 의안',       slot: 'acc', attr: ['agi', 4], def: 0, weight: 0, size: [1, 1], price: 550,  minLvl: 3, icon: 'icon_acc_agi2', desc: '표적을 놓치지 않는 인공 눈.' },
+  hunter:  { name: '사냥꾼의 눈',     slot: 'acc', attr: ['agi', 6], def: 0, weight: 0, size: [1, 1], price: 1100, minLvl: 5, icon: 'icon_acc_agi3', desc: '어둠 속의 열까지 읽는 의안.' },
+  tablet:  { name: '전술 단말기',     slot: 'acc', attr: ['tec', 2], def: 0, weight: 0, size: [1, 1], price: 250,  minLvl: 1, icon: 'icon_acc_tec1', desc: '드론과 포탑을 손목에서 다룬다.' },
+  module:  { name: '전술 모듈',       slot: 'acc', attr: ['tec', 4], def: 0, weight: 0, size: [1, 1], price: 550,  minLvl: 3, icon: 'icon_acc_tec2', desc: '장비 회로에 끼우는 확장 모듈.' },
+  hud:     { name: '전술 바이저',     slot: 'acc', attr: ['tec', 6], def: 0, weight: 0, size: [1, 1], price: 1100, minLvl: 5, icon: 'icon_acc_tec3', desc: '전장을 겹쳐 보여 주는 바이저.' },
+  eeg:     { name: '뇌파 머리띠',     slot: 'acc', attr: ['psi', 2], def: 0, weight: 0, size: [1, 1], price: 250,  minLvl: 1, icon: 'icon_acc_psi1', desc: '뇌파를 읽어 영능을 다듬는다.' },
+  implant: { name: '신경 이식체',     slot: 'acc', attr: ['psi', 4], def: 0, weight: 0, size: [1, 1], price: 550,  minLvl: 3, icon: 'icon_acc_psi2', desc: '척수에 심는 신경 증폭 회로.' },
+  amp:     { name: '신경 증폭기',     slot: 'acc', attr: ['psi', 6], def: 0, weight: 0, size: [1, 1], price: 1100, minLvl: 5, icon: 'icon_acc_psi3', desc: '의식을 몸 바깥까지 넓히는 증폭기.' },
 };
-// 방어구 옵션: slots가 있으면 그 칸 방어구에만, stat: 능력치 (type: str·agi·tec·psi)
+// 방어구 옵션: slots가 있으면 그 종류에만, stat: 능력치 (type: str·agi·tec·psi)
+// 강화칩은 몸 능력 옵션, 강화장신구는 line 옵션 (type이 그 장신구의 계열 — 그 계열 스킬에만)
+const ARMOR_PIECES = ['head', 'body', 'legs', 'arm'];
+const BODY_GEAR = ['head', 'body', 'legs', 'arm', 'chip'];
 const ARMOR_AFFIXES = {
-  def:   { prefix: '견고한',   min: 0.15, max: 0.45, text: v => `방어 +${pct(v)}` },
-  hp:    { prefix: '튼튼한',   min: 10, max: 50, int: true, text: v => `최대 체력 +${v}` },
-  regen: { prefix: '재생하는', min: 0.5, max: 2.5, text: v => `초당 체력 회복 +${v.toFixed(1)}` },
-  res:   { prefix: '면역의',   min: 0.15, max: 0.45, text: v => `중독·화상·감전 시간 -${pct(v)}` },
-  stam:  { prefix: '지구력의', min: 10, max: 35, int: true, text: v => `최대 스태미너 +${v}` },
-  spd:   { prefix: '날쌘',     min: 0.03, max: 0.10, slots: ['legs'], text: v => `이동 속도 +${pct(v)}` },
-  cdr:   { prefix: '집중의',   min: 0.04, max: 0.12, slots: ['head'], text: v => `스킬 대기시간 -${pct(v)}` },
-  stat:  { min: 2, max: 7, int: true, text: (v, t) => `${ATTRS[t].name} +${v}` },
+  def:    { prefix: '견고한',   min: 0.15, max: 0.45, slots: ARMOR_PIECES, text: v => `방어 +${pct(v)}` },
+  hp:     { prefix: '튼튼한',   min: 10, max: 50, int: true, slots: BODY_GEAR, text: v => `최대 체력 +${v}` },
+  regen:  { prefix: '재생하는', min: 0.5, max: 2.5, slots: BODY_GEAR, text: v => `초당 체력 회복 +${v.toFixed(1)}` },
+  res:    { prefix: '면역의',   min: 0.15, max: 0.45, slots: BODY_GEAR, text: v => `중독·화상·감전 시간 -${pct(v)}` },
+  stam:   { prefix: '지구력의', min: 10, max: 35, int: true, slots: BODY_GEAR, text: v => `최대 스태미너 +${v}` },
+  spd:    { prefix: '날쌘',     min: 0.03, max: 0.10, slots: ['legs', 'chip'], text: v => `이동 속도 +${pct(v)}` },
+  cdr:    { prefix: '집중의',   min: 0.04, max: 0.12, slots: ['head', 'acc'], text: v => `스킬 대기시간 -${pct(v)}` },
+  dash:   { prefix: '재빠른',   min: 0.08, max: 0.25, slots: ['chip'], text: v => `회피 대기시간 -${pct(v)}` },
+  reload: { prefix: '능숙한',   min: 0.05, max: 0.15, slots: ['arm'], text: v => `재장전 시간 -${pct(v)}` },
+  melee:  { prefix: '강타하는', min: 0.08, max: 0.25, slots: ['arm'], text: v => `근접 피해 +${pct(v)}` },
+  stat:   { min: 2, max: 7, int: true, text: (v, t) => `${ATTRS[t].name} +${v}` },
+  spow:   { prefix: '공명하는', min: 0.06, max: 0.20, slots: ['acc'], line: true, text: (v, t) => `${ATTRS[t].name} 스킬 위력 +${pct(v)}` },
+  scd:    { prefix: '가속하는', min: 0.05, max: 0.15, slots: ['acc'], line: true, text: (v, t) => `${ATTRS[t].name} 스킬 대기시간 -${pct(v)}` },
+  sr:     { prefix: '광역의',   min: 0.08, max: 0.25, slots: ['acc'], line: true, text: (v, t) => `${ATTRS[t].name} 스킬 범위 +${pct(v)}` },
+  sdur:   { prefix: '지속하는', min: 0.10, max: 0.30, slots: ['acc'], line: true, text: (v, t) => `${ATTRS[t].name} 스킬 지속 +${pct(v)}` },
+  sn:     { prefix: '다중의',   min: 1, max: 1, int: true, slots: ['acc'], line: true, text: (v, t) => `${ATTRS[t].name} 스킬 개수 +${v}` },
+  scc:    { prefix: '압도하는', min: 0.10, max: 0.35, slots: ['acc'], line: true, text: (v, t) => `${ATTRS[t].name} 스킬 기절·빙결 +${pct(v)}` },
 };
 const ARMOR_DROP = 0.35;         // 떨어지는 장비 중 방어구 비율 (나머지는 무기)
-const ARMOR_STOCK = 8;           // 상점의 방어구 진열 수
+const ARMOR_SLOT_DROP = { head: 1, body: 1, legs: 1, arm: 1, chip: 0.7, acc: 0.7 }; // 방어구 종류 가중치 (종류를 먼저 고르고 그 안에서 바탕)
+const ARMOR_STOCK = 10;          // 상점의 방어구 진열 수 (팔·강화칩·강화장신구 포함)
 // 분해·재련 (개조실): 분해하면 부품 (등급별 SALVAGE + 강화 단계마다 2), 재련은 옵션 하나를 다시 굴림 (등급별 부품·골드)
 const SALVAGE = [1, 3, 8, 20, 40, 40];
 const REFORGE = { parts: [0, 4, 10, 20, 0, 0], gold: [0, 60, 150, 300, 0, 0] };
@@ -414,7 +460,8 @@ const SELL_RATE = 0.4;           // 판매가 = 가치 x 0.4
 const GAMBLE = { mul: 2.2, lvl: 0.1, odds: { 1: 64, 2: 25, 3: 7, uq: 2, set: 2 } };
 const GAMBLE_CATS = [
   { name: '근접 무기', cat: 0 }, { name: '권총', cat: 1 }, { name: '샷건', cat: 2 }, { name: '라이플', cat: 3 }, { name: '기관총', cat: 4 },
-  { name: '에너지 무기', cat: 5 }, { name: '머리 방어구', slot: 'head' }, { name: '몸 방어구', slot: 'body' }, { name: '다리 방어구', slot: 'legs' }, { name: '스킬 쉘', shell: true },
+  { name: '에너지 무기', cat: 5 }, { name: '머리 방어구', slot: 'head' }, { name: '몸통 방어구', slot: 'body' }, { name: '다리 방어구', slot: 'legs' },
+  { name: '팔 방어구', slot: 'arm' }, { name: '강화칩', slot: 'chip' }, { name: '강화장신구', slot: 'acc' }, { name: '스킬 쉘', shell: true },
 ];
 
 // ranged: 원거리 공격 정보 (volley: 한 번에 부채꼴로 쏘는 수, burst: 간격 gap초로 이어 쏘는 연사 수), keep: 유지 거리,
@@ -531,7 +578,7 @@ const HEAVY_MAX = [1, 4];     // 방 하나의 위협도 5 이상(브루트·모
 const KILL_REWARD = { gold: 0.25, item: 0.5, loot: 0.25 };
 
 // ===== 캐릭터 성장 =====
-// 적을 처치하면 경험치, 레벨이 오를 때마다 특성 점수 1점 + 능력치 점수 ATTR_PER_LEVEL점 → [K] 성장 창에서 투자 (특성: 계열 3개 x 4개, 캠페인 끝까지 약 12점)
+// 적을 처치하면 경험치, 레벨이 오를 때마다 특성 점수 1점 (스킬 창 [K]) + 능력치 점수 ATTR_PER_LEVEL점 (인벤토리 [I]) (특성: 계열 3개 x 4개, 캠페인 끝까지 약 12점)
 const XP_NEXT = [100, 200];   // 다음 레벨까지 필요 경험치 = 앞 값 + 뒤 값 x 현재 레벨 (1구역 끝 Lv 2, 캠페인 끝 Lv 13 안팎)
 const XP_PER_COST = 2;        // 처치 경험치 = 적 위협도 x 이 값 x (1 + 0.15 x (구역-1)), 정예 12배, 보스 400 (최종 보스 800) — 적이 많아 한 마리당은 적게
 const RESPEC_COST = 150;      // 특성 초기화 비용 = 이 값 x 레벨 (골드)
@@ -554,7 +601,7 @@ const PERKS = {
 };
 
 // ===== 능력치 =====
-// 레벨이 오를 때마다 ATTR_PER_LEVEL점 → [K] 성장 창에서 투자. 장착한 스킬 쉘의 능력치 옵션으로도 오름
+// 레벨이 오를 때마다 ATTR_PER_LEVEL점 → 인벤토리 [I]에서 투자. 장착한 쉘·방어구의 능력치 옵션, 강화칩·강화장신구의 기본 능력치로도 오름
 // 능력치는 스킬의 수치를 키움 — 스킬마다 영향을 받는 능력치와 수치가 다름 (SKILLS의 st)
 const ATTR_PER_LEVEL = 3;
 const ATTRS = {
@@ -565,7 +612,7 @@ const ATTRS = {
 };
 
 // ===== 액티브 스킬 (스킬 쉘) =====
-// 스킬은 '스킬 쉘' 아이템을 인벤토리의 스킬 칸 4개(SHELL_SLOTS 키)에 끼워야 씀 — 같은 스킬은 한 칸에만
+// 스킬은 '스킬 쉘' 아이템을 스킬 창 [K]의 스킬 칸 4개(SHELL_SLOTS 키)에 끼워야 씀 — 같은 스킬은 한 칸에만
 // 쉘은 등급(일반~전설)이 높을수록 위력 보너스(SHELL_POW)와 옵션 수(RARITY의 affixes)가 큼
 // v: 기본 수치 — 종류는 키 이름으로 정해짐 (SKILL_PARAM): dmg·heal·armor 위력 / r·dist 범위 / dur 지속 / n 개수 / stun·freeze 제어
 //    (crit·amb·leech 같은 비율은 능력치로만 커짐)
@@ -999,7 +1046,7 @@ const TIPS = {
   hub:       { title: '보급 거점', icon: null, lines: ['안에서는 싸울 수 없다. 자판기 앞에서 [F], 가운데 패드로 순간이동'] },
   gate:      { title: '봉쇄 격벽', icon: null, lines: ['보스를 처치하거나 임무를 마치면 열린다'] },
   controls:  { title: '기본 조작', icon: 'playa1', lines: ['WASD 이동, 좌클릭 공격, Shift 달리기, Space 회피, I 인벤토리'] },
-  skills:    { title: '스킬 쉘', icon: 'bfe1d0', lines: ['인벤토리의 스킬 칸(Z X V B)에 쉘을 끼워 쓴다'] },
+  skills:    { title: '스킬 쉘', icon: 'bfe1d0', lines: ['스킬 창 [K]의 칸(Z X V B)에 쉘을 끼워 쓴다'] },
   vision:    { title: '어둠 속의 시야', icon: 'tlmpa0', lines: ['손전등이 비추는 곳만 보인다. 등 뒤를 조심하라'] },
   key:       { title: '보안문과 키카드', icon: 'bkeya0', lines: ['같은 색 키카드가 있어야 열린다'] },
   loot:      { title: '무기 줍기', icon: 'icon_pump', lines: ['[F]로 줍는다. 이름 색이 등급이다'] },
@@ -1007,7 +1054,7 @@ const TIPS = {
   armor:     { title: '장갑 몬스터', icon: 'bos2a1', lines: ['약한 탄은 잘 안 통한다. 강한 한 방을 써라'] },
   dodge:     { title: '총알을 피하는 적', icon: 'trooa1', lines: ['넓게 쏘거나 피한 직후를 노려라'] },
   boss:      { title: '보스', icon: 'cybra1', lines: ['체력이 절반 밑이면 격노한다'] },
-  levelup:   { title: '레벨 업', icon: 'icon_syringe_blue', lines: ['[K] 성장 창에서 점수를 투자한다'] },
+  levelup:   { title: '레벨 업', icon: 'icon_syringe_blue', lines: ['능력치는 인벤토리 [I], 특성은 스킬 창 [K]에서 올린다'] },
   rescue:    { title: '임무: 생존자 구출', icon: 'sswva1', lines: ['생존자를 거점 패드까지 데려가라'] },
   hack:      { title: '임무: 해킹', icon: null, lines: ['단말기 곁을 지키면 해킹이 진행된다'] },
   nest:      { title: '임무: 둥지 파괴', icon: 'col5a0', lines: ['둥지는 계속 몬스터를 낳는다. 서둘러 부숴라'] },
@@ -1015,7 +1062,8 @@ const TIPS = {
   gas:       { title: '독가스 누출', icon: 'icon_gren_gas', lines: ['치료제 [E]를 쓰거나 방을 벗어나라'] },
   breach:    { title: '선체 파손', icon: null, lines: ['구멍 쪽으로 빨려 간다. 다른 방으로 피하라'] },
   watcher:   { title: '감시자', icon: 'vilea1d1', lines: ['발밑에 붉은 원이 생기면 바로 비켜서라'] },
-  gear:      { title: '방어구', icon: 'icon_vest_tac', lines: ['머리, 몸, 다리 방어구가 받는 피해를 줄인다'] },
+  gear:      { title: '방어구', icon: 'icon_vest_tac', lines: ['머리, 몸통, 팔, 다리 방어구가 받는 피해를 줄인다'] },
+  augment:   { title: '강화칩·강화장신구', icon: 'icon_chip_str3', lines: ['칩은 몸 능력을, 장신구는 한 계열의 스킬을 키운다'] },
   melee:     { title: '근접 무기', icon: 'icon_knife', lines: ['근접으로 처치하면 체력과 탄약을 얻는다'] },
   attach:    { title: '무기 파츠', icon: 'att_scope', lines: ['보급 거점의 개조 자판기에서 무기에 끼운다'] },
   thief:     { title: '보물 약탈자', icon: 'sthfa1', lines: ['놓치면 사라진다. 달려서 쫓아라'] },
