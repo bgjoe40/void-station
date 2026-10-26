@@ -4563,41 +4563,36 @@ function pouchStacks() {
   return out;
 }
 // '소켓 · 보석' 탭 배치: 고른 장비 상자, 소켓 줄, 보석 합성 칸 (2줄 x 10칸)
-const sockLayout = g => ({ by: g.gy + 44, rowY: n => g.gy + 118 + n * 22, gemY: g.gy + 204 });
+const sockLayout = g => ({ by: g.gy, rowY: n => g.gy + 76 + n * 26, gemY: g.gy + 176 });
 function drawSocketArea(g) {
-  const p = player, L = sockLayout(g), it = trade.sel && ownedItems().includes(trade.sel) && canSocket(trade.sel) ? trade.sel : (trade.sel = null);
-  ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = '#9fd28f'; ctx.fillText('소켓과 보석', g.gx, g.gy + 14);
-  ctx.textAlign = 'right'; ctx.fillStyle = '#ffd27a'; ctx.fillText(`부품 ${p.parts}`, g.gx + VG_W * CELL, g.gy + 14);
-  ctx.fillStyle = '#0b0a08'; ctx.fillRect(g.gx, L.by, 140, 64); ctx.strokeStyle = '#4a463c'; ctx.strokeRect(g.gx + 0.5, L.by + 0.5, 139, 63);
+  const L = sockLayout(g), it = trade.sel && ownedItems().includes(trade.sel) && canSocket(trade.sel) ? trade.sel : (trade.sel = null);
+  pxWell([g.gx, L.by, 140, 64], false, it && it.rarity > 0 ? RARITY[it.rarity].glow : null);
   if (it) {
-    const [sw, sh] = it.s.size, k = Math.min(132 / (sw * CELL), 56 / (sh * CELL));
+    const [sw, sh] = it.s.size, k = Math.min(128 / (sw * CELL), 52 / (sh * CELL));
     drawItemBox(it, g.gx + 70 - sw * CELL * k / 2, L.by + 32 - sh * CELL * k / 2, sw * CELL * k, sh * CELL * k);
-    ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = itemColor(it); ctx.fillText(fitText(it.name, 190), g.gx + 150, L.by + 13);
-    ctx.font = font(FS); ctx.fillStyle = '#9a9484'; ctx.fillText(`소켓 ${(it.gems || []).length}/${it.sockets || 0} (최대 ${socketMax(it)})`, g.gx + 150, L.by + 28);
+    ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = itemColor(it); ctx.fillText(fitText(it.name, 190), g.gx + 150, L.by + 14);
+    ctx.font = font(FS); ctx.fillStyle = HC.dim; ctx.fillText(`소켓 ${(it.gems || []).length}/${it.sockets || 0} (최대 ${socketMax(it)})`, g.gx + 150, L.by + 30);
     const part = it.kind === 'armor' ? 'armor' : 'weapon';
     for (let n = 0; n < socketMax(it); n++) {
       const y = L.rowY(n), gm = (it.gems || [])[n], open = n < (it.sockets || 0);
-      ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fillRect(g.gx, y - 2, VG_W * CELL, 20);
-      if (gm) { drawIcon(GEMS[gm.id].icon, g.gx + 4, y, 16, 16); ctx.fillStyle = GEMS[gm.id].color; ctx.fillText(fitText(`${gemName(gm.id, gm.grade)}: ${gemFxText(gm.id, gm.grade, part)}`, VG_W * CELL - 30), g.gx + 26, y + 12); }
-      else { ctx.fillStyle = open ? '#8a8478' : '#4a463c'; ctx.fillText(open ? '◇ 빈 소켓' : '소켓 없음 (뚫을 수 있음)', g.gx + 8, y + 12); }
+      pxWell([g.gx, y, VG_W * CELL, 22]);
+      if (gm) { drawIcon(GEMS[gm.id].icon, g.gx + 5, y + 3, 16, 16); ctx.fillStyle = GEMS[gm.id].color; ctx.fillText(fitText(`${gemName(gm.id, gm.grade)}: ${gemFxText(gm.id, gm.grade, part)}`, VG_W * CELL - 32), g.gx + 27, y + 15); }
+      else { ctx.fillStyle = open ? HC.dim : '#4a4d55'; ctx.fillText(open ? '◇ 빈 소켓' : '뚫지 않은 소켓', g.gx + 8, y + 15); }
     }
   }
-  ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = '#9fd28f'; ctx.fillText('보석 주머니: 같은 보석 3개를 클릭하면 한 등급 위로', g.gx, L.gemY - 6);
-  const stacks = pouchStacks();
-  if (!stacks.length) { ctx.font = font(FS); ctx.fillStyle = '#6a6458'; ctx.fillText('보석이 없다', g.gx, L.gemY + 20); }
-  for (const b of tradeButtons()) if (b.gem) { // 보석 칸: 그림 + 개수, 합성할 수 있으면 초록 테두리
-    const { id, grade, n } = b.gem, hov = mouse.x >= b.x && mouse.x < b.x + b.w && mouse.y >= b.y && mouse.y < b.y + b.h;
-    ctx.fillStyle = b.on ? 'rgba(80,200,90,0.16)' : 'rgba(255,255,255,0.04)'; ctx.fillRect(b.x, b.y, b.w, b.h);
-    ctx.strokeStyle = hov ? '#fff' : b.on ? '#6f6' : '#3a3830'; ctx.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
-    const sz = [16, 21, 26][grade];
+  ctx.textAlign = 'left'; ctx.font = font(FS); ctx.fillStyle = HC.dim; ctx.fillText('보석', g.gx, L.gemY - 7);
+  for (const b of tradeButtons()) if (b.gem) { // 보석 칸: 그림 + 개수, 합성할 수 있으면 호박빛과 점
+    const { id, grade, n } = b.gem, r = [b.x, b.y, b.w, b.h], sz = [16, 21, 26][grade];
+    pxWell(r, inRect(r), b.on ? '216,154,58' : null);
     drawIcon(GEMS[id].icon, b.x + (b.w - sz) / 2, b.y + (b.h - sz) / 2, sz, sz);
-    ctx.font = font(FS, true); ctx.textAlign = 'right'; ctx.fillStyle = '#000'; ctx.fillText(n, b.x + b.w - 2, b.y + b.h - 2); ctx.fillStyle = '#fff'; ctx.fillText(n, b.x + b.w - 3, b.y + b.h - 3);
+    if (b.on) { ctx.fillStyle = HC.acc; ctx.fillRect(b.x + b.w - 7, b.y + 3, 4, 4); }
+    winNum(n, b.x + b.w - 3, b.y + b.h - 3 - 6 * WU(), 'small', 'right');
   }
   const hb = tradeButtons().find(b => b.gem && mouse.x >= b.x && mouse.x < b.x + b.w && mouse.y >= b.y && mouse.y < b.y + b.h);
   if (hb) {
     const { id, grade, n } = hb.gem, L2 = gemTooltip(gemInfo(id, grade));
-    L2.push({ t: grade >= 2 ? '가장 높은 등급' : n >= 3 ? `클릭: 3개 → ${gemName(id, grade + 1)} (${GEM_UP_GOLD[grade]}G)` : `${3 - n}개 더 있으면 합성 (${GEM_UP_GOLD[grade]}G)`, c: hb.on ? '#7f7' : '#a99', b: true });
-    drawTooltip(L2, mouse.x + 18, mouse.y + 18);
+    L2.push({ t: grade >= 2 ? '가장 높은 등급' : n >= 3 ? `클릭: 3개 → ${gemName(id, grade + 1)} (${GEM_UP_GOLD[grade]}G)` : `${3 - n}개 더 있으면 합성 (${GEM_UP_GOLD[grade]}G)`, c: hb.on ? HC.acc : '#a99', b: true });
+    queueTip(L2, mouse.x + 18, mouse.y + 18);
   }
 }
 
@@ -4653,24 +4648,20 @@ function reforge(it, n) {
 // 개조실 '분해 · 재련' 탭: 고른 장비, 분해 버튼, 옵션마다 재련 버튼 (버튼은 tradeButtons)
 const FORGE_ROW = 30;
 function drawForgeArea(g) {
-  const p = player, it = trade.sel && ownedItems().includes(trade.sel) ? trade.sel : (trade.sel = null);
-  ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = '#9fd28f'; ctx.fillText('분해와 재련', g.gx, g.gy + 14);
-  ctx.textAlign = 'right'; ctx.fillStyle = '#ffd27a'; ctx.fillText(`부품 ${p.parts}`, g.gx + VG_W * CELL, g.gy + 14);
-  const by = g.gy + 66;
-  ctx.fillStyle = '#0b0a08'; ctx.fillRect(g.gx, by, 140, 70); ctx.strokeStyle = '#4a463c'; ctx.strokeRect(g.gx + 0.5, by + 0.5, 139, 69);
+  const it = trade.sel && ownedItems().includes(trade.sel) ? trade.sel : (trade.sel = null), by = g.gy;
+  pxWell([g.gx, by, 140, 70], false, it && it.rarity > 0 ? RARITY[it.rarity].glow : null);
   if (!it) return;
-  const [sw, sh] = it.s.size, k = Math.min(132 / (sw * CELL), 62 / (sh * CELL));
+  const [sw, sh] = it.s.size, k = Math.min(128 / (sw * CELL), 58 / (sh * CELL));
   drawItemBox(it, g.gx + 70 - sw * CELL * k / 2, by + 35 - sh * CELL * k / 2, sw * CELL * k, sh * CELL * k);
-  ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = RARITY[it.rarity].color; ctx.fillText(fitText(it.name, 200), g.gx + 150, by + 14);
-  ctx.font = font(FS); ctx.fillStyle = '#9a9484';
+  ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = RARITY[it.rarity].color; ctx.fillText(fitText(it.name, 190), g.gx + 150, by + 14);
+  ctx.font = font(FS); ctx.fillStyle = HC.dim;
   ctx.fillText(`${RARITY[it.rarity].name} ${it.kind === 'shell' ? '스킬 쉘' : it.kind === 'armor' ? '방어구' : it.kind === 'attach' ? '파츠' : '무기'}${isEquipped(it) ? ' (장착 중)' : ''}`, g.gx + 150, by + 30);
-  if (!canReforge(it)) { ctx.fillStyle = '#6a6458'; ctx.fillText(it.uq ? '고유 전설은 옵션이 정해져 있어 재련할 수 없음' : '옵션이 없는 일반 등급 (분해만 가능)', g.gx + 150, by + 46); }
   const T = it.kind === 'shell' ? SHELL_AFFIXES : it.kind === 'armor' ? ARMOR_AFFIXES : AFFIXES;
-  it.affixes.forEach((a, n) => {
-    const y = by + 92 + n * FORGE_ROW;
-    ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fillRect(g.gx, y - 4, VG_W * CELL, FORGE_ROW - 4);
+  it.affixes.forEach((a, n) => { // 옵션 줄 (위에 구분선, 오른쪽에 재련 버튼)
+    const y = by + 84 + n * FORGE_ROW;
+    ctx.fillStyle = '#26282e'; ctx.fillRect(g.gx, y, VG_W * CELL, 1);
     ctx.font = font(FS); ctx.fillStyle = a.k === 'stat' ? ATTRS[a.type].color : a.k === 'elem' ? ELEMS[a.type].color : '#8af';
-    ctx.fillText(fitText(T[a.k].text(a.v, a.type), VG_W * CELL - 130), g.gx + 8, y + 13);
+    ctx.fillText(fitText(T[a.k].text(a.v, a.type), VG_W * CELL - 134), g.gx + 4, y + 19);
   });
 }
 
@@ -4991,13 +4982,15 @@ function codexGeom() {
   const pw = Math.min(W - 24, 880), ph = Math.min(VH - 16, 600), cw = 96, ch = 108, gap = 8;
   return { x: Math.round((W - pw) / 2), y: Math.max(8, Math.round((VH - ph) / 2)), pw, ph, cw, ch, gap, cols: Math.max(1, Math.floor((pw - 24 + gap) / (cw + gap))) };
 }
-const codexCard = (g, n) => ({ x: g.x + 12 + (n % g.cols) * (g.cw + g.gap), y: g.y + 82 + Math.floor(n / g.cols) * (g.ch + g.gap) });
-const codexTabW = g => Math.floor((g.pw - 24 + 8) / CODEX_TABS.length) - 8; // 탭 폭 (탭 수에 맞춰)
-const codexTabX = (g, k) => g.x + 12 + k * (codexTabW(g) + 8);
+const codexCard = (g, n) => ({ x: g.x + 12 + (n % g.cols) * (g.cw + g.gap), y: g.y + 64 + Math.floor(n / g.cols) * (g.ch + g.gap) });
+const codexTabW = g => Math.floor((g.pw - 24 + 6) / CODEX_TABS.length) - 6; // 탭 폭 (탭 수에 맞춰)
+const codexTabRect = (g, k) => [g.x + 12 + k * (codexTabW(g) + 6), g.y + 30, codexTabW(g), 24];
+const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)).join(','); // '#rrggbb' → 'r,g,b' (pxWell 빛)
 function codexHit(mx, my) {
   const g = codexGeom();
   if (mx < g.x || mx > g.x + g.pw || my < g.y || my > g.y + g.ph) return null;
-  for (let k = 0; k < CODEX_TABS.length; k++) if (mx >= codexTabX(g, k) && mx < codexTabX(g, k) + codexTabW(g) && my >= g.y + 40 && my < g.y + 68) return { tab: CODEX_TABS[k][0] };
+  if (inRect(closeBtn(g.x, g.y, g.pw), mx, my)) return { close: true };
+  for (let k = 0; k < CODEX_TABS.length; k++) if (inRect(codexTabRect(g, k), mx, my)) return { tab: CODEX_TABS[k][0] };
   const n = codexCards(codexTab).length;
   for (let i = 0; i < n; i++) { const c = codexCard(g, i); if (mx >= c.x && mx < c.x + g.cw && my >= c.y && my < c.y + g.ch) return { card: i }; }
   return { panel: true };
@@ -5006,26 +4999,23 @@ function codexHit(mx, my) {
 function codexMouseDown(button) {
   const h = codexHit(mouse.x, mouse.y);
   if (!h) return false;
+  if (h.close) { if (button === 0) { codexOpen = false; Snd.play('menu'); } return true; }
   if (button === 0 && h.tab && h.tab !== codexTab) { codexTab = h.tab; Snd.play('menu'); }
   return true;
 }
 function drawCodex() {
   const g = codexGeom(), h = codexHit(mouse.x, mouse.y), cards = codexCards(codexTab);
-  ctx.fillStyle = 'rgba(18,16,12,0.985)'; rr(g.x, g.y, g.pw, g.ph, 8); ctx.fill();
-  ctx.strokeStyle = '#8c8574'; ctx.lineWidth = 2; ctx.stroke(); ctx.lineWidth = 1;
-  ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = '#ff8a5a'; ctx.fillText('수집 도감', g.x + 14, g.y + 25);
-  ctx.textAlign = 'right'; ctx.font = font(FS); ctx.fillStyle = '#887'; ctx.fillText('[J] 닫기', g.x + g.pw - 14, g.y + 25);
-  CODEX_TABS.forEach(([id, label], k) => { // 탭 (찾은 수 / 전체)
-    const all = codexCards(id), got = all.filter(c => c.known).length, x = codexTabX(g, k), tw = codexTabW(g), on = codexTab === id, hov = h && h.tab === id;
-    ctx.fillStyle = on ? '#2a3a26' : '#1a1814'; rr(x, g.y + 40, tw, 28, 4); ctx.fill();
-    ctx.strokeStyle = on ? '#8f8' : hov ? '#cfe8c8' : '#4a463c'; ctx.stroke();
-    ctx.textAlign = 'center'; ctx.font = font(FS, true); ctx.fillStyle = on ? '#dfffd0' : '#9a9484';
-    ctx.fillText(fitText(`${label}  ${got}/${all.length}`, tw - 8), x + tw / 2, g.y + 58);
+  winCard(g.x, g.y, g.pw, g.ph); winHeader(g.x, g.y, g.pw, '수집 도감', 'J', h && h.close);
+  CODEX_TABS.forEach(([id, label], k) => { // 탭 (찾은 수 / 전체): 고른 탭은 호박빛
+    const all = codexCards(id), got = all.filter(c => c.known).length, r = codexTabRect(g, k), on = codexTab === id;
+    pxWell(r, on || (h && h.tab === id), on ? '216,154,58' : null);
+    ctx.textAlign = 'center'; ctx.font = font(FS, true); ctx.fillStyle = on ? INK : HC.dim;
+    ctx.fillText(fitText(`${label}  ${got}/${all.length}`, r[2] - 8), r[0] + r[2] / 2, r[1] + 16);
   });
-  cards.forEach((c, n) => {
-    const q = codexCard(g, n), hov = h && h.card === n;
-    ctx.fillStyle = c.known ? '#17150f' : '#0c0b09'; ctx.fillRect(q.x, q.y, g.cw, g.ch);
-    ctx.strokeStyle = hov ? '#ffd27a' : c.known ? c.col : '#2e2b24'; ctx.lineWidth = hov ? 2 : 1; ctx.strokeRect(q.x + 0.5, q.y + 0.5, g.cw - 1, g.ch - 1); ctx.lineWidth = 1;
+  cards.forEach((c, n) => { // 카드: 찾은 것은 그 색의 빛과 아래 줄, 커서 아래는 호박색 테두리
+    const q = codexCard(g, n), r = [q.x, q.y, g.cw, g.ch];
+    pxWell(r, h && h.card === n, c.known ? hexRgb(c.col) : null);
+    if (c.known) { ctx.fillStyle = c.col; ctx.fillRect(q.x + Z, q.y + g.ch - 2 * Z, g.cw - 2 * Z, Z); }
     if (c.gems) { // 보석 조합: 순서대로 보석 (아직 안 만들었으면 흐리게)
       ctx.globalAlpha = c.known ? 1 : 0.35;
       c.gems.forEach((id, j) => drawIcon(GEMS[id].icon, q.x + g.cw / 2 - c.gems.length * 13 + j * 26, q.y + 26, 24, 24));
@@ -5035,16 +5025,16 @@ function drawCodex() {
       if (!c.known) { ctx.filter = ach ? 'grayscale(1) brightness(0.55)' : 'brightness(0)'; ctx.globalAlpha = ach ? 0.8 : 0.75; }
       drawIcon(c.icon, q.x + 8, q.y + 6, g.cw - 16, g.ch - 42);
       ctx.filter = 'none'; ctx.globalAlpha = 1;
-      if (!c.known && !ach) { ctx.textAlign = 'center'; ctx.font = font(FL, true); ctx.fillStyle = '#4a463c'; ctx.fillText('?', q.x + g.cw / 2, q.y + 44); }
+      if (!c.known && !ach) { ctx.textAlign = 'center'; ctx.font = font(FL, true); ctx.fillStyle = '#3a3d44'; ctx.fillText('?', q.x + g.cw / 2, q.y + 44); }
     }
-    ctx.textAlign = 'center'; ctx.font = font(FS, true); ctx.fillStyle = c.known ? c.col : '#5a5648'; ctx.fillText(fitText(c.name, g.cw - 8), q.x + g.cw / 2, q.y + g.ch - 22);
-    ctx.font = font(FS); ctx.fillStyle = c.known ? '#9a9484' : '#4a463c'; ctx.fillText(fitText(c.sub || '', g.cw - 8), q.x + g.cw / 2, q.y + g.ch - 8);
-    if (c.frac !== undefined && !c.known) { ctx.fillStyle = '#2a2720'; ctx.fillRect(q.x + 8, q.y + g.ch - 36, g.cw - 16, 4); ctx.fillStyle = '#c9a03a'; ctx.fillRect(q.x + 8, q.y + g.ch - 36, (g.cw - 16) * clamp(c.frac, 0, 1), 4); } // 업적 진행
+    ctx.textAlign = 'center'; ctx.font = font(FS, true); ctx.fillStyle = c.known ? c.col : '#4a4d55'; ctx.fillText(fitText(c.name, g.cw - 8), q.x + g.cw / 2, q.y + g.ch - 23);
+    ctx.font = font(FS); ctx.fillStyle = c.known ? HC.dim : '#3a3d44'; ctx.fillText(fitText(c.sub || '', g.cw - 8), q.x + g.cw / 2, q.y + g.ch - 9);
+    if (c.frac !== undefined && !c.known) { ctx.fillStyle = '#26282e'; ctx.fillRect(q.x + 8, q.y + g.ch - 37, g.cw - 16, 4); ctx.fillStyle = HC.acc; ctx.fillRect(q.x + 8, q.y + g.ch - 37, Math.round((g.cw - 16) * clamp(c.frac, 0, 1)), 4); } // 업적 진행
   });
-  if (codexTab === 'ach') { // 지금 받는 업적 보너스 합계
+  if (codexTab === 'ach') { // 지금 받는 업적 보너스 합계 (있을 때만)
     const keys = [...new Set(ACHIEVEMENTS.flatMap(A => Object.keys(A.bonus)))].filter(k => achSum(k) > 0);
-    ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = '#ffe08a';
-    ctx.fillText(fitText(keys.length ? `업적 보너스: ${keys.map(k => SET_FX[k](achSum(k))).join(', ')}` : '업적 보너스: 아직 없음', g.pw - 28), g.x + 14, g.y + g.ph - 14);
+    ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = HC.acc;
+    if (keys.length) ctx.fillText(fitText(`업적 보너스: ${keys.map(k => SET_FX[k](achSum(k))).join(', ')}`, g.pw - 28), g.x + 14, g.y + g.ph - 14);
   }
   if (h && h.card !== undefined && cards[h.card]) drawTooltip(cards[h.card].tip, mouse.x + 18, mouse.y + 18, VH);
 }
@@ -5248,22 +5238,23 @@ function openTrade(mode) {
 }
 function closeTrade() { stowHeld(); trade = null; invOpen = false; perkOpen = false; state = 'play'; mouse.down = false; Snd.play('menu'); }
 
-function tradeGeom() {
-  const x = 12, y = 12, pw = VG_W * CELL + 24, tabY = y + 38, gx = x + 12, gy = tabY + 32;
-  return { x, y, pw, ph: gy - y + VG_H * CELL + 52, tabY, gx, gy, footY: gy + VG_H * CELL + 8 };
+function tradeGeom() { // 탭이 하나뿐인 곳 (회수 자판기·보관함)은 탭 줄 없이
+  const x = 12, y = 12, pw = VG_W * CELL + 24, tabY = y + 30, gx = x + 12, gy = trade && TRADE_TABS[trade.mode].length > 1 ? tabY + 30 : y + 30;
+  return { x, y, pw, ph: gy - y + VG_H * CELL + 56, tabY, gx, gy, footY: gy + VG_H * CELL + 8 };
 }
 const TRADE_TABS = { shop: [['weapons', '무기'], ['armor', '장비'], ['shells', '스킬 쉘'], ['attach', '파츠'], ['goods', '소모품'], ['gamble', '도박']], sell: [['sell', '판매·되사기']], upgrade: [['upgrade', '개조·강화'], ['attach', '파츠 개조'], ['forge', '분해·재련'], ['socket', '소켓·보석'], ['rune', '보석 조합']], stash: [['stash', '보관함']] };
 const tabW = n => Math.min(154, Math.floor((VG_W * CELL - (n - 1) * 6) / n)); // 탭 너비 (탭이 많으면 좁게)
+const tradeTabRect = (g, k, n) => [g.gx + k * (tabW(n) + 6), g.tabY, tabW(n), 24];
 function tradeButtons() {
-  const g = tradeGeom(), p = player, B = [{ id: 'close', x: g.x + g.pw - 96, y: g.footY + 12, w: 84, h: 26, label: '닫기 (Esc)', on: true }];
-  if (trade.mode === 'shop') B.push({ id: 'heal', x: g.gx, y: g.footY + 12, w: 170, h: 26, label: `체력 완전 회복 ${healCost()}G`, on: p.hp < p.maxhp && p.gold >= healCost() });
-  if (trade.mode === 'sell') { const n = bagCommons().length; B.push({ id: 'sellAll', x: g.gx, y: g.footY + 12, w: 220, h: 26, label: `가방의 일반 등급 모두 판매 (${n}개)`, on: n > 0 }); }
+  const g = tradeGeom(), p = player, cb = closeBtn(g.x, g.y, g.pw), B = [{ id: 'close', x: cb[0], y: cb[1], w: cb[2], h: cb[3], label: '', on: true, hdr: true }]; // 닫기: 제목 줄의 X (winHeader가 그림)
+  if (trade.mode === 'shop') B.push({ id: 'heal', x: g.gx, y: g.footY + 14, w: 150, h: 22, label: `체력 완전 회복 ${healCost()}G`, on: p.hp < p.maxhp && p.gold >= healCost() });
+  if (trade.mode === 'sell') { const n = bagCommons().length; B.push({ id: 'sellAll', x: g.gx, y: g.footY + 14, w: 210, h: 22, label: `가방의 일반 등급 모두 판매 (${n}개)`, on: n > 0 }); }
   if (trade.mode === 'upgrade' && trade.tab === 'socket') { // 소켓 · 보석: 소켓 뚫기·보석 빼기, 보석 합성 칸
     const it = trade.sel && ownedItems().includes(trade.sel) && canSocket(trade.sel) ? trade.sel : null, L = sockLayout(g);
     if (it) {
       const c = socketCost(it), full = (it.sockets || 0) >= socketMax(it), n = (it.gems || []).length;
-      B.push({ id: 'sock', x: g.gx + 150, y: L.by + 38, w: 96, h: 22, label: it.rw ? '보석 조합됨' : full ? '소켓 최대' : `뚫기 ${c.parts}부품, ${c.gold}G`, on: !it.rw && !full && p.parts >= c.parts && p.gold >= c.gold });
-      B.push({ id: 'unsock', x: g.gx + 250, y: L.by + 38, w: 90, h: 22, label: n ? `빼기 ${UNSOCKET_GOLD * n}G` : '빼기', on: n > 0 && p.gold >= UNSOCKET_GOLD * n });
+      B.push({ id: 'sock', x: g.gx + 150, y: L.by + 42, w: 120, h: 22, label: it.rw ? '보석 조합됨' : full ? '소켓 최대' : `뚫기 ${c.parts}부품, ${c.gold}G`, on: !it.rw && !full && p.parts >= c.parts && p.gold >= c.gold });
+      B.push({ id: 'unsock', x: g.gx + 274, y: L.by + 42, w: 66, h: 22, label: n ? `빼기 ${UNSOCKET_GOLD * n}G` : '빼기', on: n > 0 && p.gold >= UNSOCKET_GOLD * n });
     }
     pouchStacks().slice(0, 20).forEach((st, k) => B.push({ id: `gu:${st.id}:${st.grade}`, x: g.gx + (k % 10) * CELL, y: L.gemY + Math.floor(k / 10) * CELL, w: CELL - 2, h: CELL - 2, label: '', gem: st,
       on: st.grade < 2 && st.n >= 3 && p.gold >= GEM_UP_GOLD[st.grade] }));
@@ -5271,26 +5262,26 @@ function tradeButtons() {
     B.push(...attSlotBoxes(g));
   } else if (trade.mode === 'upgrade' && trade.tab === 'rune') { // 보석 조합: 무기 / 방어구 쪽
     const pg = trade.rwPage || 'weapon';
-    B.push({ id: 'rwp:weapon', x: g.gx, y: g.gy + 36, w: 70, h: 20, label: '무기', on: true, sel: pg === 'weapon' });
-    B.push({ id: 'rwp:armor', x: g.gx + 76, y: g.gy + 36, w: 70, h: 20, label: '방어구', on: true, sel: pg === 'armor' });
+    B.push({ id: 'rwp:weapon', x: g.gx, y: g.gy, w: 70, h: 22, label: '무기', on: true, sel: pg === 'weapon' });
+    B.push({ id: 'rwp:armor', x: g.gx + 76, y: g.gy, w: 70, h: 22, label: '방어구', on: true, sel: pg === 'armor' });
   } else if (trade.mode === 'upgrade' && trade.tab === 'forge') { // 분해·재련: 고른 장비의 분해 버튼, 옵션마다 재련 버튼, 일반 등급 일괄 분해
     const it = trade.sel && ownedItems().includes(trade.sel) ? trade.sel : null;
     if (it) {
       const eq = isEquipped(it), c = reforgeCost(it), ok = canReforge(it);
-      B.push({ id: 'salv', x: g.gx + 150, y: g.gy + 66 + 44, w: 150, h: 24, label: eq ? '장착 중 (분해 불가)' : `분해 → 부품 +${salvageValue(it)}`, on: !eq });
-      it.affixes.forEach((a, n) => B.push({ id: 'rf:' + n, x: g.gx + VG_W * CELL - 122, y: g.gy + 66 + 92 + n * FORGE_ROW - 3, w: 120, h: 22, label: ok ? `재련 ${c.parts}부품, ${c.gold}G` : '재련 불가', on: ok && p.parts >= c.parts && p.gold >= c.gold }));
+      B.push({ id: 'salv', x: g.gx + 150, y: g.gy + 44, w: 130, h: 22, label: eq ? '장착 중 (분해 불가)' : `분해 → 부품 +${salvageValue(it)}`, on: !eq });
+      it.affixes.forEach((a, n) => B.push({ id: 'rf:' + n, x: g.gx + VG_W * CELL - 124, y: g.gy + 84 + n * FORGE_ROW + 4, w: 124, h: 22, label: ok ? `재련 ${c.parts}부품, ${c.gold}G` : '재련 불가', on: ok && p.parts >= c.parts && p.gold >= c.gold }));
     }
     const commons = p.bag.filter(o => o.rarity === 0 && o.kind !== 'gem' && !o.rw).length;
-    B.push({ id: 'salvAll', x: g.gx, y: g.footY + 12, w: 220, h: 26, label: `가방의 일반 등급 모두 분해 (${commons}개)`, on: commons > 0 });
+    B.push({ id: 'salvAll', x: g.gx, y: g.footY + 14, w: 210, h: 22, label: `가방의 일반 등급 모두 분해 (${commons}개)`, on: commons > 0 });
   } else if (trade.mode === 'upgrade') {
     Object.entries(UPGRADES).forEach(([k, u], n) => {
       const lv = p.up[k], cost = u.cost * (lv + 1);
-      B.push({ id: 'up:' + k, x: g.gx + VG_W * CELL - 86, y: g.gy + 23 + n * 34, w: 86, h: 26, label: lv >= u.max ? '최대' : `${cost}G`, on: lv < u.max && p.gold >= cost });
+      B.push({ id: 'up:' + k, x: g.gx + VG_W * CELL - 80, y: g.gy + 23 + n * 36, w: 80, h: 22, label: lv >= u.max ? '최대' : `${cost}G`, on: lv < u.max && p.gold >= cost });
     });
     const w = trade.sel;
     if (w && w.kind !== 'shell' && w.kind !== 'attach') { // 스킬 쉘·파츠는 강화하지 않음
       const done = w.plus >= ENHANCE_MAX;
-      B.push({ id: 'enh', x: g.gx + 150, y: g.gy + 245, w: 130, h: 24, label: done ? '최대 강화' : `강화 ${enhanceCost(w)}G`, on: !done && p.gold >= enhanceCost(w) });
+      B.push({ id: 'enh', x: g.gx + 150, y: g.gy + 250, w: 120, h: 22, label: done ? '최대 강화' : `강화 ${enhanceCost(w)}G`, on: !done && p.gold >= enhanceCost(w) });
     }
   }
   return B;
@@ -5317,11 +5308,8 @@ function tradeEntries() {
 function tradeHit(mx, my) {
   const g = tradeGeom();
   if (!trade || mx < g.x || mx > g.x + g.pw || my < g.y || my > g.y + g.ph) return null;
-  const tabs = TRADE_TABS[trade.mode], tw = tabW(tabs.length);
-  for (let k = 0; k < tabs.length; k++) {
-    const tx = g.gx + k * (tw + 6);
-    if (mx >= tx && mx < tx + tw && my >= g.tabY && my < g.tabY + 26) return { area: 'tab', tab: tabs[k][0] };
-  }
+  const tabs = TRADE_TABS[trade.mode];
+  for (let k = 0; tabs.length > 1 && k < tabs.length; k++) if (inRect(tradeTabRect(g, k, tabs.length), mx, my)) return { area: 'tab', tab: tabs[k][0] };
   for (const b of tradeButtons()) if (mx >= b.x && mx < b.x + b.w && my >= b.y && my < b.y + b.h) return { area: 'btn', btn: b };
   if (trade.mode !== 'upgrade' && mx >= g.gx && mx < g.gx + VG_W * CELL && my >= g.gy && my < g.gy + VG_H * CELL)
     return { area: 'grid', cx: Math.floor((mx - g.gx) / CELL), cy: Math.floor((my - g.gy) / CELL) };
@@ -5479,14 +5467,13 @@ function gambleTooltip(e) {
   return L;
 }
 // 도박 칸: 그 종류의 대표 그림을 검게 (정체를 모름) + 물음표와 이름 (아직 안 나오는 종류는 흐리게)
-function drawGambleCard(e, x, y, w, h) {
+function drawGambleCard(e, x, y, w, h, hot) {
   const on = e.price > 0;
-  ctx.fillStyle = on ? 'rgba(255,210,120,0.06)' : 'rgba(255,255,255,0.02)'; ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
-  ctx.strokeStyle = on ? '#8a7448' : '#3a3830'; ctx.lineWidth = 1; ctx.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3);
+  pxWell([x + 1, y + 1, w - 2, h - 2], hot);
   ctx.filter = 'brightness(0.3)'; ctx.globalAlpha = on ? 1 : 0.5; drawIcon(gambleIcon(e.c), x + 6, y + 16, w - 12, h - 30); ctx.filter = 'none'; ctx.globalAlpha = 1;
-  ctx.textAlign = 'center'; ctx.font = font(FL, true); ctx.fillStyle = on ? '#ffd27a' : '#5a5448'; ctx.fillText('?', x + w / 2, y + h / 2 + 10);
-  ctx.textAlign = 'left'; ctx.font = font(FS); ctx.fillStyle = on ? '#e8dcc0' : '#6a6458'; ctx.fillText(fitText(e.c.name, w - 8), x + 4, y + 12);
-  if (!on) { ctx.textAlign = 'center'; ctx.fillStyle = '#7a7466'; ctx.fillText(`구역 ${gambleFrom(e.c)}부터`, x + w / 2, y + h - 5); }
+  ctx.textAlign = 'center'; ctx.font = font(FL, true); ctx.fillStyle = on ? HC.acc : '#3a3d44'; ctx.fillText('?', x + w / 2, y + h / 2 + 10);
+  ctx.textAlign = 'left'; ctx.font = font(FS); ctx.fillStyle = on ? INK : HC.dim; ctx.fillText(fitText(e.c.name, w - 8), x + 5, y + 14);
+  if (!on) { ctx.textAlign = 'center'; ctx.fillStyle = HC.dim; ctx.fillText(`구역 ${gambleFrom(e.c)}부터`, x + w / 2, y + h - 6); }
 }
 function sellWeapon(inst) {
   const price = sellPrice(inst);
@@ -5512,74 +5499,74 @@ function enhance(w) {
   trade.note = `${w.name} 강화 성공`; Snd.play('buy');
 }
 
-function tradeButton(b) { // sel: 고른 쪽 (보석 조합의 무기 / 방어구)
-  ctx.fillStyle = b.sel ? '#1c4a42' : b.on ? '#1d4a26' : '#2a2620'; rr(b.x, b.y, b.w, b.h, 4); ctx.fill();
-  ctx.strokeStyle = b.sel ? RW_COLOR : b.on ? '#6f6' : '#5a5448'; ctx.lineWidth = 1; ctx.stroke();
-  ctx.font = font(FS); ctx.textAlign = 'center'; ctx.fillStyle = b.sel ? '#dffff6' : b.on ? '#cfe8c8' : '#7a7466';
-  ctx.fillText(b.label, b.x + b.w / 2, b.y + Math.min(17, b.h - 5));
+function tradeButton(b) { // sel이 있으면 탭처럼 고른 쪽을 호박빛으로 (보석 조합의 무기 / 방어구)
+  const r = [b.x, b.y, b.w, b.h];
+  if (!('sel' in b)) { pxBtn(r, b.label, inRect(r), b.on); return; }
+  pxWell(r, b.sel || inRect(r), b.sel ? '216,154,58' : null);
+  ctx.textAlign = 'center'; ctx.font = font(FS, true); ctx.fillStyle = b.sel ? INK : HC.dim; ctx.fillText(b.label, b.x + b.w / 2, b.y + b.h / 2 + 4);
 }
 function drawTrade() {
   const g = tradeGeom(), p = player, hit = tradeHit(mouse.x, mouse.y);
-  const title = { shop: '보급 자판기', sell: '회수 자판기', upgrade: '개조 자판기', stash: '보관함 (창고)' }[trade.mode];
-  ctx.fillStyle = 'rgba(18,16,12,0.95)'; rr(g.x, g.y, g.pw, g.ph, 8); ctx.fill();
-  ctx.strokeStyle = '#8c8574'; ctx.lineWidth = 2; ctx.stroke();
-  ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = '#ff8a5a'; ctx.fillText(title, g.gx, g.y + 25);
-  ctx.textAlign = 'right'; ctx.font = font(FM, true); ctx.fillStyle = '#ffd27a'; ctx.fillText(`${p.gold} G`, g.x + g.pw - 12, g.y + 25);
-  // 탭
-  TRADE_TABS[trade.mode].forEach(([id, label], k, tabs) => {
-    const tw = tabW(tabs.length), tx = g.gx + k * (tw + 6), on = trade.tab === id;
-    ctx.fillStyle = on ? '#2a3a26' : '#1a1814'; rr(tx, g.tabY, tw, 26, 4); ctx.fill();
-    ctx.strokeStyle = on ? '#8f8' : '#4a463c'; ctx.lineWidth = 1; ctx.stroke();
-    ctx.textAlign = 'center'; ctx.font = font(FS, true); ctx.fillStyle = on ? '#dfffd0' : '#9a9484'; ctx.fillText(label, tx + tw / 2, g.tabY + 17);
+  const title = { shop: '보급 자판기', sell: '회수 자판기', upgrade: '개조 자판기', stash: '보관함' }[trade.mode];
+  winCard(g.x, g.y, g.pw, g.ph); winHeader(g.x, g.y, g.pw, title, '', hit && hit.area === 'btn' && hit.btn.id === 'close');
+  // 골드 (개조 자판기는 부품도): 닫기 X 왼쪽
+  const gold = `${p.gold.toLocaleString()} G`, rx = closeBtn(g.x, g.y, g.pw)[0] - 10;
+  ctx.textAlign = 'right'; ctx.font = font(FS, true); ctx.fillStyle = '#e8c060'; ctx.fillText(gold, rx, g.y + 19);
+  if (trade.mode === 'upgrade') { const gw = ctx.measureText(gold).width; ctx.font = font(FS); ctx.fillStyle = HC.dim; ctx.fillText(`부품 ${p.parts}`, rx - gw - 14, g.y + 19); }
+  // 탭 (하나뿐이면 없음): 고른 탭은 호박빛
+  const tabs = TRADE_TABS[trade.mode];
+  if (tabs.length > 1) tabs.forEach(([id, label], k) => {
+    const r = tradeTabRect(g, k, tabs.length), on = trade.tab === id;
+    pxWell(r, on || (hit && hit.area === 'tab' && hit.tab === id), on ? '216,154,58' : null);
+    ctx.textAlign = 'center'; ctx.font = font(FS, true); ctx.fillStyle = on ? INK : HC.dim; ctx.fillText(label, r[0] + r[2] / 2, r[1] + 16);
   });
   if (trade.mode === 'upgrade') { if (trade.tab === 'forge') drawForgeArea(g); else if (trade.tab === 'socket') drawSocketArea(g); else if (trade.tab === 'rune') drawRunewordArea(g); else if (trade.tab === 'attach') drawAttachArea(g); else drawUpgradeArea(g); }
   else {
     // 진열대 격자
-    ctx.fillStyle = '#0b0a08'; ctx.fillRect(g.gx, g.gy, VG_W * CELL, VG_H * CELL);
-    ctx.strokeStyle = '#26231c'; ctx.lineWidth = 1; ctx.beginPath();
+    ctx.fillStyle = WELL_FILL; ctx.fillRect(g.gx, g.gy, VG_W * CELL, VG_H * CELL);
+    ctx.strokeStyle = '#1c1e24'; ctx.lineWidth = 1; ctx.beginPath();
     for (let i = 0; i <= VG_W; i++) { ctx.moveTo(g.gx + i * CELL + 0.5, g.gy); ctx.lineTo(g.gx + i * CELL + 0.5, g.gy + VG_H * CELL); }
     for (let j = 0; j <= VG_H; j++) { ctx.moveTo(g.gx, g.gy + j * CELL + 0.5); ctx.lineTo(g.gx + VG_W * CELL, g.gy + j * CELL + 0.5); }
     ctx.stroke();
     if (trade.tab === 'sell') {
-      ctx.fillStyle = 'rgba(255,210,120,0.05)'; ctx.fillRect(g.gx, g.gy + 6 * CELL, VG_W * CELL, 2 * CELL);
-      ctx.font = font(FS); ctx.textAlign = 'left'; ctx.fillStyle = '#6a6458';
+      ctx.fillStyle = 'rgba(216,154,58,0.04)'; ctx.fillRect(g.gx, g.gy + 6 * CELL, VG_W * CELL, 2 * CELL);
+      ctx.font = font(FS); ctx.textAlign = 'left'; ctx.fillStyle = HC.dim;
       ctx.fillText('소모품 판매', g.gx + 6, g.gy + 6 * CELL - 4);
     }
+    const he = !held && hit && hit.area === 'grid' && entryAt(hit.cx, hit.cy); // 커서 아래 항목: 호박색 테두리
     for (const e of tradeEntries()) {
-      const x = g.gx + e.gx * CELL, y = g.gy + e.gy * CELL, w = e.w * CELL, h = e.h * CELL;
+      const x = g.gx + e.gx * CELL, y = g.gy + e.gy * CELL, w = e.w * CELL, h = e.h * CELL, hot = he && he.gx === e.gx && he.gy === e.gy;
       if (e.inst) drawItemBox(e.inst, x, y, w, h);
-      else if (e.kind === 'gamble') drawGambleCard(e, x, y, w, h);
+      else if (e.kind === 'gamble') drawGambleCard(e, x, y, w, h, hot);
       else {
-        ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
-        ctx.strokeStyle = '#4a463c'; ctx.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3);
-        drawIcon(goodIcon(e.k, e.id), x + 5, y + (e.h > 1 ? 14 : 4), w - 10, h - (e.h > 1 ? 30 : 10));
+        pxWell([x + 1, y + 1, w - 2, h - 2], hot);
+        drawIcon(goodIcon(e.k, e.id), x + 5, y + (e.h > 1 ? 16 : 4), w - 10, h - (e.h > 1 ? 32 : 10));
         if (e.h > 1) { // 이름 (같은 그림의 메디킷 구분용)
           const info = goodInfo(e.k, e.id);
           ctx.font = font(FS); ctx.textAlign = 'left'; ctx.fillStyle = info.color || '#c9a040';
-          ctx.fillText(fitText(info.short || info.name, w - 8), x + 4, y + 12);
+          ctx.fillText(fitText(info.short || info.name, w - 10), x + 5, y + 14);
         }
       }
-      ctx.font = font(FS); ctx.textAlign = 'right';
-      if (e.kind === 'sellG') { ctx.fillStyle = '#dfffd0'; ctx.fillText(goodCount(e.k, e.id), x + w - 3, y + h - 3); }
+      if (hot && e.inst) { ctx.strokeStyle = HC.acc; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, w - 2, h - 2); ctx.lineWidth = 1; }
+      if (e.kind === 'sellG') winNum(goodCount(e.k, e.id), x + w - 4, y + h - 4 - 6 * WU(), 'small', 'right'); // 가진 개수
       else if (e.price) { // 가격표 (살 수 없으면 빨간색, 창고·아직 안 나오는 도박 종류는 없음)
+        ctx.font = font(FS); ctx.textAlign = 'right';
         const tag = `${e.price}G`, tw = ctx.measureText(tag).width + 6;
-        ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(x + w - tw - 2, y + h - 14, tw, 12);
-        ctx.fillStyle = p.gold >= e.price ? '#ffd27a' : '#f66'; ctx.fillText(tag, x + w - 5, y + h - 4);
+        ctx.fillStyle = 'rgba(9,10,13,0.85)'; ctx.fillRect(x + w - tw - 3, y + h - 16, tw, 13);
+        ctx.fillStyle = p.gold >= e.price ? '#e8c060' : '#e0605a'; ctx.fillText(tag, x + w - 6, y + h - 6);
       }
     }
-    const e = hit && hit.area === 'grid' && entryAt(hit.cx, hit.cy);
-    if (e && !held) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.strokeRect(g.gx + e.gx * CELL + 1.5, g.gy + e.gy * CELL + 1.5, e.w * CELL - 3, e.h * CELL - 3); }
     if (held && trade.mode === 'stash' && hit && hit.area === 'grid') { // 창고에 놓을 자리 미리보기 (초록: 빈 자리, 노랑: 교체, 빨강: 불가)
       const t = stashTarget(held.inst), n = gridOverlaps(stash, held.inst, t.gx, t.gy).length;
       ctx.fillStyle = n === 0 ? 'rgba(80,255,120,0.22)' : n === 1 ? 'rgba(255,220,80,0.22)' : 'rgba(255,60,60,0.25)';
       ctx.fillRect(g.gx + t.gx * CELL, g.gy + t.gy * CELL, held.inst.s.size[0] * CELL, held.inst.s.size[1] * CELL);
     }
   }
-  // 하단: 안내 / 버튼
+  // 아래: 결과 / 버튼
   ctx.textAlign = 'left'; ctx.font = font(FS);
-  ctx.fillStyle = trade.note ? '#9f9' : '#887';
-  ctx.fillText(trade.note || (trade.mode === 'stash' ? `보관 ${stash.length}개` : ''), g.gx, g.footY + 4);
-  for (const b of tradeButtons()) if (!b.gem && !b.att) tradeButton(b); // 보석 칸·파츠 칸은 drawSocketArea·drawAttachArea가 그림
+  ctx.fillStyle = trade.note ? INK : HC.dim;
+  ctx.fillText(fitText(trade.note || (trade.mode === 'stash' ? `보관 ${stash.length}개` : ''), VG_W * CELL), g.gx, g.footY + 6);
+  for (const b of tradeButtons()) if (!b.gem && !b.att && !b.hdr) tradeButton(b); // 보석 칸·파츠 칸은 drawSocketArea·drawAttachArea가, 닫기 X는 winHeader가 그림
   // 진열 항목 툴팁
   const e = !held && hit && hit.area === 'grid' && entryAt(hit.cx, hit.cy);
   if (e) {
@@ -5595,11 +5582,11 @@ function drawTrade() {
       L.push({ t: `보유 ${goodCount(e.k, e.id)}`, c: '#9a9' });
       L.push(e.kind === 'sellG' ? { t: `판매가 ${e.price}G`, c: '#ffd27a', b: true } : { t: `구매가 ${e.price}G`, c: p.gold >= e.price ? '#ffd27a' : '#f66', b: true });
     }
-    drawTooltip(L, mouse.x + 18, mouse.y + 18);
+    queueTip(L, mouse.x + 18, mouse.y + 18);
   }
 }
 // '보석 조합' 탭: 조합식 목록 (무기 / 방어구 쪽) — 줄마다 보석 순서·이름·효과, 마우스를 올리면 자세히. 고른 장비에 맞는 조합식은 빛남
-const RW_ROW = 30;
+const RW_ROW = 34;
 const rwKeys = page => Object.keys(RUNEWORDS).filter(k => (RUNEWORDS[k].type === 'weapon') === (page !== 'armor'));
 // 주머니에 이 조합식의 보석이 (등급 상관없이) 모두 있는지, 모자란 보석
 function rwShort(k) {
@@ -5610,23 +5597,18 @@ function rwShort(k) {
 function drawRunewordArea(g) {
   const page = trade.rwPage || 'weapon', W0 = VG_W * CELL;
   const sel = trade.sel && ownedItems().includes(trade.sel) && canSocket(trade.sel) ? trade.sel : null;
-  ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = RW_COLOR; ctx.fillText('보석 조합', g.gx, g.gy + 14);
-  ctx.font = font(FS); ctx.fillStyle = '#9a9484';
-  ctx.fillText(fitText('일반 등급 장비의 소켓을 정해진 보석으로 순서대로 꽉 채우면 이름 있는 장비가 된다', W0), g.gx, g.gy + 30);
-  if (sel) { ctx.textAlign = 'right'; ctx.fillStyle = itemColor(sel); ctx.fillText(fitText(`고른 장비: ${sel.name} (소켓 ${sel.sockets || 0})`, W0 - 156), g.gx + W0, g.gy + 50); }
+  if (sel) { ctx.textAlign = 'right'; ctx.font = font(FS); ctx.fillStyle = itemColor(sel); ctx.fillText(fitText(`${sel.name} (소켓 ${sel.sockets || 0})`, W0 - 156), g.gx + W0, g.gy + 15); }
   let hover = null;
-  rwKeys(page).forEach((k, n) => {
-    const R = RUNEWORDS[k], y = g.gy + 62 + n * RW_ROW, fits = sel && rwFits(sel).includes(k);
-    const hov = mouse.x >= g.gx && mouse.x < g.gx + W0 && mouse.y >= y && mouse.y < y + RW_ROW - 3;
+  rwKeys(page).forEach((k, n) => { // 조합식 줄: 고른 장비에 맞으면 청록 테두리, 보석이 다 있으면 ✓
+    const R = RUNEWORDS[k], y = g.gy + 30 + n * RW_ROW, fits = sel && rwFits(sel).includes(k), r = [g.gx, y, W0, RW_ROW - 4], hov = inRect(r);
     if (hov) hover = k;
-    ctx.fillStyle = fits ? 'rgba(95,224,200,0.14)' : 'rgba(255,255,255,0.04)'; ctx.fillRect(g.gx, y, W0, RW_ROW - 3);
-    if (hov || fits) { ctx.strokeStyle = hov ? '#fff' : RW_COLOR; ctx.lineWidth = 1; ctx.strokeRect(g.gx + 0.5, y + 0.5, W0 - 1, RW_ROW - 4); }
-    R.gems.forEach((id, j) => drawIcon(GEMS[id].icon, g.gx + 4 + j * 19, y + 5, 17, 17));
-    ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = RW_COLOR; ctx.fillText(R.name, g.gx + 64, y + 12);
-    ctx.font = font(FS); ctx.fillStyle = '#8a8478'; ctx.fillText(`${RW_TYPE[R.type]}, 소켓 ${R.gems.length}`, g.gx + 64, y + 24);
-    ctx.font = font(FS); ctx.fillStyle = '#cfe8c8';
-    ctx.fillText(fitText(Object.entries(R.stats).map(([s, v]) => RW_FX[s](v)).join(', '), W0 - 172 - 18), g.gx + 168, y + 17);
-    if (!rwShort(k).length) { ctx.textAlign = 'right'; ctx.font = font(FS, true); ctx.fillStyle = '#7f7'; ctx.fillText('✓', g.gx + W0 - 5, y + 17); }
+    pxWell(r, hov, fits ? RW_GLOW : null);
+    if (fits && !hov) { ctx.strokeStyle = RW_COLOR; ctx.lineWidth = 1; ctx.strokeRect(r[0] + 0.5, r[1] + 0.5, r[2] - 1, r[3] - 1); }
+    R.gems.forEach((id, j) => drawIcon(GEMS[id].icon, g.gx + 5 + j * 19, y + 6, 17, 17));
+    ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = RW_COLOR; ctx.fillText(R.name, g.gx + 66, y + 13);
+    ctx.font = font(FS); ctx.fillStyle = HC.dim; ctx.fillText(`${RW_TYPE[R.type]}, 소켓 ${R.gems.length}`, g.gx + 66, y + 27);
+    ctx.fillStyle = INK; ctx.fillText(fitText(Object.entries(R.stats).map(([s, v]) => RW_FX[s](v)).join(', '), W0 - 172 - 18), g.gx + 168, y + 19);
+    if (!rwShort(k).length) { ctx.textAlign = 'right'; ctx.font = font(FS, true); ctx.fillStyle = '#7f7'; ctx.fillText('✓', g.gx + W0 - 6, y + 19); }
   });
   if (!hover) return;
   const R = RUNEWORDS[hover], n = R.gems.length, short = rwShort(hover);
@@ -5637,30 +5619,30 @@ function drawRunewordArea(g) {
   L.push({ t: R.type === 'weapon' ? `바탕: 일반 등급 무기 (소켓 ${n}칸: ${n >= 3 ? '큰 무기 (8칸 이상)' : '보통 이상 무기 (4칸 이상)'}` : `바탕: 일반 등급 ${RW_TYPE[R.type]}`, c: '#ccc' });
   L.push({ t: '보석 등급은 상관없다. 보석을 빼면 조합이 풀린다', c: '#888' });
   L.push(short.length ? { t: `모자란 보석: ${short.join(', ')}`, c: '#a99' } : { t: '보석 주머니에 필요한 보석이 모두 있다', c: '#7f7' });
-  drawTooltip(L, mouse.x + 18, mouse.y + 18);
+  queueTip(L, mouse.x + 18, mouse.y + 18);
 }
 // 개조실: 신체 개조 5종 + 선택한 무기 강화
 function drawUpgradeArea(g) {
   const p = player;
-  ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = '#9fd28f'; ctx.fillText('신체 개조 (영구)', g.gx, g.gy + 14);
-  Object.entries(UPGRADES).forEach(([k, u], n) => {
-    const y = g.gy + 20 + n * 34, lv = p.up[k];
-    ctx.fillStyle = '#0b0a08'; ctx.fillRect(g.gx, y, 32, 32); ctx.strokeStyle = '#4a463c'; ctx.strokeRect(g.gx + 0.5, y + 0.5, 31, 31);
-    drawIcon(UP_ICON[k], g.gx + 3, y + 3, 26, 26);
-    ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = '#e8dcc0'; ctx.fillText(u.name, g.gx + 40, y + 13);
-    ctx.font = font(FS); ctx.fillStyle = '#9a9484'; ctx.fillText(u.desc, g.gx + 40, y + 28);
-    for (let s = 0; s < u.max; s++) { ctx.fillStyle = s < lv ? '#8f8' : '#2a3a2a'; ctx.fillRect(g.gx + 170 + s * 12, y + 5, 9, 9); }
+  ctx.textAlign = 'left'; ctx.font = font(FS); ctx.fillStyle = HC.dim; ctx.fillText('신체 개조', g.gx, g.gy + 10);
+  Object.entries(UPGRADES).forEach(([k, u], n) => { // 그림 칸, 이름, 효과, 단계 (호박색 칸)
+    const y = g.gy + 18 + n * 36, lv = p.up[k];
+    pxWell([g.gx, y, 32, 32]);
+    drawIcon(UP_ICON[k], g.gx + 4, y + 4, 24, 24);
+    ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = INK; ctx.fillText(u.name, g.gx + 42, y + 13);
+    ctx.font = font(FS); ctx.fillStyle = HC.dim; ctx.fillText(u.desc, g.gx + 42, y + 28);
+    for (let s = 0; s < u.max; s++) { ctx.fillStyle = s < lv ? HC.acc : '#26282e'; ctx.fillRect(g.gx + 170 + s * 9, y + 6, 7, 7); }
   });
-  const ey = g.gy + 210;
-  ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = '#9fd28f'; ctx.fillText(`장비 강화 (단계마다 피해·방어 +${Math.round(ENHANCE_DMG * 100)}%, 최대 +${ENHANCE_MAX})`, g.gx, ey);
+  const ey = g.gy + 214;
+  ctx.textAlign = 'left'; ctx.font = font(FS); ctx.fillStyle = HC.dim; ctx.fillText('장비 강화', g.gx, ey);
   const w = trade.sel && ownedItems().includes(trade.sel) ? trade.sel : (trade.sel = null);
-  ctx.fillStyle = '#0b0a08'; ctx.fillRect(g.gx, ey + 6, 140, 54); ctx.strokeStyle = '#4a463c'; ctx.strokeRect(g.gx + 0.5, ey + 6.5, 139, 53);
+  pxWell([g.gx, ey + 6, 140, 52], false, w && w.rarity > 0 ? RARITY[w.rarity].glow : null);
   if (!w) return;
-  const [sw, sh] = w.s.size, k = Math.min(132 / (sw * CELL), 46 / (sh * CELL));
-  drawItemBox(w, g.gx + 70 - sw * CELL * k / 2, ey + 33 - sh * CELL * k / 2, sw * CELL * k, sh * CELL * k);
-  ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = RARITY[w.rarity].color; ctx.fillText(fitText(w.name, 200), g.gx + 150, ey + 17);
-  ctx.font = font(FS); ctx.fillStyle = '#ccc';
-  if (w.kind === 'shell' || w.kind === 'attach') { ctx.fillText(w.kind === 'shell' ? '스킬 쉘은 강화할 수 없다' : '파츠는 강화할 수 없다', g.gx + 150, ey + 31); return; }
+  const [sw, sh] = w.s.size, k = Math.min(128 / (sw * CELL), 44 / (sh * CELL));
+  drawItemBox(w, g.gx + 70 - sw * CELL * k / 2, ey + 32 - sh * CELL * k / 2, sw * CELL * k, sh * CELL * k);
+  ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = RARITY[w.rarity].color; ctx.fillText(fitText(w.name, 190), g.gx + 150, ey + 18);
+  ctx.font = font(FS); ctx.fillStyle = INK;
+  if (w.kind === 'shell' || w.kind === 'attach') { ctx.fillStyle = HC.dim; ctx.fillText(w.kind === 'shell' ? '스킬 쉘은 강화할 수 없다' : '파츠는 강화할 수 없다', g.gx + 150, ey + 31); return; }
   if (w.kind === 'armor' && isAug(w)) { ctx.fillText(`강화 ${w.plus}/${ENHANCE_MAX}, ${ATTRS[w.s.attr[0]].name} +${w.s.attrN}${w.plus < ENHANCE_MAX ? ` → +${w.s.attrN + 1}` : ''}`, g.gx + 150, ey + 31); return; }
   const key = w.kind === 'armor' ? 'def' : 'dmg', next = Math.round(w.s[key] / (1 + ENHANCE_DMG * w.plus) * (1 + ENHANCE_DMG * (w.plus + 1)));
   ctx.fillText(`강화 ${w.plus}/${ENHANCE_MAX}, ${key === 'def' ? '방어' : '피해'} ${Math.round(w.s[key])}${w.plus < ENHANCE_MAX ? ` → ${next}` : ''}`, g.gx + 150, ey + 31);
@@ -8207,7 +8189,7 @@ function pxNum(n, x, y, set = 'small', align) {
   return w;
 }
 // 3x5 픽셀 글자 (단축키·레벨 표시), 픽셀 모양 (# 채움)
-const GLYPH = { '+': '000010111010000', '.': '000000000000100', '/': '001001010100100', S: '011100010001110', I: '111010010010111', Z: '111001010100111', X: '101101010101101', V: '101101101101010', B: '110101110101110', Q: '010101101110011', E: '111100110100111', T: '111010010010010', G: '011100101101011', K: '101110100110101', L: '100100100100111' };
+const GLYPH = { '+': '000010111010000', '.': '000000000000100', '/': '001001010100100', S: '011100010001110', I: '111010010010111', Z: '111001010100111', X: '101101010101101', V: '101101101101010', B: '110101110101110', Q: '010101101110011', E: '111100110100111', T: '111010010010010', G: '011100101101011', K: '101110100110101', L: '100100100100111', J: '011001001101010' };
 function pxGlyph(ch, x, y, col) { const g = GLYPH[ch]; if (!g) return; ctx.fillStyle = col; for (let k = 0; k < 15; k++) if (g[k] === '1') ctx.fillRect(x + (k % 3) * Z, y + Math.floor(k / 3) * Z, Z, Z); }
 // 테두리를 두른 픽셀 모양: 위아래 양옆으로 한 칸씩 어두운 색을 깔고 그 위에 (작은 HUD에서도 모양이 또렷하게)
 function pxShapeEdge(rows, x, y, col, edge) { for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) pxShape(rows, x + dx * Z, y + dy * Z, edge); pxShape(rows, x, y, col); }

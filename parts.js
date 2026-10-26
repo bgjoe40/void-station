@@ -190,7 +190,7 @@ function drawWeaponBottom(w, x, y, scale) {
 }
 
 // --- 개조 자판기 '파츠 개조' 탭: 고른 무기를 크게, 칸 상자, 수치 비교 ---
-const attLayout = g => ({ W0: VG_W * CELL, artY: g.gy + 22, artH: 72, slotY: g.gy + 98, slotH: 64, statY: g.gy + 177 });
+const attLayout = g => ({ W0: VG_W * CELL, artY: g.gy, artH: 72, slotY: g.gy + 80, slotH: 64, statY: g.gy + 162 });
 // 칸 상자 (클릭: 끼운 파츠를 빼서 가방으로) — tradeButtons가 버튼으로 씀
 function attSlotBoxes(g) {
   const w = attW(), L = attLayout(g);
@@ -205,10 +205,8 @@ function attPreviewPart(w) {
   return it && it.kind === 'attach' && canAttach(w, it.id) ? it : null;
 }
 function drawAttachArea(g) {
-  const L = attLayout(g), w = attW();
-  ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = '#9fd28f'; ctx.fillText('파츠 개조', g.gx, g.gy + 14);
-  ctx.fillStyle = '#0b0a08'; ctx.fillRect(g.gx, L.artY, L.W0, L.artH);
-  ctx.strokeStyle = '#4a463c'; ctx.lineWidth = 1; ctx.strokeRect(g.gx + 0.5, L.artY + 0.5, L.W0 - 1, L.artH - 1);
+  const L = attLayout(g), w = attW(), blink = Math.sin(gtime * 6) > 0;
+  pxWell([g.gx, L.artY, L.W0, L.artH], false, w && w.rarity > 0 ? RARITY[w.rarity].glow : null);
   if (!w) return;
   const prev = attPreviewPart(w);
   if (prev) { // 미리보기: 파츠를 끼운 모습을 흐리게 겹침
@@ -216,20 +214,19 @@ function drawAttachArea(g) {
     ctx.globalAlpha = 0.55 + 0.25 * Math.sin(gtime * 6); drawWeaponArt(ghost, g.gx + 10, L.artY + 6, L.W0 - 20, L.artH - 10); ctx.globalAlpha = 1;
   } else drawWeaponArt(w, g.gx + 10, L.artY + 6, L.W0 - 20, L.artH - 10);
   ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = itemColor(w); ctx.fillText(fitText(w.name, L.W0 - 16), g.gx + 8, L.artY + 15);
-  // 칸 상자
+  // 칸 상자: 끼운 파츠는 그림·이름 (등급 빛), 빈 칸은 그 칸 파츠의 흐린 그림, 들고 있는 파츠가 맞는 칸은 깜박임
   let hover = null;
   for (const b of attSlotBoxes(g)) {
-    const a = w.att && w.att[b.slot], hov = mouse.x >= b.x && mouse.x < b.x + b.w && mouse.y >= b.y && mouse.y < b.y + b.h, fit = prev && ATTACH[prev.id].slot === b.slot;
+    const a = w.att && w.att[b.slot], r = [b.x, b.y, b.w, b.h], hov = inRect(r), fit = prev && ATTACH[prev.id].slot === b.slot;
     if (hov) hover = b;
-    ctx.fillStyle = fit ? 'rgba(80,220,110,0.16)' : a ? `rgba(${RARITY[a.rarity].glow},0.10)` : 'rgba(255,255,255,0.03)'; ctx.fillRect(b.x, b.y, b.w, b.h);
-    ctx.strokeStyle = hov ? '#fff' : fit ? '#6f6' : a ? RARITY[a.rarity].color : '#3a3830'; ctx.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
-    ctx.textAlign = 'center'; ctx.font = font(FS); ctx.fillStyle = '#8a8478'; ctx.fillText(ATTACH_SLOTS[b.slot], b.x + b.w / 2, b.y + 13);
+    pxWell(r, hov || (fit && blink), a ? RARITY[a.rarity].glow : null);
+    ctx.textAlign = 'center'; ctx.font = font(FS); ctx.fillStyle = HC.dim; ctx.fillText(ATTACH_SLOTS[b.slot], b.x + b.w / 2, b.y + 15);
     if (a) {
-      drawIcon('att_' + a.id, b.x + 6, b.y + 17, b.w - 12, 18);
+      drawIcon('att_' + a.id, b.x + 6, b.y + 19, b.w - 12, 16);
       const words = ATTACH[a.id].name.split(' ');
       ctx.font = font(FS, true); ctx.fillStyle = RARITY[a.rarity].color;
-      words.slice(0, 2).forEach((t, n) => ctx.fillText(fitText(n ? words.slice(1).join(' ') : t, b.w - 4), b.x + b.w / 2, b.y + b.h - (words.length > 1 ? 18 - n * 13 : 6)));
-    } else { ctx.font = font(FS); ctx.fillStyle = '#4a463c'; ctx.fillText('비어 있음', b.x + b.w / 2, b.y + b.h / 2 + 6); }
+      words.slice(0, 2).forEach((t, n) => ctx.fillText(fitText(n ? words.slice(1).join(' ') : t, b.w - 4), b.x + b.w / 2, b.y + b.h - (words.length > 1 ? 18 - n * 12 : 7)));
+    } else { ctx.globalAlpha = 0.12; drawIcon('att_' + Object.keys(ATTACH).find(k => ATTACH[k].slot === b.slot), b.x + 8, b.y + 22, b.w - 16, b.h - 30); ctx.globalAlpha = 1; }
   }
   drawAttachStats(g, w, prev, L);
   if (hover && !held) {
@@ -238,18 +235,18 @@ function drawAttachArea(g) {
       : [{ t: `빈 ${ATTACH_SLOTS[hover.slot]} 칸`, c: '#ccc', b: true },
         { t: `맞는 파츠: ${Object.keys(ATTACH).filter(k => ATTACH[k].slot === hover.slot && canAttach(w, k)).map(k => ATTACH[k].name).join(', ')}`, c: '#9a9' },
         { t: '가방의 파츠를 끌어다 놓거나 우클릭하면 끼워짐', c: '#9cf' }];
-    drawTooltip(T, mouse.x + 18, mouse.y + 18);
+    queueTip(T, mouse.x + 18, mouse.y + 18);
   }
 }
 // 수치 비교: 파츠 없을 때 → 지금 (미리보기 중이면 지금 → 끼웠을 때), 아래에 특수 효과
 function drawAttachStats(g, w, prev, L) {
   const base = weaponStats({ ...w, att: {} }), cur = w.s, to = prev ? withAttach(w, prev.id, prev.rarity) : cur, from = prev ? cur : base, rows = statRows(cur), cw = L.W0 / 2;
-  ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = prev ? '#ffd27a' : '#9fd28f';
+  ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = prev ? HC.acc : HC.dim;
   ctx.fillText(prev ? `${prev.name}을(를) 끼우면` : '파츠 효과 (파츠 없을 때 → 지금)', g.gx, L.statY);
   rows.forEach(([name, f, d, low, unit = ''], n) => {
     const x = g.gx + (n % 2) * cw, y = L.statY + 15 + Math.floor(n / 2) * 14, a = f(from), b = f(to), same = fmtStat(a, d) === fmtStat(b, d);
-    ctx.font = font(FS); ctx.fillStyle = '#8a8478'; ctx.fillText(name, x, y);
-    ctx.fillStyle = '#ddd'; ctx.fillText(same ? `${fmtStat(b, d)}${unit}` : `${fmtStat(a, d)} → `, x + 58, y);
+    ctx.font = font(FS); ctx.fillStyle = HC.dim; ctx.fillText(name, x, y);
+    ctx.fillStyle = INK; ctx.fillText(same ? `${fmtStat(b, d)}${unit}` : `${fmtStat(a, d)} → `, x + 58, y);
     if (!same) { const tw = ctx.measureText(`${fmtStat(a, d)} → `).width; ctx.fillStyle = (low ? b < a : b > a) ? '#7f7' : '#f77'; ctx.fillText(`${fmtStat(b, d)}${unit}`, x + 58 + tw, y); }
   });
   const fx = [to.quiet && '소음', to.thermal && '열상', to.ap && `장갑 ${pct(to.ap)} 무시`, ...Object.entries(to.gemProc || {}).map(([k, v]) => `${{ fire: '화상', cryo: '둔화', shock: '기절', poison: '중독' }[k]} ${pct(v)}`)].filter(Boolean);
