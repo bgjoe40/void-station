@@ -1791,7 +1791,7 @@ function newPlayer() {
   return {
     x: 0, y: 0, r: 0.3, hp: 230, maxhp: 230, armor: 0, aim: 0,
     equip: [makeWeapon('knife'), makeWeapon('revolver'), null, null], slot: 1, bag: [], // 무기 슬롯 (어떤 무기든, NSLOT칸 중 열린 칸만) + 가방
-    up: { hp: 0, stamina: 0, bag: 0, load: 0, ammo: 0 }, // 기지 신체 개조 단계
+    up: { bag: 0 }, // 기지 개조 단계 (확장 배낭)
     ammo: { pistol: 36, shell: 0, rifle: 0, belt: 0, cell: 0, rocket: 0 },
     charging: 0, // 분쇄포처럼 모았다가 쏘는 무기의 남은 충전 시간
     clv: 1, xp: 0, pts: 0, perks: {}, // 캐릭터 레벨, 경험치, 남은 특성 점수, 특성별 단계
@@ -1815,13 +1815,13 @@ const NSLOT = WEAPON_SLOTS.max; // 무기 슬롯 수 (열린 칸은 slotsOpen)
 const slotsOpen = () => Math.min(NSLOT, WEAPON_SLOTS.base + ((flags && flags.armory) || []).length); // 처음 2칸 + 해제한 무기고마다 한 칸
 const allWeapons = () => [...player.equip.filter(Boolean), ...player.bag];
 const load = () => allWeapons().reduce((s, w) => s + w.s.weight, 0) + GEAR_KEYS.reduce((s, g) => s + (player.gear[g] ? player.gear[g].s.weight : 0), 0); // 가방의 쉘·방어구도
-// 기지 신체 개조로 늘어나는 한도들
+// 장비 (옵션·장비 개조)로 늘어나는 한도들, 가방 줄은 기지 개조 (확장 배낭)
 const hpRegen = () => gearV('regen') + perkV('regen'); // 초당 체력 재생: 장비 옵션·보석·세트, 재생 조직
-const staminaMax = () => STAMINA_MAX + 20 * player.up.stamina + gearV('stam');
+const staminaMax = () => STAMINA_MAX + gearV('stam');
 const bagH = () => BAG_H + player.up.bag;
-const maxLoad = () => MAX_LOAD + 5 * player.up.load;
-const ammoMax = a => Math.round(AMMO[a].max * (1 + 0.25 * player.up.ammo));
-function applyUpgrades(p) { p.maxhp = 230 + 25 * p.up.hp + (p.perks.hp || 0) * PERKS.hp.per + gearV('hp', undefined, p); p.hp = Math.min(p.hp, p.maxhp); } // 방어구 체력 옵션 포함
+const maxLoad = () => MAX_LOAD + gearV('load');
+const ammoMax = a => Math.round(AMMO[a].max * (1 + gearV('ammo')));
+function applyUpgrades(p) { p.maxhp = 230 + (p.perks.hp || 0) * PERKS.hp.per + gearV('hp', undefined, p); p.hp = Math.min(p.hp, p.maxhp); } // 방어구 체력 옵션·장비 개조 포함
 function useStamina(n) { player.stamina = Math.max(0, player.stamina - n * (1 - perkV('stamina') * 2 / 3)); player.staminaDelay = STAMINA_REGEN_DELAY; }
 
 // ===== 캐릭터 성장: 경험치 → 레벨 → 특성 점수 =====
@@ -2064,7 +2064,7 @@ function bloodSplat(x, y, r, col, more = true) {
 // 플레이어 피격 (난이도 배율 적용). (sx, sy): 공격이 온 곳 — 맞은 방향 표시와 밀려남에 씀
 function hurtPlayer(dmg, sx, sy) {
   const p = player;
-  if (p.dash > 0 || p.inv > 0 || state !== 'play' || dmg <= 0 || inHub()) return false; // 안전 지대에서는 다치지 않음
+  if (p.dash > 0 || p.inv > 0 || (state !== 'play' && state !== 'trade') || dmg <= 0 || inHub()) return false; // 안전 지대에서는 다치지 않음
   dmg *= DIFFICULTY[difficulty].dmg * (rift ? rift.T.dmg : 1) * (buff('berserk') ? 1 - SKILLS.berserk.guard : 1) * (buff('iron') ? 1 - SKILLS.iron.guard : 1) // 균열 단계, 광폭화·강철 피부 중에는 덜 아픔
     * (1 - defCut(gearDef() * (p.fx.curse > 0 ? ELITE_FX.curse.def : 1))) * (1 - resV('str')) * (shrineOn('guard') ? 1 - SHRINES.guard.cut : 1); // 방어구 (저주 중이면 절반), 근력 공명, 수호의 신단
   const ab = Math.min(p.armor, dmg * 0.6);
@@ -2090,7 +2090,7 @@ function hurtPlayer(dmg, sx, sy) {
 // 불사조 (보석 조합): 죽을 피해를 받으면 체력 50%로 되살아남 — 그 뒤 정해진 시간 동안은 다시 안 됨
 function rebirth() {
   const p = player, cd = gearV('phoenix');
-  if (!cd || p.phoenixT > 0 || state !== 'play') return false;
+  if (!cd || p.phoenixT > 0 || (state !== 'play' && state !== 'trade')) return false;
   p.hp = p.maxhp * 0.5; p.phoenixT = cd; p.inv = Math.max(p.inv, 2); p.fx.poison = p.fx.burn = 0;
   msg('불사조! 다시 일어섰다', RW_COLOR); Snd.play('unique');
   flashes.push({ x: p.x, y: p.y, r: 520, t: 0.6, max: 0.6, col: '255,170,80' }); fireBurst(p.x, p.y, 50, 5); shake = Math.max(shake, 8);
@@ -3440,7 +3440,7 @@ function randomLootShell(bonus = 0) {
 // 쉘의 지금 수치: 기본 x 등급·옵션(위력·범위·지속·제어) x 능력치, 개수는 더하기, 피해는 구역 배율. cd: 대기시간
 // 강화장신구 옵션 (그 장신구 계열의 스킬에만): 쉘 수치 종류 → 장신구 옵션
 const ACC_LINE = { r: 'sr', dur: 'sdur', cc: 'scc' };
-const accV = (k, stat) => { const a = player.gear.acc; return a ? affixSum(a, k, stat) : 0; };
+const accV = (k, stat) => { const a = player.gear.acc; return a ? affixSum(a, k, stat) + modSum(a, k, stat) : 0; };
 function shellVals(sh) {
   const S = SKILLS[sh.id], out = {}, rt = resTier(S.stat);
   for (const k in S.v) {
@@ -4367,7 +4367,7 @@ function makeArmor(id, rarity = 0) {
   return canSocket(it) ? rollSockets(it) : it; // 강화칩·강화장신구는 소켓 없음
 }
 function buildArmor(id, rarity, affixes, plus = 0, sockets = 0, gems = []) {
-  const inst = { uid: uidSeq++, kind: 'armor', id, rarity, affixes, plus, gx: 0, gy: 0, sockets, gems };
+  const inst = { uid: uidSeq++, kind: 'armor', id, rarity, affixes, plus, gx: 0, gy: 0, sockets, gems, mods: {} }; // mods: 장비 개조 { MODS 키: 단계 }
   refreshArmor(inst);
   return inst;
 }
@@ -4390,7 +4390,17 @@ const randomLoot = (bonus = 0, heavy = 0) => Math.random() < ARMOR_DROP ? random
 // 보상용: 일반 등급이면 같은 장비의 '고급'으로
 const atLeastMagic = it => it.rarity ? it : it.kind === 'armor' ? makeArmor(it.id, 1) : makeWeapon(it.id, 1);
 // 장착한 방어구: 옵션 합 + 끼운 보석 + 보석 조합 (type: 능력치 종류), 방어 합, 받는 피해 감소 비율
-const gearV = (k, type, p = player) => GEAR_KEYS.reduce((s, g) => s + (p.gear[g] ? affixSum(p.gear[g], k, type) + (type ? 0 : gemSum(p.gear[g], 'armor', k) + rwStat(p.gear[g], k)) : 0), 0) + (type ? 0 : setSum(k, p) + achSum(k)); // + 세트 효과 + 업적 보너스
+const gearV = (k, type, p = player) => GEAR_KEYS.reduce((s, g) => s + (p.gear[g] ? affixSum(p.gear[g], k, type) + (type ? 0 : gemSum(p.gear[g], 'armor', k) + rwStat(p.gear[g], k) + modSum(p.gear[g], k)) : 0), 0) + (type ? 0 : setSum(k, p) + achSum(k)); // + 장비 개조 + 세트 효과 + 업적 보너스
+// 장비 개조 (MODS): 그 장비의 개조 효과 합 (line 개조는 그 장신구 계열 type일 때만), 단계 합, 등급별 한도, n번째 단계 비용, 달 수 있는 개조
+function modSum(it, k, type) {
+  let s = 0;
+  for (const m in it.mods || {}) { const M = MODS[m]; if (M && M.k === k && (M.line ? type === it.s.attr[0] : !type)) s += M.per * it.mods[m]; }
+  return s;
+}
+const modSteps = it => Object.values(it.mods || {}).reduce((a, b) => a + b, 0);
+const modCap = it => MOD_CAP[it.rarity] || 0;
+const modCost = n => ({ gold: MOD_COST.gold[n] || 0, parts: MOD_COST.parts[n] || 0 });
+const modsFor = it => Object.keys(MODS).filter(m => MODS[m].slot === it.s.slot);
 const gearDef = (p = player) => GEAR_KEYS.reduce((s, g) => s + (p.gear[g] ? p.gear[g].s.def : 0), 0) + setSum('defN', p) + achSum('defN');
 const defCut = def => def / (def + ARMOR_K);
 const gearChanged = () => applyUpgrades(player); // 체력 옵션 → 최대 체력
@@ -4430,6 +4440,7 @@ function armorTooltip(inst) {
   if (aug) { const A = ATTRS[s.attr[0]]; L.push({ t: `${A.name} +${s.attrN}${inst.plus ? ` (강화 +${inst.plus})` : ''}${s.slot === 'acc' ? `, ${A.name} 계열 스킬 강화` : ''}`, c: A.color }); }
   else L.push({ t: `방어 ${Math.round(s.def)}${inst.plus ? ` (강화 +${inst.plus})` : ''}, 받는 피해 -${pct(defCut(s.def))}`, c: '#eee' });
   for (const a of inst.affixes) L.push({ t: ARMOR_AFFIXES[a.k].text(a.v, a.type), c: a.k === 'stat' ? ATTRS[a.type].color : '#8af' });
+  for (const m of modsFor(inst)) { const n = (inst.mods || {})[m], M = MODS[m]; if (n) L.push({ t: `개조 ${M.name} ${n}단계: ${M.text(M.per * n, aug ? s.attr[0] : undefined)}`, c: HC.acc }); }
   setLines(inst, L);
   rwLines(inst, L);
   socketLines(inst, L);
@@ -4878,7 +4889,7 @@ function achCheck() {
   for (const A of ACHIEVEMENTS) {
     if (codex.ach[A.id] || achProgress(A) < A.goal) continue;
     codex.ach[A.id] = 1; codexDirty = true;
-    if (state !== 'play') continue; // 제목 화면 등: 조용히
+    if (state !== 'play' && state !== 'trade') continue; // 제목 화면 등: 조용히
     msg(`업적 달성: ${A.name}`, '#ffe08a'); Snd.play('levelUp'); tip('ach');
     flashes.push({ x: player.x, y: player.y, r: 360, t: 0.4, max: 0.4, col: '255,220,120' });
     gearChanged(); // 최대 체력 등
@@ -5202,7 +5213,6 @@ let stock = [], buyback = [], shellStock = [], armorStock = []; // 무기 진열
 let stash = [];                   // 기지 창고에 보관한 무기 (진열대와 같은 격자, 저장 슬롯에 함께 저장)
 const VG_W = 10, VG_H = 8;        // 진열대·창고 격자
 const GOODS = [...Object.keys(ITEMS).map(id => ['item', id]), ...Object.keys(AMMO).map(id => ['ammo', id]), ...Object.keys(GRENADES).map(id => ['gren', id])];
-const UP_ICON = { hp: 'media0', stamina: 'icon_syringe_blue', bag: 'bpaka0', load: 'arm1a0', ammo: 'ammoa0' };
 const goodInfo = (k, id) => k === 'item' ? ITEMS[id] : k === 'ammo' ? AMMO[id] : GRENADES[id];
 const goodIcon = (k, id) => k === 'item' ? ITEM_ICON[id] : k === 'ammo' ? AMMO_ART[id][0] : 'icon_gren_' + id;
 const goodCount = (k, id) => (k === 'item' ? player.items : k === 'ammo' ? player.ammo : player.gren)[id];
@@ -5231,8 +5241,9 @@ function rollStock() {
   });
   rollAttachStock(); // 무기 파츠 진열 (parts.js)
 }
-function openTrade(mode) {
-  trade = { mode, tab: { shop: 'weapons', sell: 'sell', upgrade: 'upgrade', stash: 'stash' }[mode], note: '', sel: null }; perkOpen = false;
+const TRADE_RANGE = 2.5; // 자판기에서 이만큼 멀어지면 거래 창을 닫음 (여는 거리는 nearestTerminal의 1.7)
+function openTrade(mode, at) { // at: 연 자판기 자리 {x, y}
+  trade = { mode, tab: { shop: 'weapons', sell: 'sell', upgrade: 'upgrade', stash: 'stash' }[mode], note: '', sel: null, at }; perkOpen = false;
   invOpen = true; state = 'trade'; mouse.down = false;
   Snd.play('menu');
 }
@@ -5275,14 +5286,18 @@ function tradeButtons() {
     B.push({ id: 'salvAll', x: g.gx, y: g.footY + 14, w: 210, h: 22, label: `가방의 일반 등급 모두 분해 (${commons}개)`, on: commons > 0 });
   } else if (trade.mode === 'upgrade') {
     Object.entries(UPGRADES).forEach(([k, u], n) => {
-      const lv = p.up[k], cost = u.cost * (lv + 1);
-      B.push({ id: 'up:' + k, x: g.gx + VG_W * CELL - 80, y: g.gy + 23 + n * 36, w: 80, h: 22, label: lv >= u.max ? '최대' : `${cost}G`, on: lv < u.max && p.gold >= cost });
+      const lv = p.up[k], c = upCost(k);
+      B.push({ id: 'up:' + k, x: g.gx + VG_W * CELL - 110, y: g.gy + 5 + n * 36, w: 110, h: 22, label: lv >= u.max ? '최대' : `${c.gold}G ${c.parts}부품`, on: lv < u.max && p.gold >= c.gold && p.parts >= c.parts });
     });
     const w = trade.sel;
     if (w && w.kind !== 'shell' && w.kind !== 'attach') { // 스킬 쉘·파츠는 강화하지 않음
       const done = w.plus >= ENHANCE_MAX;
-      B.push({ id: 'enh', x: g.gx + 150, y: g.gy + 250, w: 120, h: 22, label: done ? '최대 강화' : `강화 ${enhanceCost(w)}G`, on: !done && p.gold >= enhanceCost(w) });
+      B.push({ id: 'enh', x: g.gx + 150, y: g.gy + 88, w: 120, h: 22, label: done ? '최대 강화' : `강화 ${enhanceCost(w)}G`, on: !done && p.gold >= enhanceCost(w) });
     }
+    if (w && w.kind === 'armor') modsFor(w).forEach((m, n) => { // 장비 개조: 한도까지 (이 장비의 단계 합 기준 비용)
+      const full = modSteps(w) >= modCap(w), c = modCost(modSteps(w));
+      B.push({ id: 'mod:' + m, x: g.gx + VG_W * CELL - 110, y: g.gy + MOD_Y + n * MOD_ROW + 5, w: 110, h: 22, label: full ? '최대' : `${c.gold}G ${c.parts}부품`, on: !full && p.gold >= c.gold && p.parts >= c.parts });
+    });
   }
   return B;
 }
@@ -5419,6 +5434,7 @@ function pressTradeButton(id) {
   else if (id.startsWith('gu:')) { const [, gid, gr] = id.split(':'); combineGems(gid, +gr); }
   else if (id.startsWith('rwp:')) { trade.rwPage = id.slice(4); Snd.play('menu'); }
   else if (id.startsWith('att:')) removeAttach(attW(), id.slice(4)); // 파츠 개조: 칸을 누르면 빼서 가방으로
+  else if (id.startsWith('mod:')) buyMod(trade.sel, id.slice(4));
   else buyUpgrade(id.slice(3));
 }
 // --- 도박 (GAMBLE, GAMBLE_CATS): 종류마다 이 구역에서 나오는 바탕 장비 중 무작위, 등급은 GAMBLE.odds (일반은 안 나옴) ---
@@ -5483,13 +5499,20 @@ function sellWeapon(inst) {
   if (spot) { inst.gx = spot.gx; inst.gy = spot.gy; buyback.push(inst); }
   trade.note = `${inst.name} 판매 +${price}G`; Snd.play('gold');
 }
+const upCost = k => { const u = UPGRADES[k], lv = player.up[k] || 0; return { gold: u.gold[lv] || 0, parts: u.parts[lv] || 0 }; };
 function buyUpgrade(k) {
-  const p = player, u = UPGRADES[k], lv = p.up[k], cost = u.cost * (lv + 1);
-  if (lv >= u.max || p.gold < cost) return;
-  p.gold -= cost; p.up[k]++;
-  applyUpgrades(p);
-  if (k === 'hp') p.hp = Math.min(p.maxhp, p.hp + 25);
+  const p = player, u = UPGRADES[k], c = u && upCost(k);
+  if (!u || p.up[k] >= u.max || p.gold < c.gold || p.parts < c.parts) return;
+  p.gold -= c.gold; p.parts -= c.parts; p.up[k]++;
   trade.note = `${u.name} ${p.up[k]}단계 완료`; Snd.play('buy');
+}
+// 장비 개조 한 단계: 그 장비 종류의 개조만, 등급별 한도까지 (장착 중이면 바로 반영)
+function buyMod(it, m) {
+  const p = player, M = MODS[m], n = it ? modSteps(it) : 0, c = modCost(n);
+  if (!it || !M || it.kind !== 'armor' || M.slot !== it.s.slot || n >= modCap(it) || p.gold < c.gold || p.parts < c.parts) return;
+  p.gold -= c.gold; p.parts -= c.parts; it.mods = { ...it.mods, [m]: ((it.mods || {})[m] || 0) + 1 };
+  if (isEquipped(it)) gearChanged();
+  trade.note = `${it.name}: ${M.name} ${it.mods[m]}단계`; Snd.play('buy');
 }
 function enhance(w) {
   const p = player;
@@ -5621,20 +5644,21 @@ function drawRunewordArea(g) {
   L.push(short.length ? { t: `모자란 보석: ${short.join(', ')}`, c: '#a99' } : { t: '보석 주머니에 필요한 보석이 모두 있다', c: '#7f7' });
   queueTip(L, mouse.x + 18, mouse.y + 18);
 }
-// 개조실: 신체 개조 5종 + 선택한 무기 강화
+// 개조실 '개조·강화' 탭: 확장 배낭 (기지 개조), 고른 장비의 강화, 방어구면 그 종류의 장비 개조 (MODS)
+const MOD_Y = 140, MOD_ROW = 38; // 장비 개조 줄 (g.gy 기준), 줄 간격
+// 개조 줄: 그림 칸, 이름, 한 단계 효과, 단계 (호박색 칸)
+function upRow(x, y, icon, name, desc, lv, max) {
+  pxWell([x, y, 32, 32]);
+  drawIcon(icon, x + 4, y + 4, 24, 24);
+  ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = INK; ctx.fillText(name, x + 42, y + 13);
+  ctx.font = font(FS); ctx.fillStyle = HC.dim; ctx.fillText(desc, x + 42, y + 28);
+  for (let s = 0; s < max; s++) { ctx.fillStyle = s < lv ? HC.acc : '#26282e'; ctx.fillRect(x + 170 + s * 9, y + 6, 7, 7); }
+}
 function drawUpgradeArea(g) {
-  const p = player;
-  ctx.textAlign = 'left'; ctx.font = font(FS); ctx.fillStyle = HC.dim; ctx.fillText('신체 개조', g.gx, g.gy + 10);
-  Object.entries(UPGRADES).forEach(([k, u], n) => { // 그림 칸, 이름, 효과, 단계 (호박색 칸)
-    const y = g.gy + 18 + n * 36, lv = p.up[k];
-    pxWell([g.gx, y, 32, 32]);
-    drawIcon(UP_ICON[k], g.gx + 4, y + 4, 24, 24);
-    ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = INK; ctx.fillText(u.name, g.gx + 42, y + 13);
-    ctx.font = font(FS); ctx.fillStyle = HC.dim; ctx.fillText(u.desc, g.gx + 42, y + 28);
-    for (let s = 0; s < u.max; s++) { ctx.fillStyle = s < lv ? HC.acc : '#26282e'; ctx.fillRect(g.gx + 170 + s * 9, y + 6, 7, 7); }
-  });
-  const ey = g.gy + 214;
-  ctx.textAlign = 'left'; ctx.font = font(FS); ctx.fillStyle = HC.dim; ctx.fillText('장비 강화', g.gx, ey);
+  const p = player, W0 = VG_W * CELL;
+  Object.entries(UPGRADES).forEach(([k, u], n) => upRow(g.gx, g.gy + n * 36, u.icon, u.name, u.desc, p.up[k], u.max));
+  const ey = g.gy + 52;
+  ctx.textAlign = 'left'; ctx.font = font(FS); ctx.fillStyle = HC.dim; ctx.fillText('장비', g.gx, ey);
   const w = trade.sel && ownedItems().includes(trade.sel) ? trade.sel : (trade.sel = null);
   pxWell([g.gx, ey + 6, 140, 52], false, w && w.rarity > 0 ? RARITY[w.rarity].glow : null);
   if (!w) return;
@@ -5643,9 +5667,26 @@ function drawUpgradeArea(g) {
   ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = RARITY[w.rarity].color; ctx.fillText(fitText(w.name, 190), g.gx + 150, ey + 18);
   ctx.font = font(FS); ctx.fillStyle = INK;
   if (w.kind === 'shell' || w.kind === 'attach') { ctx.fillStyle = HC.dim; ctx.fillText(w.kind === 'shell' ? '스킬 쉘은 강화할 수 없다' : '파츠는 강화할 수 없다', g.gx + 150, ey + 31); return; }
-  if (w.kind === 'armor' && isAug(w)) { ctx.fillText(`강화 ${w.plus}/${ENHANCE_MAX}, ${ATTRS[w.s.attr[0]].name} +${w.s.attrN}${w.plus < ENHANCE_MAX ? ` → +${w.s.attrN + 1}` : ''}`, g.gx + 150, ey + 31); return; }
-  const key = w.kind === 'armor' ? 'def' : 'dmg', next = Math.round(w.s[key] / (1 + ENHANCE_DMG * w.plus) * (1 + ENHANCE_DMG * (w.plus + 1)));
-  ctx.fillText(`강화 ${w.plus}/${ENHANCE_MAX}, ${key === 'def' ? '방어' : '피해'} ${Math.round(w.s[key])}${w.plus < ENHANCE_MAX ? ` → ${next}` : ''}`, g.gx + 150, ey + 31);
+  if (w.kind === 'armor' && isAug(w)) ctx.fillText(`강화 ${w.plus}/${ENHANCE_MAX}, ${ATTRS[w.s.attr[0]].name} +${w.s.attrN}${w.plus < ENHANCE_MAX ? ` → +${w.s.attrN + 1}` : ''}`, g.gx + 150, ey + 31);
+  else {
+    const key = w.kind === 'armor' ? 'def' : 'dmg', next = Math.round(w.s[key] / (1 + ENHANCE_DMG * w.plus) * (1 + ENHANCE_DMG * (w.plus + 1)));
+    ctx.fillText(`강화 ${w.plus}/${ENHANCE_MAX}, ${key === 'def' ? '방어' : '피해'} ${Math.round(w.s[key])}${w.plus < ENHANCE_MAX ? ` → ${next}` : ''}`, g.gx + 150, ey + 31);
+  }
+  if (w.kind !== 'armor') return;
+  // 장비 개조: 이 종류의 개조마다 그림·이름·한 단계 효과·단계, 오른쪽 위에 쓴 단계 / 등급별 한도
+  const used = modSteps(w), cap = modCap(w), type = isAug(w) ? w.s.attr[0] : undefined;
+  ctx.textAlign = 'left'; ctx.fillStyle = HC.dim; ctx.fillText('개조', g.gx, g.gy + MOD_Y - 6);
+  ctx.textAlign = 'right'; ctx.font = font(FS, true); ctx.fillStyle = used < cap ? HC.acc : HC.dim; ctx.fillText(`${used} / ${cap}`, g.gx + W0, g.gy + MOD_Y - 6);
+  let hover = null;
+  modsFor(w).forEach((m, n) => {
+    const M = MODS[m], y = g.gy + MOD_Y + n * MOD_ROW;
+    upRow(g.gx, y, M.icon || w.s.icon, M.name, M.text(M.per, type), (w.mods || {})[m] || 0, cap);
+    if (inRect([g.gx, y, W0 - 116, 32])) hover = m;
+  });
+  if (!hover || held) return;
+  const M = MODS[hover], lv = (w.mods || {})[hover] || 0;
+  queueTip([{ t: M.name, c: INK, b: true }, { t: lv ? `지금: ${M.text(M.per * lv, type)}` : '아직 달지 않음', c: lv ? '#dfffd0' : HC.dim },
+    used < cap ? { t: `다음: ${M.text(M.per * (lv + 1), type)}`, c: '#8fc4ff' } : { t: `개조 한도 ${cap}단계`, c: '#e0806a' }], mouse.x + 18, mouse.y + 18);
 }
 
 // ===== 입력 =====
@@ -5838,6 +5879,7 @@ function updatePlayer(dt) {
   // 패드: 올라선 순간 — 거점의 순간이동 패드면 이동 창, 탈출정은 자폭 중에만 (내려섰다 다시 올라야 다시 뜸)
   const onPad = tileAt(Math.floor(p.x), Math.floor(p.y)) === T.EXIT;
   if (onPad && !p.onPad && !inBase) {
+    if (trade) closeTrade();
     const pd = pads.find(q => q.i === Math.floor(p.x) && q.j === Math.floor(p.y));
     if (pd && pd.hub) teleportScreen(pd.hub);
     else if (pd && (pd.kind === 'rift' || pd.kind === 'riftExit')) riftPadScreen(); // 차원 균열의 패드
@@ -6349,7 +6391,8 @@ function update(dt) {
   gtime += dt;
   checkSets();
   updatePlayer(dt);
-  if (state !== 'play') return;
+  if (trade && trade.at && Math.hypot(player.x - trade.at.x, player.y - trade.at.y) > TRADE_RANGE) closeTrade(); // 자판기에서 걸어서 멀어지면 거래 창을 닫음
+  if (state !== 'play' && state !== 'trade') return;
   updateDoors(dt);
   updateEnemies(dt);
   updatePillars(dt);
@@ -8390,16 +8433,17 @@ function writeSaves(s) {
 }
 const packWeapon = w => w && (w.kind === 'gem' ? { kind: 'gem', id: w.id, grade: w.grade, gx: w.gx, gy: w.gy } // 무기·스킬 쉘·방어구·보석·파츠
   : w.kind === 'shell' ? { kind: 'shell', id: w.id, rarity: w.rarity, affixes: w.affixes, gx: w.gx, gy: w.gy, uq: w.uq || undefined }
-  : w.kind === 'armor' ? { kind: 'armor', id: w.id, rarity: w.rarity, affixes: w.affixes, plus: w.plus || 0, gx: w.gx, gy: w.gy, sockets: w.sockets || 0, gems: w.gems || [], set: w.set }
+  : w.kind === 'armor' ? { kind: 'armor', id: w.id, rarity: w.rarity, affixes: w.affixes, plus: w.plus || 0, gx: w.gx, gy: w.gy, sockets: w.sockets || 0, gems: w.gems || [], set: w.set, mods: w.mods }
   : w.kind === 'attach' ? { kind: 'attach', id: w.id, rarity: w.rarity, gx: w.gx, gy: w.gy }
   : { id: w.id, rarity: w.rarity, affixes: w.affixes, plus: w.plus || 0, mag: w.mag, gx: w.gx, gy: w.gy, uq: w.uq, sockets: w.sockets || 0, gems: w.gems || [], set: w.set, att: w.att });
 const okGems = d => (d.gems || []).filter(g => GEMS[g.id]); // 없어진 보석 종류는 버림
+const okMods = d => Object.fromEntries(Object.entries(d.mods || {}).filter(([m, n]) => MODS[m] && MODS[m].slot === ARMORS[d.id].slot && n > 0)); // 장비 개조 (없어진 개조는 버림)
 function unpackWeapon(d) {
   if (!d) return null;
   if (d.kind === 'gem') { if (!GEMS[d.id]) return null; const g = makeGem(d.id, clamp(d.grade || 0, 0, 2)); g.gx = d.gx; g.gy = d.gy; return g; }
   if (d.kind === 'shell') { if (!SKILLS[d.id]) return null; const sh = buildShell(d.id, d.rarity, d.affixes, d.uq); sh.gx = d.gx; sh.gy = d.gy; return sh; }
   const set = it => { if (SET_ITEMS[d.set]) { it.set = d.set; it.found = true; (it.kind === 'armor' ? refreshArmor : refreshWeapon)(it); } return it; }; // 세트 장비
-  if (d.kind === 'armor') { if (!ARMORS[d.id]) return null; const a = set(buildArmor(d.id, d.rarity, d.affixes, d.plus, d.sockets || 0, okGems(d))); a.gx = d.gx; a.gy = d.gy; return a; }
+  if (d.kind === 'armor') { if (!ARMORS[d.id]) return null; const a = set(buildArmor(d.id, d.rarity, d.affixes, d.plus, d.sockets || 0, okGems(d))); a.mods = okMods(d); a.gx = d.gx; a.gy = d.gy; return a; }
   if (d.kind === 'attach') { if (!ATTACH[d.id]) return null; const a = makeAttach(d.id, clamp(d.rarity || 0, 0, 2)); a.gx = d.gx; a.gy = d.gy; return a; } // 무기 파츠
   const w = set(buildWeapon(d.id, d.rarity, d.affixes, d.plus, d.uq, d.sockets || 0, okGems(d), okAttach(d.id, d.att))); // 파츠가 생기기 전 저장은 빈 칸
   if (w.uq) w.found = true;
@@ -8440,6 +8484,7 @@ function oldGren(g = {}) {
   const n = k => g[k] || 0;
   return { frag: n('frag') + n('gas') + n('shock') + n('fire'), cryo: n('cryo') };
 }
+const OLD_UP_COST = { hp: 300, stamina: 250, load: 300, ammo: 250 }; // 장비 개조 이전의 신체 개조 (단계마다 비용 = 값 x 단계)
 function loadGame(slot) {
   const d = saveAt(readSaves(), slot);
   if (!d) return;
@@ -8450,7 +8495,8 @@ function loadGame(slot) {
   p.attr = { ...p.attr, ...(q.attr || {}) }; p.apts = q.attr ? q.apts || 0 : ATTR_PER_LEVEL * (p.clv - 1); // 능력치가 생기기 전 저장은 지난 레벨만큼 점수를 줌
   if (q.gear) for (const g of GEAR_KEYS) p.gear[g] = unpackWeapon(q.gear[g]); // 방어구가 생기기 전 저장은 기본 방탄 조끼
   p.parts = q.parts || 0;
-  p.up = { ...p.up, ...q.up };
+  const oldUp = q.up || {}, refund = Object.entries(OLD_UP_COST).reduce((s, [k, c]) => s + c * (oldUp[k] || 0) * ((oldUp[k] || 0) + 1) / 2, 0);
+  p.up = { bag: oldUp.bag || 0 }; p.gold += refund;
   const eqOld = (q.equip || []).map(unpackWeapon); p.bag = q.bag.map(unpackWeapon).filter(Boolean);
   if (q.gemBag) for (const k of GEM_KEYS) if (Array.isArray(q.gemBag[k])) p.gemBag[k] = [0, 1, 2].map(n => Math.max(0, Math.floor(+q.gemBag[k][n] || 0))); // 보석 주머니
   for (const g of p.bag) if (g.kind === 'gem') p.gemBag[g.id][g.grade]++; // 주머니가 생기기 전 저장: 가방의 보석을 주머니로
@@ -8486,6 +8532,7 @@ function loadGame(slot) {
   for (const w of moved.floor) dropWeapon(player.x + rnd(-0.8, 0.8), player.y + rnd(0.6, 1.2), w); // 가방·창고가 다 차면 발밑에
   if (extra.length) { msg(`무기 슬롯이 ${open}칸으로 바뀌었다. 남는 무기 ${extra.length}개: 가방 ${moved.bag}, 창고 ${moved.stash}${moved.floor.length ? `, 발밑 ${moved.floor.length}` : ''}`, '#ffd27a'); tip('armory'); }
   msg(`${slotName(slot)}을(를) 불러왔습니다`, '#9f9');
+  if (refund) msg(`신체 개조가 장비 개조로 바뀌어 ${refund.toLocaleString()}G를 돌려받았다`, '#ffd27a');
 }
 // 가장 최근 저장: 슬롯 번호, 'auto', 없으면 -1
 function latestSlot() {
@@ -8525,9 +8572,9 @@ function newGame(diff = 'normal') {
 }
 // 쓰러짐: 보통은 마지막으로 들른 보급 거점에서 다시 일어남 (respawn) — 자폭 중이거나 자폭에 휘말리면 임무 실패
 function die(reason) {
-  if (state !== 'play') return;
+  if (state !== 'play' && state !== 'trade') return;
   stowHeld(); // 커서로 들고 있던 장비·보석은 제자리로 (사라지지 않게)
-  state = 'dead'; invOpen = false; perkOpen = false; codexOpen = false;
+  trade = null; state = 'dead'; invOpen = false; perkOpen = false; codexOpen = false;
   Snd.play('pdeath');
   if (escape || reason) { escape = null; Music.stop(2.5); setTimeout(() => gameOverScreen(reason || '탈출하지 못하고 정거장과 함께 사라졌다'), 900); return; }
   setTimeout(respawn, 1800);
@@ -8747,7 +8794,7 @@ function useTerminal(t) {
   if (t.kind === 'armory') { startArmory(t); return; }
   if (t.hub) lastHub = t.hub.n;
   if (t.kind === 'shop') hubStock(t.hub);
-  if (t.kind !== 'save') { openTrade(t.kind); return; }
+  if (t.kind !== 'save') { openTrade(t.kind, { x: t.i + 0.5, y: t.j + 0.5 }); return; }
   closeInventory();
   state = 'menu'; mouse.down = false; Snd.play('menu');
   saveScreen('기록 단말기', '닫기', closeMenu);
@@ -8762,7 +8809,7 @@ function hubStock(h) {
 let lastT = performance.now();
 function frame(t) {
   const dt = Math.min(0.05, (t - lastT) / 1000); lastT = t;
-  if (state === 'play') { if (hitStop > 0) hitStop -= dt; else { update(dt); playtime += dt; } } // 큰 공격에 맞으면 아주 잠깐 멈춤
+  if (state === 'play' || state === 'trade') { if (hitStop > 0) hitStop -= dt; else { update(dt); playtime += dt; } } // 큰 공격에 맞으면 아주 잠깐 멈춤 (자판기를 쓰는 동안에도 게임은 계속)
   else if (state === 'dead') { updateMisc(dt); player.deathT += dt; }
   else if (state === 'ending') { updateMisc(dt); endT += dt; }
   else if (state === 'title') titleTick(dt); // 타이틀 뒤 풍경 (menu.js)

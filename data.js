@@ -1,7 +1,7 @@
 // ===== 게임 데이터 정의 (무기 / 탄약 / 수류탄 / 아이템 / 적) =====
 
 // 버전: GitHub에 커밋·푸시할 때마다 올림 (새 기능은 가운데 자리, 고침·작은 추가는 끝자리) — 타이틀·일시정지 화면에 표시, git 태그 v<버전>
-const VERSION = '0.12.0';
+const VERSION = '0.13.0';
 
 const CAT_NAMES = ['근접', '권총', '샷건', '라이플', '기관총', '에너지'];
 const MAX_LOAD = 30;   // 장착 + 가방 무기 무게 합이 넘으면 이동속도 감소
@@ -188,14 +188,27 @@ const ITEM_KEY_LABEL = Object.fromEntries(Object.entries(ITEM_KEYS).map(([code, 
 const ITEM_DROP_WEIGHTS = { med: 6, cure: 3, adren: 1.5 };
 
 // ===== 우주 기지 =====
-// 신체 개조 (영구): max 단계까지, 단계마다 비용 = cost x (현재 단계 + 1)
+// 기지 개조 (영구, 개조 자판기): max 단계까지, n번째 단계 비용 = gold[n]·parts[n]
 const UPGRADES = {
-  hp:      { name: '강화 골격',     desc: '최대 체력 +25',          max: 5, cost: 300 },
-  stamina: { name: '인공 폐',       desc: '최대 스태미너 +20',      max: 5, cost: 250 },
-  bag:     { name: '확장 배낭',     desc: '가방 한 줄 추가 (+10칸)', max: 2, cost: 600 },
-  load:    { name: '외골격 프레임', desc: '최대 적재량 +5',         max: 4, cost: 300 },
-  ammo:    { name: '탄약 벨트',     desc: '탄약 최대치 +25%',       max: 3, cost: 250 },
+  bag: { name: '확장 배낭', desc: '가방 한 줄 추가 (+10칸)', icon: 'bpaka0', max: 2, gold: [1500, 3000], parts: [15, 30] },
 };
+// 장비 개조 (개조 자판기): 장비 종류(slot)마다 달 수 있는 개조. 그 장비를 장착했을 때만 효과 (k: 더하는 효과 — gearV·accV, per: 한 단계)
+// 한 장비의 개조 단계 합은 등급별 MOD_CAP까지 (일반·고급·희귀·전설·고유 전설·세트), 그 장비의 n번째 단계 비용은 MOD_COST
+// line: 강화장신구 계열의 스킬에만 (그 장신구의 계열), icon이 없으면 장비 그림
+const MODS = {
+  neuro:  { name: '신경 가속',   slot: 'head', k: 'cdr',    per: 0.03, icon: 'icon_brain',        text: v => `스킬 대기시간 -${pct(v)}` },
+  filter: { name: '면역 필터',   slot: 'head', k: 'res',    per: 0.10, icon: 'bon1a0',            text: v => `중독·화상·감전 시간 -${pct(v)}` },
+  frame:  { name: '강화 골격',   slot: 'body', k: 'hp',     per: 15,   icon: 'media0',            text: v => `최대 체력 +${v}` },
+  pouch:  { name: '탄약 주머니', slot: 'body', k: 'ammo',   per: 0.10, icon: 'ammoa0',            text: v => `탄약 최대치 +${pct(v)}` },
+  exo:    { name: '외골격 다리', slot: 'legs', k: 'load',   per: 2,    icon: 'arm1a0',            text: v => `적재량 +${v}` },
+  muscle: { name: '인공 근육',   slot: 'legs', k: 'spd',    per: 0.02, icon: 'icon_boots',        text: v => `이동 속도 +${pct(v)}` },
+  servo:  { name: '서보 보조',   slot: 'arm',  k: 'reload', per: 0.04, icon: 'clipa0',            text: v => `재장전 시간 -${pct(v)}` },
+  impact: { name: '충격 증폭',   slot: 'arm',  k: 'melee',  per: 0.05, icon: 'icon_knife',        text: v => `근접 피해 +${pct(v)}` },
+  lung:   { name: '인공 폐',     slot: 'chip', k: 'stam',   per: 10,   icon: 'icon_syringe_blue', text: v => `최대 스태미너 +${v}` },
+  reso:   { name: '공명 회로',   slot: 'acc',  k: 'spow',   per: 0.03, line: true,                text: (v, t) => `${ATTRS[t].name} 스킬 위력 +${pct(v)}` },
+};
+const MOD_CAP = [1, 2, 3, 4, 4, 4];
+const MOD_COST = { gold: [200, 400, 700, 1100], parts: [4, 8, 14, 20] };
 // ===== 방어구 · 강화칩 · 강화장신구 =====
 // 인벤토리의 인체 모양 장비 칸 (GEAR_SLOTS: 칸 → 끼우는 종류, 팔 장비는 왼팔·오른팔 어디든)
 // def: 방어 (받는 피해 감소 = 방어 / (방어 + ARMOR_K)), 등급마다 방어 +ARMOR_RARITY_DEF, 강화 단계마다 +ENHANCE_DMG
