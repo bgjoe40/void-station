@@ -37,8 +37,8 @@ function dbgList(tab) {
   if (tab === 'weapons') return Object.keys(WEAPONS).map(k => ({ id: k, name: WEAPONS[k].name, icon: 'icon_' + k, w: WEAPONS[k], head: CAT_NAMES[WEAPONS[k].cat] }));
   if (tab === 'items') return [
     ...Object.keys(GRENADES).map(k => ({ id: 'g_' + k, name: GRENADES[k].name, icon: 'icon_gren_' + k, nade: k, head: '수류탄' })),
-    ...Object.keys(ITEMS).map(k => ({ id: 'i_' + k, name: ITEMS[k].name, icon: ITEM_ART[k][0], item: k, head: '소모품' })),
-    ...Object.keys(AMMO).map(k => ({ id: 'a_' + k, name: AMMO[k].name, icon: AMMO_ART[k][0], ammo: k, head: '탄약' })),
+    ...Object.keys(ITEMS).map(k => ({ id: 'i_' + k, name: ITEMS[k].name, icon: ITEM_ART[k], item: k, head: '소모품' })),
+    ...Object.keys(AMMO).map(k => ({ id: 'a_' + k, name: AMMO[k].name, icon: AMMO_ART[k], ammo: k, head: '탄약' })),
     ...Object.keys(SKILLS).map(k => ({ id: 's_' + k, name: SKILLS[k].name, icon: SKILLS[k].icon, skill: k, head: '스킬 쉘' })),
   ];
   if (tab === 'fx') {

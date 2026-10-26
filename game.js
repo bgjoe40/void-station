@@ -5214,7 +5214,7 @@ let stash = [];                   // 기지 창고에 보관한 무기 (진열�
 const VG_W = 10, VG_H = 8;        // 진열대·창고 격자
 const GOODS = [...Object.keys(ITEMS).map(id => ['item', id]), ...Object.keys(AMMO).map(id => ['ammo', id]), ...Object.keys(GRENADES).map(id => ['gren', id])];
 const goodInfo = (k, id) => k === 'item' ? ITEMS[id] : k === 'ammo' ? AMMO[id] : GRENADES[id];
-const goodIcon = (k, id) => k === 'item' ? ITEM_ICON[id] : k === 'ammo' ? AMMO_ART[id][0] : 'icon_gren_' + id;
+const goodIcon = (k, id) => k === 'item' ? ITEM_ICON[id] : k === 'ammo' ? AMMO_ART[id] : 'icon_gren_' + id;
 const goodCount = (k, id) => (k === 'item' ? player.items : k === 'ammo' ? player.ammo : player.gren)[id];
 const buyPrice = w => Math.round(weaponValue(w));
 const healCost = () => 60 + level * 20;
@@ -7078,10 +7078,13 @@ function drawBarrel(b) {
 function drawLamp(l) { drawSprite('tlmp', 'abcd'[Math.floor(gtime * 8 + l.ph) % 4], PX(l.x, l.y), PY(l.x, l.y), 0, 0.85); }
 
 // --- 아이템 ---
-// [스프라이트, 크기 배율]
-const ITEM_ART = { med: ['media0', 1.1], cure: ['bon1a0', 1.3], adren: ['icon_syringe_red', 0.8] };
+// 바닥의 소모품·탄약 그림 (크기는 floorScale)
+const ITEM_ART = { med: 'media0', cure: 'bon1a0', adren: 'icon_syringe_red' };
 const ITEM_ICON = { med: 'icon_medkit', cure: 'icon_pills', adren: 'icon_injection' }; // HUD·상점의 소모품 그림 (바닥은 ITEM_ART)
-const AMMO_ART = { pistol: ['clipa0', 1.3], shell: ['shela0', 1.2], rifle: ['ammoa0', 1], belt: ['broka0', 0.55], cell: ['cella0', 1.3], rocket: ['rocka0', 1.1] };
+const AMMO_ART = { pistol: 'clipa0', shell: 'shela0', rifle: 'ammoa0', belt: 'broka0', cell: 'cella0', rocket: 'rocka0' };
+// 바닥에 떨어진 것의 크기: 그림의 원래 크기와 상관없이 비슷하게 (넓이가 FLOOR_T² 쯤, 긴 변은 FLOOR_L·높이는 FLOOR_H까지, 작은 그림은 FLOOR_UP배까지만 키움). k: 종류별 배율
+const FLOOR_T = 22, FLOOR_L = 40, FLOOR_H = 28, FLOOR_UP = 2.5;
+const floorScale = (f, k = 1) => Math.min(FLOOR_T * k / Math.sqrt(f[2] * f[3]), FLOOR_L * k / Math.max(f[2], f[3]), FLOOR_H * k / f[3], FLOOR_UP);
 function drawPickup(it) {
   const sx = PX(it.x, it.y), sy = PY(it.x, it.y), z = 2 + Math.sin(gtime * 3 + it.bob) * 2;
   ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(sx, sy, 9, 4.5, 0, 0, Math.PI * 2); ctx.fill();
@@ -7106,12 +7109,12 @@ function drawPickup(it) {
     ctx.strokeStyle = `rgba(${R.glow},${0.5 + 0.5 * Math.sin(gtime * 5)})`; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.ellipse(sx, sy, shell ? 14 : 20, shell ? 7 : 10, 0, 0, Math.PI * 2); ctx.stroke();
     if (!f) return;
-    if (!k) drawWeaponBottom(it.inst, sx, sy - z, Math.min(1, 44 / f[2])); // 무기 (끼운 파츠까지)
-    else drawBottom(key, sx, sy - z - (shell ? 4 : 0), gem ? [0.5, 0.62, 0.75][it.inst.grade] : att ? Math.min(2, 22 / Math.max(f[2], f[3])) : shell ? Math.min(1, 26 / Math.max(f[2], f[3])) : Math.min(1, 44 / f[2]));
+    if (!k) drawWeaponBottom(it.inst, sx, sy - z, floorScale(f)); // 무기 (끼운 파츠까지)
+    else drawBottom(key, sx, sy - z - (shell ? 4 : 0), floorScale(f, gem ? [0.7, 0.85, 1][it.inst.grade] : att ? 0.9 : 1)); // 보석은 등급이 높을수록 크게
     return;
   }
-  const [key, sc] = it.kind === 'item' ? ITEM_ART[it.id] : it.kind === 'ammo' ? AMMO_ART[it.id] : ['icon_gren_' + it.id, 0.8];
-  drawBottom(key, sx, sy - z, sc); // 이름은 커서를 올렸을 때
+  const key = it.kind === 'item' ? ITEM_ART[it.id] : it.kind === 'ammo' ? AMMO_ART[it.id] : 'icon_gren_' + it.id, f = META.frames[key];
+  if (f) drawBottom(key, sx, sy - z, floorScale(f, 0.85)); // 이름은 커서를 올렸을 때
 }
 
 // --- 핏자국: 흰 핏자국 그림을 체액 색으로 칠한 것 (그림·색마다 한 번 만들어 둠) ---
