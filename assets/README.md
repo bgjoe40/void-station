@@ -14,13 +14,18 @@
 
 ## knekko "Futuristic Guns, Weapons and Items" — CC0 (퍼블릭 도메인)
 - 출처: https://opengameart.org/content/futuristic-guns-weapons-and-items
-- 무기·수류탄·주사기·방어구·케이스(보급 캐시·금고 보물함, 보물함은 금빛으로 물들임) 아이콘으로 잘라 씀 (방어구는 armor_1.png, 네온 방어구는 neonpunk.png). 해머는 90도 회전, 창은 진압봉에 날을 그려 넣음,
+- 무기·수류탄·주사기·방어구·케이스(보급 캐시·금고 보물함, 보물함은 금빛으로 물들임) 아이콘으로 잘라 씀 (바이저 헬멧·하의는 armor_1.png, 네온 하의는 neonpunk.png). 해머는 90도 회전, 창은 진압봉에 날을 그려 넣음,
   2연발은 펌프 손잡이를 총열색으로 칠함, 수류탄 일부는 색조를 바꿈 (출처 표기는 필수 아님)
   (체인톱은 마체테 칼날에 사슬 무늬를 넣고 검은 서류가방을 주황 엔진으로 칠해 붙임, 방전 진압봉은 진압봉 끝에 전극과 불꽃을 그려 넣음,
   플라즈마 블레이드는 카타나 칼날을 푸른빛으로·손잡이를 금속색으로 칠함)
   (무기 파츠 그림은 시트의 무기에서 부품만 잘라 씀 — 스코프·총열·개머리판은 저격소총, 탄창·소염기·접이식 개머리판은 M4, 곡선 탄창·앞손잡이는 MP5,
   상자 탄창은 중기관총, 광학 조준기는 P90, 소음기는 진압봉 끝, 모듈·레이저는 테이저 카트리지(색을 바꿈), 근접 파츠는 마체테·해머·카타나·총검·진압봉에서)
   (소드오프 아이콘은 Freedoom의 2연발 샷건 스프라이트, 칼날 부채 스킬 그림은 총검 세 자루를 부채꼴로 겹침)
+
+## Project Cordon Sprites — CC0 (퍼블릭 도메인)
+- 출처: https://github.com/doficia/project-cordon-sprites (doficia와 커뮤니티 기여자들, CC0-1.0)
+- 128px 픽셀아트 낱장을 그대로 씀: 전투 헬멧(army-helmet), 정찰 헬멧(kevlar-helmet), 조끼 4종(tactical-vest의 색만 바꿈),
+  전투화(military-boots를 어두운 회색으로), HUD·상점의 소모품(medkit, painkillers, injection)
 
 ## knekko "Cybericons"·"Microchips" — CC0 (퍼블릭 도메인)
 - 출처: https://opengameart.org/content/cybericons, https://opengameart.org/content/microchips-cpus-ics
@@ -30,6 +35,10 @@
 ## MELLE 보석 아이콘 — CC0 (퍼블릭 도메인)
 - 출처: https://opengameart.org/content/cc0-gem-icons (AntumDeluge가 모은 CC0 보석 아이콘, MELLE 묶음 — 원작 https://opengameart.org/node/89286)
 - 32x32 보석 5색을 그대로 씀. 사파이어는 루비를 파란 색조로, 다이아몬드는 하늘색 보석을 무채색으로 바꿈
+
+## 갈무리 (Galmuri) — SIL Open Font License 1.1
+- 출처: https://github.com/quiple/galmuri (이민서), 웹 글꼴은 npm galmuri 2.40.3 (jsDelivr)
+- `fonts/Galmuri11.woff2`, `fonts/Galmuri11-Bold.woff2`, `fonts/Galmuri14.woff2`를 그대로 씀. 라이선스 전문: `fonts/LICENSE-galmuri.txt`
 
 ## AlejandroHaibi "Liquid Splatter Pixel Texture" — CC0 (퍼블릭 도메인)
 - 출처: https://opengameart.org/content/liquid-splatter-pixel-texture

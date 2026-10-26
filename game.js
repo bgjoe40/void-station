@@ -4,8 +4,11 @@
 
 const TW = 64, TH = 32, WALLH = 72;
 // 글자: 한 글꼴, 세 크기 — 작게 (부가 설명·좁은 칸), 보통 (이름표·본문), 크게 (제목·큰 숫자)
-const FONT = "'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif", FS = 12, FM = 14, FL = 20;
-const font = (size, bold) => `${bold ? 'bold ' : ''}${size}px ${FONT}`;
+// 글꼴: 갈무리 (한글 픽셀 글꼴, index.html의 @font-face) — Galmuri11은 12px의 배수, Galmuri14는 15px의 배수에서만 또렷해서
+// 크기를 그 배수로 맞춤: 14~17은 Galmuri14 15px (굵은 글꼴이 없어 보통), 나머지는 가장 가까운 12의 배수
+const FONT = "'Galmuri11', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif", FONT14 = "'Galmuri14', " + FONT, FS = 12, FM = 14, FL = 20;
+const font = (size, bold) => size >= 14 && size <= 17 ? `15px ${FONT14}` : `${bold ? 'bold ' : ''}${Math.max(1, Math.round(size / 12)) * 12}px ${FONT}`;
+for (const f of ["12px 'Galmuri11'", "bold 12px 'Galmuri11'", "15px 'Galmuri14'"]) document.fonts.load(f, '가A1').catch(() => {}); // 캔버스는 불러오기 전엔 다른 글꼴로 그리므로 처음부터
 const AUTO_AIM_CONE = 0.55; // 자동 조준 허용 각도 (화면 기준 한쪽, 라디안 ≈ 31°)
 const canvas = document.getElementById('game');
 const mainCtx = canvas.getContext('2d');
@@ -5182,7 +5185,7 @@ const VG_W = 10, VG_H = 8;        // 진열대·창고 격자
 const GOODS = [...Object.keys(ITEMS).map(id => ['item', id]), ...Object.keys(AMMO).map(id => ['ammo', id]), ...Object.keys(GRENADES).map(id => ['gren', id])];
 const UP_ICON = { hp: 'media0', stamina: 'icon_syringe_blue', bag: 'bpaka0', load: 'arm1a0', ammo: 'ammoa0' };
 const goodInfo = (k, id) => k === 'item' ? ITEMS[id] : k === 'ammo' ? AMMO[id] : GRENADES[id];
-const goodIcon = (k, id) => k === 'item' ? ITEM_ART[id][0] : k === 'ammo' ? AMMO_ART[id][0] : 'icon_gren_' + id;
+const goodIcon = (k, id) => k === 'item' ? ITEM_ICON[id] : k === 'ammo' ? AMMO_ART[id][0] : 'icon_gren_' + id;
 const goodCount = (k, id) => (k === 'item' ? player.items : k === 'ammo' ? player.ammo : player.gren)[id];
 const buyPrice = w => Math.round(weaponValue(w));
 const healCost = () => 60 + level * 20;
@@ -7035,6 +7038,7 @@ function drawLamp(l) { drawSprite('tlmp', 'abcd'[Math.floor(gtime * 8 + l.ph) % 
 // --- 아이템 ---
 // [스프라이트, 크기 배율]
 const ITEM_ART = { med: ['media0', 1.1], cure: ['bon1a0', 1.3], adren: ['icon_syringe_red', 0.8] };
+const ITEM_ICON = { med: 'icon_medkit', cure: 'icon_pills', adren: 'icon_injection' }; // HUD·상점의 소모품 그림 (바닥은 ITEM_ART)
 const AMMO_ART = { pistol: ['clipa0', 1.3], shell: ['shela0', 1.2], rifle: ['ammoa0', 1], belt: ['broka0', 0.55], cell: ['cella0', 1.3], rocket: ['rocka0', 1.1] };
 function drawPickup(it) {
   const sx = PX(it.x, it.y), sy = PY(it.x, it.y), z = 2 + Math.sin(gtime * 3 + it.bob) * 2;
@@ -7374,7 +7378,7 @@ function dollSilhouette() {
   g.globalCompositeOperation = 'source-in'; g.fillStyle = '#1e232c'; g.fillRect(0, 0, c.width, c.height);
   return dollSil = c;
 }
-const GEAR_GHOST = { chip: 'icon_chip_str1', head: 'icon_helm_black', acc: 'icon_acc_psi1', larm: 'icon_arm_dark', body: 'icon_vest_tac', rarm: 'icon_arm_dark', legs: 'icon_pants' }; // 빈 칸의 흐린 그림
+const GEAR_GHOST = { chip: 'icon_chip_str1', head: 'icon_helm_army', acc: 'icon_acc_psi1', larm: 'icon_arm_dark', body: 'icon_vest_tac', rarm: 'icon_arm_dark', legs: 'icon_pants' }; // 빈 칸의 흐린 그림
 
 // ===== 인벤토리 창 그리기 =====
 function drawInventory() {
@@ -8254,7 +8258,7 @@ function drawHUD() {
   if (sk.length) x += 6 * U;
   for (const k of items) {
     const c = p.items[k] || 0;
-    box(x, false); ctx.globalAlpha = c ? 1 : 0.3; drawIcon(ITEM_ART[k][0], x + 3 * U, y + 2 * U, S - 6 * U, S - 9 * U); ctx.globalAlpha = 1;
+    box(x, false); ctx.globalAlpha = c ? 1 : 0.3; drawIcon(ITEM_ICON[k], x + 3 * U, y + 2 * U, S - 6 * U, S - 9 * U); ctx.globalAlpha = 1;
     pxGlyph(ITEM_KEY_LABEL[k], x + 2 * U, y + S - 7 * U, HC.acc); pxNum(c, x + S - 2 * U, y + S - 8 * U, c ? 'small' : 'grey', 'right');
     x += S + gap;
   }
@@ -8655,18 +8659,18 @@ function drawIntro() {
     const x = Math.max(28, W * 0.06), y = bar + 60, a = typed(I.place, 0.5, 16), b = typed(I.sub, 0.5 + I.place.length / 16, 16);
     ctx.globalAlpha = ca; ctx.textAlign = 'left';
     ctx.fillStyle = '#ff9a3c'; ctx.fillRect(x, y - 28, 3, 52);
-    ctx.font = `bold 26px ${FONT}`; txt(a + (a.length < I.place.length && Math.sin(t * 20) > 0 ? '▌' : ''), x + 16, y, '#f2ede4');
-    ctx.font = `15px ${FONT}`; txt(b, x + 16, y + 24, '#8fb4c8', 3);
+    ctx.font = font(26, true); txt(a + (a.length < I.place.length && Math.sin(t * 20) > 0 ? '▌' : ''), x + 16, y, '#f2ede4');
+    ctx.font = font(15); txt(b, x + 16, y + 24, '#8fb4c8', 3);
     ctx.globalAlpha = 1;
   }
   const qa = clamp(Math.min((t - I.quietAt) / 0.3, (I.turn + 0.3 - t) / 0.4), 0, 1); // 혼잣말
-  if (qa > 0) { ctx.globalAlpha = qa; ctx.textAlign = 'center'; ctx.font = `22px ${FONT}`; txt(I.quiet, W / 2, H - bar - 36, '#e8e2d6'); ctx.globalAlpha = 1; }
+  if (qa > 0) { ctx.globalAlpha = qa; ctx.textAlign = 'center'; ctx.font = font(22); txt(I.quiet, W / 2, H - bar - 36, '#e8e2d6'); ctx.globalAlpha = 1; }
   const ra = clamp(Math.min((t - I.seal) / 0.4, (I.end + 0.2 - t) / 0.5), 0, 1); // 구역 이름 (위쪽 가운데, 양옆에 주황 줄)
   if (ra > 0) {
     const y = bar + 70;
     ctx.globalAlpha = ra; ctx.textAlign = 'center';
-    ctx.font = `bold 14px ${FONT}`; txt('구역 1', W / 2, y - 34, '#ff9a3c', 3);
-    ctx.font = `bold 44px ${FONT}`; txt(CAMPAIGN[0].name, W / 2, y + 10, '#f2ede4', 5);
+    ctx.font = font(14, true); txt('구역 1', W / 2, y - 34, '#ff9a3c', 3);
+    ctx.font = font(44, true); txt(CAMPAIGN[0].name, W / 2, y + 10, '#f2ede4', 5);
     const half = ctx.measureText(CAMPAIGN[0].name).width / 2 + 24;
     ctx.fillStyle = '#ff9a3c'; ctx.fillRect(W / 2 - half - 70 * ra, y - 7, 70 * ra, 2); ctx.fillRect(W / 2 + half, y - 7, 70 * ra, 2);
     ctx.globalAlpha = 1;
@@ -8674,7 +8678,7 @@ function drawIntro() {
   if (t < 1.2) { ctx.fillStyle = `rgba(0,0,0,${1 - t / 1.2})`; ctx.fillRect(0, 0, W, H); }
   if (bh > bar * 0.5) { // 건너뛰기 안내: 누르고 있으면 둥근 게이지가 참
     const k = Math.min(1, it.hold / I.hold), x = W - 32, y = H - bh / 2;
-    ctx.globalAlpha = k > 0 ? 0.95 : 0.55; ctx.textAlign = 'right'; ctx.font = `12px ${FONT}`; ctx.fillStyle = k > 0 ? '#f2ede4' : '#9a968c';
+    ctx.globalAlpha = k > 0 ? 0.95 : 0.55; ctx.textAlign = 'right'; ctx.font = font(12); ctx.fillStyle = k > 0 ? '#f2ede4' : '#9a968c';
     ctx.fillText('누르고 있으면 건너뛰기', x - 16, y + 4);
     ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI * 2); ctx.stroke();
     if (k > 0) { ctx.lineWidth = 3; ctx.strokeStyle = '#ff9a3c'; ctx.beginPath(); ctx.arc(x, y, 8, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); ctx.stroke(); }
@@ -8711,11 +8715,11 @@ function drawIntroClose(k, bar, txt) {
   if (t >= I.roarAt - 0.1) { // 대사: 첫 줄은 치듯이, 둘째 줄은 쾅 하고 크게
     const [l1, l2] = I.roar, sx = zx * P, sy = zy * P, x = wide ? W * 0.56 : W / 2, y = wide ? H * 0.46 : H - bar - 92, s2 = Math.min(58, (wide ? W * 0.4 : W * 0.9) / (l2.length * 0.95));
     ctx.globalAlpha = k; ctx.textAlign = wide ? 'left' : 'center';
-    ctx.font = `bold 30px ${FONT}`; txt(l1.slice(0, Math.max(0, Math.floor((t - I.roarAt + 0.1) * 14))), x + sx * 0.5, y, '#f2ede4');
+    ctx.font = font(30, true); txt(l1.slice(0, Math.max(0, Math.floor((t - I.roarAt + 0.1) * 14))), x + sx * 0.5, y, '#f2ede4');
     if (t >= I.line2) {
       const slam = 1 + 0.4 * Math.max(0, 1 - (t - I.line2) / 0.15), y2 = y + s2 + 14;
       ctx.save(); ctx.translate(x + sx, y2 + sy); ctx.scale(slam, slam);
-      ctx.font = `bold ${Math.round(s2)}px ${FONT}`; txt(l2, 0, 0, '#ff7a3a', 7);
+      ctx.font = font(Math.max(12, Math.floor(s2 / 12) * 12), true); txt(l2, 0, 0, '#ff7a3a', 7);
       ctx.restore();
     }
     ctx.globalAlpha = 1;

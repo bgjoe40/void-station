@@ -10,6 +10,10 @@
       https://opengameart.org/content/cc0-gem-icons
   - knekko "Cybericons"·"Microchips" (CC0): 팔 장비·강화칩·강화장신구·스킬 메뉴 아이콘
       https://opengameart.org/content/cybericons, https://opengameart.org/content/microchips-cpus-ics
+  - Project Cordon Sprites (CC0, doficia와 기여자들): 헬멧·조끼·전투화·소모품 아이콘 (128px 픽셀아트)
+      https://github.com/doficia/project-cordon-sprites
+  - 갈무리 Galmuri (SIL OFL 1.1, 이민서): 한글 픽셀 글꼴 (웹 글꼴은 npm galmuri)
+      https://github.com/quiple/galmuri
 
 결과물 (assets/):
   atlas.png   스프라이트·아이콘 아틀라스
@@ -17,6 +21,7 @@
   tex/*.png   벽 텍스처(패치 합성)와 바닥 텍스처
   sfx/*.wav   효과음
   music/*.mid 배경음악 (Freedoom MIDI 그대로, 게임이 신시사이저로 연주)
+  fonts/*.woff2 글꼴 (갈무리), fonts/LICENSE-galmuri.txt
   LICENSE-freedoom.txt, CREDITS-freedoom.txt, CREDITS-freedoom-music.txt, README.md
 
 사용: python tools/build_assets.py   (내려받은 원본은 tools/.cache 에 캐시)
@@ -181,15 +186,8 @@ ICONS = {
     'gren_fire':     ('misc_3.png',       (2, 40, 19, 61), ('hue', 0.12)),
     'gren_cryo':     ('misc_3.png',       (3, 7, 20, 28), ('hue', 0.07)),
     'blades':        ('melee_0.png',      (4, 74, 36, 82), 'fan'),     # 칼날 부채 스킬: 총검 세 자루를 부채꼴로
-    # 방어구 (머리·몸·다리): 검은 장비는 어두운 칸에서도 보이게 밝힘
-    'helm_black':    ('armor_1.png',      (74, 57, 100, 80), ('tint', (1.6, 1.6, 1.6))),
-    'helm_green':    ('armor_1.png',      (109, 57, 135, 80), ('tint', (1.3, 1.3, 1.3))),
+    # 방어구 (바이저 헬멧·하의): 검은 장비는 어두운 칸에서도 보이게 밝힘. 헬멧 2종·조끼·전투화는 CORDON_ICONS
     'helm_visor':    ('armor_1.png',      (109, 5, 135, 37), ('tint', (1.3, 1.3, 1.3))),
-    'vest_tac':      ('armor_1.png',      (72, 6, 102, 45), None),
-    'vest_black':    ('armor_1.png',      (38, 8, 68, 44), ('tint', (1.6, 1.6, 1.6))),
-    'vest_heavy':    ('armor_1.png',      (4, 5, 34, 50), ('tint', (1.6, 1.6, 1.6))),
-    'vest_neon':     ('neonpunk.png',     (2, 26, 32, 62), None),
-    'boots':         ('armor_1.png',      (7, 54, 31, 84), ('tint', (1.6, 1.6, 1.6))),
     'pants':         ('armor_1.png',      (38, 56, 68, 80), ('tint', (1.6, 1.6, 1.6))),
     'pants_neon':    ('neonpunk.png',     (2, 63, 32, 87), None),
     # 필드 볼거리: 보급 캐시(흰 케이스), 금고 보물함(검은 가방을 금빛으로)
@@ -261,6 +259,24 @@ CYBER_ICONS = {
     'acc_psi1': ('cyber', 'EEG.png', None), 'acc_psi2': ('cyber', 'Neural-implant.png', None), 'acc_psi3': ('cyber', 'Neural-implant-2.png', None),
     'brain':      ('cyber', 'Brain.png', None),  # 스킬 창 메뉴 아이콘
 }
+# 더 세밀한 방어구·소모품 그림: Project Cordon Sprites (CC0, GitHub의 128px 픽셀아트 낱장) — 이름 -> (경로, 후처리)
+# 조끼는 한 종류라 색만 바꿔 네 가지로, 사막색 군화는 어두운 회색으로. 소모품 셋은 HUD·상점용 (바닥의 소모품은 Freedoom 그림 그대로)
+CORDON_RAW = 'https://raw.githubusercontent.com/doficia/project-cordon-sprites/master/sprites/'
+CORDON_ICONS = {
+    'helm_army':   ('armors/army-helmet.png', None),
+    'helm_kevlar': ('armors/kevlar-helmet.png', None),
+    'vest_tac':    ('armors/tactical-vest.png', ('tint', (1.35, 1.2, 0.85))),  # 방탄 조끼: 모래색
+    'vest_black':  ('armors/tactical-vest.png', None),                          # 플레이트 캐리어: 원래 색
+    'vest_heavy':  ('armors/tactical-vest.png', ('tint', (0.75, 0.8, 0.95))),  # 중장갑 조끼: 어두운 강철색
+    'vest_neon':   ('armors/tactical-vest.png', ('tint', (0.55, 1.2, 1.25))),  # 네온 강화복: 청록
+    'boots':       ('armors/military-boots.png', ('gray', (0.62, 0.62, 0.68))),
+    'medkit':      ('consumables/medkit.png', None),
+    'pills':       ('consumables/painkillers.png', None),
+    'injection':   ('consumables/injection.png', None),
+}
+# 글꼴: 갈무리 (이민서, SIL OFL 1.1) — 한글 픽셀 글꼴. Galmuri11은 12px의 배수, Galmuri14는 15px의 배수에서 또렷함
+GALMURI = 'https://cdn.jsdelivr.net/npm/galmuri@2.40.3/dist/'
+FONTS = ['Galmuri11.woff2', 'Galmuri11-Bold.woff2', 'Galmuri14.woff2']
 # 핏자국 (바닥 데칼): AlejandroHaibi "Liquid Splatter Pixel Texture" (CC0) — 흰 스플래터(8px 픽셀 덩어리)를 덩어리별로 나눠 변형을 만들고 1/4로 줄임
 # 게임에서 몬스터 체액 색으로 칠해 바닥에 눕혀 그림. 이름 -> 쓸 큰 덩어리 번호 (큰 것부터 0, 1, ...; 'all'은 전부) — 가까운 작은 방울은 함께
 SPLAT_FILE = 'blood_splatter_0.png'
@@ -281,13 +297,18 @@ README = """# assets/ — 그래픽 출처와 라이선스
 
 ## knekko "Futuristic Guns, Weapons and Items" — CC0 (퍼블릭 도메인)
 - 출처: https://opengameart.org/content/futuristic-guns-weapons-and-items
-- 무기·수류탄·주사기·방어구·케이스(보급 캐시·금고 보물함, 보물함은 금빛으로 물들임) 아이콘으로 잘라 씀 (방어구는 armor_1.png, 네온 방어구는 neonpunk.png). 해머는 90도 회전, 창은 진압봉에 날을 그려 넣음,
+- 무기·수류탄·주사기·방어구·케이스(보급 캐시·금고 보물함, 보물함은 금빛으로 물들임) 아이콘으로 잘라 씀 (바이저 헬멧·하의는 armor_1.png, 네온 하의는 neonpunk.png). 해머는 90도 회전, 창은 진압봉에 날을 그려 넣음,
   2연발은 펌프 손잡이를 총열색으로 칠함, 수류탄 일부는 색조를 바꿈 (출처 표기는 필수 아님)
   (체인톱은 마체테 칼날에 사슬 무늬를 넣고 검은 서류가방을 주황 엔진으로 칠해 붙임, 방전 진압봉은 진압봉 끝에 전극과 불꽃을 그려 넣음,
   플라즈마 블레이드는 카타나 칼날을 푸른빛으로·손잡이를 금속색으로 칠함)
   (무기 파츠 그림은 시트의 무기에서 부품만 잘라 씀 — 스코프·총열·개머리판은 저격소총, 탄창·소염기·접이식 개머리판은 M4, 곡선 탄창·앞손잡이는 MP5,
   상자 탄창은 중기관총, 광학 조준기는 P90, 소음기는 진압봉 끝, 모듈·레이저는 테이저 카트리지(색을 바꿈), 근접 파츠는 마체테·해머·카타나·총검·진압봉에서)
   (소드오프 아이콘은 Freedoom의 2연발 샷건 스프라이트, 칼날 부채 스킬 그림은 총검 세 자루를 부채꼴로 겹침)
+
+## Project Cordon Sprites — CC0 (퍼블릭 도메인)
+- 출처: https://github.com/doficia/project-cordon-sprites (doficia와 커뮤니티 기여자들, CC0-1.0)
+- 128px 픽셀아트 낱장을 그대로 씀: 전투 헬멧(army-helmet), 정찰 헬멧(kevlar-helmet), 조끼 4종(tactical-vest의 색만 바꿈),
+  전투화(military-boots를 어두운 회색으로), HUD·상점의 소모품(medkit, painkillers, injection)
 
 ## knekko "Cybericons"·"Microchips" — CC0 (퍼블릭 도메인)
 - 출처: https://opengameart.org/content/cybericons, https://opengameart.org/content/microchips-cpus-ics
@@ -297,6 +318,10 @@ README = """# assets/ — 그래픽 출처와 라이선스
 ## MELLE 보석 아이콘 — CC0 (퍼블릭 도메인)
 - 출처: https://opengameart.org/content/cc0-gem-icons (AntumDeluge가 모은 CC0 보석 아이콘, MELLE 묶음 — 원작 https://opengameart.org/node/89286)
 - 32x32 보석 5색을 그대로 씀. 사파이어는 루비를 파란 색조로, 다이아몬드는 하늘색 보석을 무채색으로 바꿈
+
+## 갈무리 (Galmuri) — SIL Open Font License 1.1
+- 출처: https://github.com/quiple/galmuri (이민서), 웹 글꼴은 npm galmuri 2.40.3 (jsDelivr)
+- `fonts/Galmuri11.woff2`, `fonts/Galmuri11-Bold.woff2`, `fonts/Galmuri14.woff2`를 그대로 씀. 라이선스 전문: `fonts/LICENSE-galmuri.txt`
 
 ## AlejandroHaibi "Liquid Splatter Pixel Texture" — CC0 (퍼블릭 도메인)
 - 출처: https://opengameart.org/content/liquid-splatter-pixel-texture
@@ -443,6 +468,16 @@ def gem_icon(path, post):
     im = Image.open(io.BytesIO(z.read(path))).convert('RGBA')
     if post and post[0] == 'hue':
         im = hue_shift(im, post[1])
+    elif post and post[0] == 'gray':
+        im = gray(im, post[1])
+    return trim(im)
+
+
+def cordon_icon(spec):
+    path, post = spec
+    im = Image.open(fetch(CORDON_RAW + path, 'cordon_' + path.replace('/', '_'))).convert('RGBA')
+    if post and post[0] == 'tint':
+        im = tint(im, post[1])
     elif post and post[0] == 'gray':
         im = gray(im, post[1])
     return trim(im)
@@ -779,6 +814,10 @@ def main():
         im = cyber_icon(spec)
         images['icon_' + name] = im
         frames['icon_' + name] = [0, 0, im.width, im.height, im.width // 2, im.height // 2]
+    for name, spec in CORDON_ICONS.items():  # 헬멧 2종·조끼·전투화·소모품 (Project Cordon)
+        im = cordon_icon(spec)
+        images['icon_' + name] = im
+        frames['icon_' + name] = [0, 0, im.width, im.height, im.width // 2, im.height // 2]
     for name, im in splat_icons().items():  # 핏자국 (AlejandroHaibi, CC0) — 흰색: 게임에서 칠함
         images[name] = im
         frames[name] = [0, 0, im.width, im.height, im.width // 2, im.height // 2]
@@ -847,6 +886,11 @@ def main():
     with open(os.path.join(OUT, 'atlas.js'), 'w', encoding='utf-8') as f:
         f.write('// tools/build_assets.py 가 생성한 파일 — 직접 고치지 마세요\n')
         f.write('window.ASSET_META = ' + json.dumps(meta, separators=(',', ':')) + ';\n')
+
+    os.makedirs(os.path.join(OUT, 'fonts'), exist_ok=True)  # 글꼴 (갈무리) + 라이선스 전문
+    for name in FONTS + ['LICENSE.txt']:
+        with open(fetch(GALMURI + name, 'galmuri_' + name), 'rb') as a, open(os.path.join(OUT, 'fonts', 'LICENSE-galmuri.txt' if name == 'LICENSE.txt' else name), 'wb') as b:
+            b.write(a.read())
 
     # --- 라이선스 ---
     for src, dst in (('COPYING.adoc', 'LICENSE-freedoom.txt'), ('CREDITS', 'CREDITS-freedoom.txt'),

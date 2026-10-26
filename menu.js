@@ -60,7 +60,7 @@ function uiKey(code) {
 function confirmBox({ title, text, ok = '확인', cancel = '취소', danger = false, onOk, onCancel }) {
   const m = document.createElement('div');
   m.className = 'modal';
-  m.innerHTML = `<div class="frm cf"><div class="hd"><div class="grow"><div class="h1" style="font-size:22px">${title}</div></div></div>
+  m.innerHTML = `<div class="frm cf"><div class="hd"><div class="grow"><div class="h1" style="font-size:24px">${title}</div></div></div>
     <p>${text}</p><div class="ft"><button class="btn ${danger ? 'danger' : 'pri'} cf-ok" data-nav>${ok}</button><button class="btn cf-no" data-nav>${cancel}</button></div></div>`;
   overlay.appendChild(m); UI.modal = m; wireNav(m);
   const back = overlay.querySelector('.f'), done = fn => { m.remove(); UI.modal = null; UI.closeModal = null; if (fn) fn(); else if (back && back.isConnected) setFocus(back); };
@@ -148,7 +148,7 @@ function pipsHTML(d) { // 구역 1~9: 들어가 본 곳 · 지금 구역
   return `<div class="pips">${CAMPAIGN.map((_, k) => `<i class="${k + 1 === d.stage ? 'c' : vis.includes(k + 1) ? 'v' : ''}"></i>`).join('')}</div>`;
 }
 function slotHTML(d, k, attrs) { // k: 슬롯 번호 또는 'auto' (거점 자동 저장)
-  const no = k === 'auto' ? `<div class="no" style="font-size:20px">자동<small>거점</small></div>` : `<div class="no">${k + 1}<small>슬롯</small></div>`;
+  const no = k === 'auto' ? `<div class="no" style="font-size:15px">자동<small>거점</small></div>` : `<div class="no">${k + 1}<small>슬롯</small></div>`;
   if (!d) return `<button class="sl empty" data-nav ${attrs}>${no}<div><div class="t1">빈 슬롯</div><div class="t2">아직 저장한 작전이 없습니다</div></div></button>`;
   const p = d.player || {};
   return `<button class="sl" data-nav ${attrs}>${no}
@@ -307,7 +307,7 @@ function newGameScreen() {
   const bar = (v, max) => `<div class="meter"><i style="--v:${v / max}"></i></div>`;
   screen(`<div class="center" style="position:absolute;inset:0"><div class="frm" style="width:min(980px,92vw)">
       <div class="hd"><div class="grow"><div class="h1">난이도 선택</div></div>
-        <div class="muted" style="font-size:13px;max-width:360px;text-align:right">가장 깊은 코어의 오버마인드를 처치하고 탈출하라</div></div>
+        <div class="muted" style="font-size:12px;max-width:360px;text-align:right">가장 깊은 코어의 오버마인드를 처치하고 탈출하라</div></div>
       <div class="bd"><div class="dcs">${Object.entries(DIFFICULTY).map(([k, D]) => `
         <button class="dc" data-nav data-diff="${k}">${k === 'normal' ? '<span class="rec">추천</span>' : ''}
           <div class="art">${img(monIcon(art[k]), 130)}</div>
@@ -347,7 +347,7 @@ function saveScreen(title, note, doneLabel, onDone, saved = -1) {
   const S = readSaves();
   screen(`<div class="center" style="position:absolute;inset:0"><div class="frm" style="width:min(820px,92vw)">
       <div class="hd"><div class="grow"><div class="eye cy">기록 단말기</div><div class="h1">${title}</div></div></div>
-      <div class="bd"><div class="muted" style="font-size:13px;line-height:1.6;margin-bottom:16px">${note}</div>
+      <div class="bd"><div class="muted" style="font-size:12px;line-height:1.6;margin-bottom:16px">${note}</div>
         <div class="slots">${S.slots.map((d, k) => slotHTML(d, k, `data-save="${k}"`).replace('<div class="no">', `<div class="no"${k === saved ? ' style="color:var(--good)"' : ''}>`)).join('')}</div></div>
       <div class="ft"><span class="note">${saved >= 0 ? `<span style="color:var(--good)">✔ 슬롯 ${saved + 1}에 저장했습니다</span>` : '저장할 슬롯을 고르세요'}</span><button class="btn" data-nav id="sDone">${doneLabel}</button></div>
     </div></div>`, { cls: 'dim', back: onDone, focus: saved >= 0 ? '#sDone' : 0 });
@@ -411,7 +411,7 @@ const KEY_GROUPS = [
     [['M'], '전체 지도'], [['H'], '안내 카드 닫기', '데이터 기록 재생도'], [['Esc'], '일시정지', '열린 창 닫기']]],
 ];
 function keysHTML() {
-  return `<div class="kgrid">${KEY_GROUPS.map(([t, rows]) => `<div class="kgroup"><div class="h1" style="font-size:17px;margin-bottom:8px">${t}</div>
+  return `<div class="kgrid">${KEY_GROUPS.map(([t, rows]) => `<div class="kgroup"><div class="h1" style="font:15px var(--f-disp);margin-bottom:8px">${t}</div>
     ${rows.map(([ks, what, sub]) => `<div class="krow"><span class="keys">${ks.map(k => k === '~' ? '~' : `<kbd>${k}</kbd>`).join('')}</span><span>${what}${sub ? `<small>${sub}</small>` : ''}</span></div>`).join('')}</div>`).join('')}</div>`;
 }
 const GUIDE = [
@@ -468,10 +468,11 @@ function creditsScreen(back) {
       <h3><span class="eye">그래픽, 소리, 음악</span></h3><p>Freedoom 프로젝트<small>스프라이트, 텍스처, 효과음, 배경음악 (BSD 라이선스)<br>기여자 전체 목록: assets/CREDITS-freedoom.txt</small></p>
       <h3><span class="eye">무기, 방어구 아이콘</span></h3><p>knekko: Futuristic Guns, Weapons and Items<small>CC0 (퍼블릭 도메인)</small></p>
       <h3><span class="eye">강화칩, 강화장신구 아이콘</span></h3><p>knekko: Cybericons, Microchips<small>CC0 (퍼블릭 도메인)</small></p>
+      <h3><span class="eye">헬멧, 조끼, 전투화, 소모품 아이콘</span></h3><p>Project Cordon Sprites<small>doficia와 기여자들, CC0</small></p>
       <h3><span class="eye">보석 아이콘</span></h3><p>MELLE: CC0 Gem Icons<small>AntumDeluge 모음, CC0</small></p>
       <h3><span class="eye">핏자국</span></h3><p>AlejandroHaibi: Liquid Splatter Pixel Texture<small>CC0</small></p>
       <h3><span class="eye">음악</span></h3>${songs}
-      <h3><span class="eye">글꼴</span></h3><p>맑은 고딕, Bahnschrift, Impact<small>시스템 글꼴</small></p>
+      <h3><span class="eye">글꼴</span></h3><p>갈무리 (이민서)<small>SIL Open Font License 1.1</small></p><p>Impact<small>로고, 시스템 글꼴</small></p>
       <h3 style="margin-top:90px"><span class="eye">감사합니다</span></h3><p>끝까지 함께해 주셔서 고맙습니다</p>
     </div></div>
     <div class="row-btns" style="position:absolute;right:40px;bottom:26px;margin:0"><button class="btn" data-nav id="cBack">닫기</button></div>`, { cls: 'solid', back, hints: false });
@@ -498,7 +499,7 @@ function pauseGame(from) {
         <div><small>무기 슬롯</small><b>${slotsOpen()} / ${WEAPON_SLOTS.max}</b></div>
       </div>
       <div class="muted" style="font-size:12px;margin-top:14px">저장은 보급 거점의 기록 단말기에서 합니다</div>
-      <div class="muted" style="font-size:11px;margin-top:10px;letter-spacing:.15em">v${VERSION}</div>
+      <div class="muted" style="font-size:12px;margin-top:10px;letter-spacing:.15em">v${VERSION}</div>
     </aside>`, { cls: 'dim', back: resumeGame, focus: from || 0 });
   on('p_res', resumeGame);
   on('p_set', () => settingsScreen(() => pauseGame('#p_set')));
@@ -544,7 +545,7 @@ function teleportScreen(cur) {
     ? `<button class="wr ${h === cur ? 'here' : ''}" data-nav data-hub="${h.n}" ${h === cur ? 'disabled' : ''}><span class="rn">${h.reg}</span><span><div class="w1">${escHtml(h.name)}</div><div class="w2">구역 ${h.reg} ${regName(h.reg)}</div></span><span class="go">${h === cur ? '현재 위치' : '이동 ›'}</span></button>`
     : `<div class="wr lock"><span class="rn">${h.reg}</span><span><div class="w1">미발견 거점</div><div class="w2">구역 ${h.reg} ${regName(h.reg)}</div></span><span class="go">잠김</span></div>`).join('');
   screen(`<div class="center" style="position:absolute;inset:0"><div class="frm" style="width:min(${escape ? 560 : 980}px,94vw)">
-      <div class="hd"><div class="grow"><div class="eye cy">순간이동 패드</div><div class="h1">${escHtml(cur.name)}</div></div><div class="muted num" style="font-size:13px">찾은 거점 ${found} / ${hubs.length}</div></div>
+      <div class="hd"><div class="grow"><div class="eye cy">순간이동 패드</div><div class="h1">${escHtml(cur.name)}</div></div><div class="muted num" style="font-size:12px">찾은 거점 ${found} / ${hubs.length}</div></div>
       <div class="bd" style="display:grid;grid-template-columns:${escape ? '1fr' : '1fr 1fr'};gap:26px">
         <div><div class="sect">보급 거점</div><div class="wlist">${rows}</div></div>
         ${escape ? '' : riftPanel()}
@@ -569,8 +570,8 @@ function riftPadScreen() {
   const done = rift.done, f = Math.min(1, rift.prog / rift.need);
   screen(`<div class="center" style="position:absolute;inset:0"><div class="frm violet" style="width:min(520px,92vw)">
       <div class="hd"><div class="grow"><div class="eye" style="color:var(--violet)">차원 균열</div><div class="h1">${rift.tier}단계 ${done ? '돌파' : '진행 중'}</div></div></div>
-      <div class="bd"><div class="muted" style="font-size:14px;line-height:1.6">${done ? '균열을 돌파했다. 떨어진 보상을 다 챙겼는지 확인하자.' : '아직 돌파하지 못했다. 지금 나가면 보상은 없다.'}</div>
-        ${done ? '' : `<div class="row" style="display:flex;justify-content:space-between;margin-top:16px;font-size:13px"><span class="muted">균열</span><b class="num">${Math.floor(f * 100)}%</b></div><div class="meter violet"><i style="--v:${f}"></i></div>`}</div>
+      <div class="bd"><div class="muted" style="font-size:12px;line-height:1.6">${done ? '균열을 돌파했다. 떨어진 보상을 다 챙겼는지 확인하자.' : '아직 돌파하지 못했다. 지금 나가면 보상은 없다.'}</div>
+        ${done ? '' : `<div class="row" style="display:flex;justify-content:space-between;margin-top:16px;font-size:12px"><span class="muted">균열</span><b class="num">${Math.floor(f * 100)}%</b></div><div class="meter violet"><i style="--v:${f}"></i></div>`}</div>
       <div class="ft"><button class="btn violet" data-nav id="rOut">${done ? '거점으로 돌아가기' : '균열에서 나가기'}</button><button class="btn" data-nav id="rStay">${done ? '더 둘러보기' : '계속 싸우기'}</button></div>
     </div></div>`, { cls: 'dim', back: closeMenu, focus: done ? '#rOut' : '#rStay' });
   on('rOut', () => fadeThen(() => leaveRift(done ? `차원 균열 ${rift.tier}단계에서 돌아왔다` : '균열을 포기하고 거점으로 돌아왔다')));

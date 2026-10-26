@@ -1,7 +1,7 @@
 // ===== 게임 데이터 정의 (무기 / 탄약 / 수류탄 / 아이템 / 적) =====
 
 // 버전: GitHub에 커밋·푸시할 때마다 올림 (새 기능은 가운데 자리, 고침·작은 추가는 끝자리) — 타이틀·일시정지 화면에 표시, git 태그 v<버전>
-const VERSION = '0.9.1';
+const VERSION = '0.10.0';
 
 const CAT_NAMES = ['근접', '권총', '샷건', '라이플', '기관총', '에너지'];
 const MAX_LOAD = 30;   // 장착 + 가방 무기 무게 합이 넘으면 이동속도 감소
@@ -207,8 +207,8 @@ const GEAR_NAMES = { chip: '강화칩', head: '머리', acc: '강화장신구', 
 const ARMOR_K = 100;
 const ARMOR_RARITY_DEF = 0.15;
 const ARMORS = {
-  cap:     { name: '전투 헬멧',       slot: 'head', def: 6,  weight: 1,   size: [2, 2], price: 150,  minLvl: 1, icon: 'icon_helm_black', desc: '가볍고 튼튼한 기본 헬멧.' },
-  scout:   { name: '정찰 헬멧',       slot: 'head', def: 9,  weight: 1,   size: [2, 2], price: 350,  minLvl: 3, icon: 'icon_helm_green', desc: '얇은 복합 소재로 무게는 그대로, 막는 힘은 더 크다.' },
+  cap:     { name: '전투 헬멧',       slot: 'head', def: 6,  weight: 1,   size: [2, 2], price: 150,  minLvl: 1, icon: 'icon_helm_army',  desc: '가볍고 튼튼한 기본 헬멧.' },
+  scout:   { name: '정찰 헬멧',       slot: 'head', def: 9,  weight: 1,   size: [2, 2], price: 350,  minLvl: 3, icon: 'icon_helm_kevlar', desc: '얇은 복합 소재로 무게는 그대로, 막는 힘은 더 크다.' },
   visor:   { name: '바이저 헬멧',     slot: 'head', def: 13, weight: 1.5, size: [2, 2], price: 700,  minLvl: 5, icon: 'icon_helm_visor', desc: '전투 바이저가 달린 강습용 헬멧.' },
   vest:    { name: '방탄 조끼',       slot: 'body', def: 14, weight: 3,   size: [2, 3], price: 250,  minLvl: 1, icon: 'icon_vest_tac',   desc: '주머니가 많은 경량 방탄 조끼.' },
   carrier: { name: '플레이트 캐리어', slot: 'body', def: 20, weight: 4,   size: [2, 3], price: 450,  minLvl: 2, icon: 'icon_vest_black', desc: '앞뒤로 장갑판을 넣은 조끼.' },
@@ -1077,10 +1077,10 @@ const TIPS = {
   ach:       { title: '업적', icon: null, lines: ['업적을 이루면 작은 영구 보너스가 붙는다'] },
   set:       { title: '◆ 세트 장비', icon: null, lines: ['같은 세트를 2개 이상 장착하면 세트 효과가 붙는다'] },
   unique:    { title: '★ 고유 전설', icon: null, lines: ['고유 효과가 있는 특별한 장비다'] },
-  poison:    { title: '중독', icon: 'bon1a0', lines: ['치료제 [E]로 풀 수 있다'] },
+  poison:    { title: '중독', icon: 'icon_pills', lines: ['치료제 [E]로 풀 수 있다'] },
   shock:     { title: '감전', icon: 'suita0', lines: ['치료제 [E]로 풀 수 있다'] },
   stamina:   { title: '스태미너', icon: 'icon_syringe_blue', lines: ['바닥나면 잠시 달릴 수 없다'] },
-  lowhp:     { title: '체력이 낮다', icon: 'media0', lines: ['메디킷 [Q]로 회복한다'] },
+  lowhp:     { title: '체력이 낮다', icon: 'icon_medkit', lines: ['메디킷 [Q]로 회복한다'] },
   bagfull:   { title: '가방이 가득 참', icon: 'bpaka0', lines: ['창고에 맡기거나 회수 자판기에서 팔아라'] },
   noammo:    { title: '탄약이 떨어짐', icon: 'clipa0', lines: ['다른 무기로 바꿔라. 근접 무기는 탄약이 필요 없다'] },
   gem:       { title: '보석과 소켓', icon: 'icon_gem_ruby', lines: ['소켓(◇)이 있는 장비 위에 보석을 끌어다 놓는다'] },
