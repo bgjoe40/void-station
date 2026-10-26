@@ -8,7 +8,7 @@
       https://opengameart.org/content/futuristic-guns-weapons-and-items
   - MELLE 보석 아이콘 (CC0, AntumDeluge의 "CC0 Gem Icons" 모음): 보석 6종
       https://opengameart.org/content/cc0-gem-icons
-  - knekko "Cybericons"·"Microchips" (CC0): 팔 장비·강화칩·강화장신구·스킬 메뉴 아이콘
+  - knekko "Cybericons"·"Microchips" (CC0): 팔 장비·강화칩·강화장신구·스킬 메뉴·최종 특성 아이콘
       https://opengameart.org/content/cybericons, https://opengameart.org/content/microchips-cpus-ics
   - Project Cordon Sprites (CC0, doficia와 기여자들): 헬멧·조끼·전투화·소모품 아이콘 (128px 픽셀아트)
       https://github.com/doficia/project-cordon-sprites
@@ -258,6 +258,9 @@ CYBER_ICONS = {
     'acc_tec1': ('cyber', 'Explant.png', None), 'acc_tec2': ('cyber', 'Module2.png', None), 'acc_tec3': ('cyber', 'VR2.png', None),
     'acc_psi1': ('cyber', 'EEG.png', None), 'acc_psi2': ('cyber', 'Neural-implant.png', None), 'acc_psi3': ('cyber', 'Neural-implant-2.png', None),
     'brain':      ('cyber', 'Brain.png', None),  # 스킬 창 메뉴 아이콘
+    'perk_prey':    ('cyber', 'Redeye.png', None),                          # 특성 '거물 사냥': 붉은 조준경
+    'perk_regen':   ('cyber', 'Heart-2.png', None),                         # 특성 '재생 조직': 회로 심장
+    'perk_command': ('cyber', 'VRblack.png', ('tint', (1.7, 1.7, 1.8))),  # 특성 '전술 지휘': 전술 헤드셋 (어두운 칸에서도 보이게 밝힘)
 }
 # 더 세밀한 방어구·소모품 그림: Project Cordon Sprites (CC0, GitHub의 128px 픽셀아트 낱장) — 이름 -> (경로, 후처리)
 # 조끼는 한 종류라 색만 바꿔 네 가지로, 사막색 군화는 어두운 회색으로. 소모품 셋은 HUD·상점용 (바닥의 소모품은 Freedoom 그림 그대로)
@@ -312,7 +315,8 @@ README = """# assets/ — 그래픽 출처와 라이선스
 
 ## knekko "Cybericons"·"Microchips" — CC0 (퍼블릭 도메인)
 - 출처: https://opengameart.org/content/cybericons, https://opengameart.org/content/microchips-cpus-ics
-- 32x32 아이콘을 그대로 씀: 팔 장비(기계 손), 강화칩(마이크로칩), 강화장신구(인공 심장·척추·의안·바이저·단말기·뇌파 머리띠·신경 이식체), 스킬 메뉴(뇌).
+- 32x32 아이콘을 그대로 씀: 팔 장비(기계 손), 강화칩(마이크로칩), 강화장신구(인공 심장·척추·의안·바이저·단말기·뇌파 머리띠·신경 이식체), 스킬 메뉴(뇌),
+  최종 특성(붉은 조준경·회로 심장·전술 헤드셋, 헤드셋은 밝힘).
   네온 건틀릿은 은색 손을 청록으로 칠함
 
 ## MELLE 보석 아이콘 — CC0 (퍼블릭 도메인)

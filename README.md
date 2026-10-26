@@ -14,7 +14,7 @@ HTML5 캔버스와 순수 자바스크립트로 만들었고, 설치 없이 브�
 ## 주요 기능
 
 - **무기 19종** — 근접 · 권총 · 샷건 · 라이플 · 기관총 · 에너지. 등급과 무작위 옵션, 소켓이 붙어 나옵니다.
-- **장비 파밍** — 방어구(머리 · 몸 · 다리), 보석 6종과 보석 조합 14가지, 고유 전설 11종, 세트 장비 5세트
+- **장비 파밍** — 인체 모양 장비 칸(머리 · 몸통 · 왼팔 · 오른팔 · 다리, 강화칩 · 강화장신구), 보석 6종과 보석 조합 14가지, 고유 전설 11종, 세트 장비 5세트
 - **스킬 쉘 20종** — 스킬 칸(Z X V B)에 끼워 쓰고, 같은 계열을 모으면 공명 효과
 - **근접 전투** — 근접으로 처치하면 체력·탄약 보급, 적 탄 쳐내기, 장갑 무시, 돌진·주문 같은 준비 동작 끊기
 - **보급 거점** — 상점 · 판매 · 강화 · 도박 · 보관함 · 저장, 거점끼리 순간이동
@@ -32,11 +32,10 @@ HTML5 캔버스와 순수 자바스크립트로 만들었고, 설치 없이 브�
 | R | 재장전 |
 | Shift / Space | 달리기 / 회피 대시 |
 | 1 ~ 4, 마우스 휠 | 무기 슬롯 |
-| Q E T | 메디킷 (소형 · 중형 · 대형) |
-| 7 8 9 0 - | 보조 아이템 |
+| Q E T | 메디킷 · 치료제 · 아드레날린 |
 | Z X V B | 스킬 |
 | F | 줍기 · 사용 (자판기 · 단말기 · 보물함) |
-| I (Tab) / K / J / M | 인벤토리 / 성장 / 수집 도감 / 전체 지도 |
+| I (Tab) / K / J / M | 인벤토리 (장비 · 능력치) / 스킬 (장착 스킬 · 특성) / 수집 도감 / 전체 지도 |
 | Esc | 일시정지 |
 
 ## 직접 실행하기
@@ -49,6 +48,18 @@ python tools/serve.py 8123
 
 그다음 http://localhost:8123 에 접속합니다. (캐시를 끈 개발용 서버이며, `python -m http.server`로도 됩니다.)
 
+## 데스크톱 판 (Windows, Electron)
+
+브라우저 판과 같은 게임을 창으로 실행합니다. 저장은 브라우저 판과 따로 쌓입니다. F11 또는 Alt+Enter로 전체 화면.
+
+```bash
+npm install
+npm start
+npm run dist
+```
+
+`npm start`는 바로 실행, `npm run dist`는 `dist/`에 실행 파일 폴더(`Void Station-win32-x64/VoidStation.exe`)와 배포용 zip을 만듭니다.
+
 ## 폴더 구성
 
 | 경로 | 내용 |
@@ -60,6 +71,7 @@ python tools/serve.py 8123
 | `assets/` | 그래픽 아틀라스, 텍스처, 효과음, 배경음악 (스크립트로 생성) |
 | `tools/build_assets.py` | 원본 에셋을 내려받아 `assets/`를 만드는 스크립트 |
 | `tools/serve.py` | 개발용 로컬 서버 |
+| `electron/` | 데스크톱 판: `main.js` (게임 폴더를 `app://` 주소로 엶), `build.js` (Windows 실행 파일 만들기) |
 
 에셋을 다시 만들려면 Pillow를 설치하고(`pip install pillow`) `python tools/build_assets.py`를 실행합니다. 원본은 처음 한 번 내려받아 `tools/.cache/`에 보관합니다.
 
@@ -68,6 +80,9 @@ python tools/serve.py 8123
 - [Freedoom](https://github.com/freedoom/freedoom) (BSD-3-Clause) — 스프라이트, 벽·바닥 텍스처, 효과음, 배경음악 · 라이선스 전문: [`assets/LICENSE-freedoom.txt`](assets/LICENSE-freedoom.txt)
 - knekko, [Futuristic Guns, Weapons and Items](https://opengameart.org/content/futuristic-guns-weapons-and-items) (CC0) — 무기 · 장비 아이콘
 - MELLE, [CC0 Gem Icons](https://opengameart.org/content/cc0-gem-icons) (CC0) — 보석 아이콘
+- knekko, [Cybericons](https://opengameart.org/content/cybericons) · [Microchips](https://opengameart.org/content/microchips-cpus-ics) (CC0) — 팔 장비 · 강화칩 · 강화장신구 아이콘
+- [Project Cordon Sprites](https://github.com/doficia/project-cordon-sprites) (CC0) — 헬멧 · 조끼 · 전투화 · 소모품 아이콘
 - AlejandroHaibi, [Liquid Splatter Pixel Texture](https://opengameart.org/content/liquid-splatter-pixel-texture) (CC0) — 핏자국
+- 이민서, [갈무리](https://github.com/quiple/galmuri) (SIL OFL 1.1) — 글꼴 · 라이선스 전문: [`assets/fonts/LICENSE-galmuri.txt`](assets/fonts/LICENSE-galmuri.txt)
 
 자세한 출처와 가공 내역은 [`assets/README.md`](assets/README.md)에 있습니다.

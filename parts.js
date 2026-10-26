@@ -139,7 +139,7 @@ function installAttach(w, part) {
 }
 function removeAttach(w, slot) {
   const a = w && w.att && w.att[slot];
-  if (!a) { trade.note = `빈 ${ATTACH_SLOTS[slot]} 칸. 가방의 ${ATTACH_SLOTS[slot]} 파츠를 끌어다 놓거나 우클릭하세요`; Snd.play('menu'); return; }
+  if (!a) { trade.note = `빈 ${ATTACH_SLOTS[slot]} 칸`; Snd.play('menu'); return; }
   const o = makeAttach(a.id, a.rarity), spot = bagFindSpot(o);
   if (!spot) { trade.note = '가방에 빈자리가 없습니다'; Snd.play('deny'); return; }
   o.gx = spot.gx; o.gy = spot.gy; player.bag.push(o);
@@ -207,11 +207,9 @@ function attPreviewPart(w) {
 function drawAttachArea(g) {
   const L = attLayout(g), w = attW();
   ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = '#9fd28f'; ctx.fillText('파츠 개조', g.gx, g.gy + 14);
-  ctx.font = font(FS); ctx.fillStyle = '#9a9484'; ctx.textAlign = 'right';
-  ctx.fillText(fitText('무기를 고르고 파츠를 끌어다 놓기', L.W0 - 80), g.gx + L.W0, g.gy + 14);
   ctx.fillStyle = '#0b0a08'; ctx.fillRect(g.gx, L.artY, L.W0, L.artH);
   ctx.strokeStyle = '#4a463c'; ctx.lineWidth = 1; ctx.strokeRect(g.gx + 0.5, L.artY + 0.5, L.W0 - 1, L.artH - 1);
-  if (!w) { ctx.textAlign = 'center'; ctx.font = font(FS); ctx.fillStyle = '#6a6458'; ctx.fillText('오른쪽 인벤토리에서 파츠를 끼울 무기를 클릭하세요', g.gx + L.W0 / 2, L.artY + L.artH / 2 + 4); return; }
+  if (!w) return;
   const prev = attPreviewPart(w);
   if (prev) { // 미리보기: 파츠를 끼운 모습을 흐리게 겹침
     const ghost = { ...w, att: { ...(w.att || {}), [ATTACH[prev.id].slot]: { id: prev.id, rarity: prev.rarity } } };
@@ -261,7 +259,7 @@ function drawAttachStats(g, w, prev, L) {
 function dropAttachAt(part, th, hit) {
   if (!trade || trade.mode !== 'upgrade' || trade.tab !== 'attach') return false;
   const target = th ? attW() : hit && (hit.area === 'grid' ? bagItemAt(hit.cx, hit.cy) : hit.area === 'slot' ? player.equip[hit.c] : null);
-  if (!target || target.kind) { if (th) { trade.note = '먼저 인벤토리에서 파츠를 끼울 무기를 클릭하세요'; Snd.play('deny'); } return !!th; }
+  if (!target || target.kind) { if (th) { trade.note = '먼저 무기를 고르세요'; Snd.play('deny'); } return !!th; }
   if (installAttach(target, part)) { held = null; trade.sel = target; }
   return true;
 }

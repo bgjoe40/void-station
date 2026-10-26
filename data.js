@@ -1,7 +1,7 @@
 // ===== 게임 데이터 정의 (무기 / 탄약 / 수류탄 / 아이템 / 적) =====
 
 // 버전: GitHub에 커밋·푸시할 때마다 올림 (새 기능은 가운데 자리, 고침·작은 추가는 끝자리) — 타이틀·일시정지 화면에 표시, git 태그 v<버전>
-const VERSION = '0.10.0';
+const VERSION = '0.11.0';
 
 const CAT_NAMES = ['근접', '권총', '샷건', '라이플', '기관총', '에너지'];
 const MAX_LOAD = 30;   // 장착 + 가방 무기 무게 합이 넘으면 이동속도 감소
@@ -573,32 +573,47 @@ const ENEMIES = {
 const THIEF = { room: 0.04, rift: 0.06, escape: 15, drop: 0.15, piles: 8, gold: [30, 70], gems: 3, items: 2, unique: 0.1, set: 0.25, xp: 40 };
 // 방 하나의 위협 예산 = 앞 값 + 뒤 값 x 구역 (±30%) — 구역 1 약 115마리, 구역 9 약 210마리 (예전의 4~5배)
 const ROOM_BUDGET = [10.5, 6];
+// 난이도 곡선 (구역 1~9): 앞 구역은 적을 덜, 약하게 해서 서서히 어려워지게. 1이면 원래대로 (차원 균열에는 쓰지 않음)
+// room: 방·적 무리·시련의 적 수 (위협 예산)와 고유 정예의 부하 수, hp·dmg: 적 체력·피해, elite: 정예·고유 정예가 더 받는 체력·피해 몫, boss: 보스 체력
+// 적이 적은 만큼 일반 적 한 마리의 경험치·골드·장비 확률은 1 / room 배 (구역마다 얻는 양은 비슷하게)
+const CURVE = {
+  room:  [0.65, 0.75, 0.85, 0.95, 1, 1, 1, 1, 1],
+  hp:    [0.8, 0.88, 0.94, 0.98, 1, 1, 1, 1, 1],
+  dmg:   [0.75, 0.82, 0.88, 0.95, 1, 1, 1, 1, 1],
+  elite: [0.6, 0.7, 0.8, 0.9, 1, 1, 1, 1, 1],
+  boss:  [0.6, 0.75, 0.85, 0.95, 1, 1, 1, 1, 1],
+};
 const ROOM_MAX = 36;          // 방 하나에 놓는 적 최대 수
 const HEAVY_MAX = [1, 4];     // 방 하나의 위협도 5 이상(브루트·모르타르·철갑 거수) 최대 수 = 앞 값 + 구역 / 뒤 값 (나머지는 가벼운 적으로)
 // 적이 많아진 만큼 한 마리가 주는 보상은 줄임 (일반 적만, 정예·보스는 그대로): 골드, 아이템·수류탄, 무기 — 탄약은 그대로
 const KILL_REWARD = { gold: 0.25, item: 0.5, loot: 0.25 };
 
 // ===== 캐릭터 성장 =====
-// 적을 처치하면 경험치, 레벨이 오를 때마다 특성 점수 1점 (스킬 창 [K]) + 능력치 점수 ATTR_PER_LEVEL점 (인벤토리 [I]) (특성: 계열 3개 x 4개, 캠페인 끝까지 약 12점)
+// 적을 처치하면 경험치, 레벨이 오를 때마다 특성 점수 1점 (스킬 창 [K]) + 능력치 점수 ATTR_PER_LEVEL점 (인벤토리 [I]) (특성: 사격·생존·전술 트리, 캠페인 끝까지 약 13점)
 const XP_NEXT = [100, 200];   // 다음 레벨까지 필요 경험치 = 앞 값 + 뒤 값 x 현재 레벨 (1구역 끝 Lv 2, 캠페인 끝 Lv 13 안팎)
 const XP_PER_COST = 2;        // 처치 경험치 = 적 위협도 x 이 값 x (1 + 0.15 x (구역-1)), 정예 12배, 보스 400 (최종 보스 800) — 적이 많아 한 마리당은 적게
 const RESPEC_COST = 150;      // 특성 초기화 비용 = 이 값 x 레벨 (골드)
 const PERK_TREES = ['사격', '생존', '전술'];
+// 특성 트리: 계열(탭)마다 3단 5칸 — tier 단은 PERK_TIER_LV 레벨부터, col: 0 왼쪽 · 1 오른쪽 · 0.5 가운데, req: 그중 하나에 1점 이상 넣어야 열림
+const PERK_TIER_LV = [1, 4, 8];
 const pct = v => Math.round(v * 100) + '%';
 // per: 한 단계당 수치, fmt: 지금까지 쌓인 수치(v)를 설명으로
 const PERKS = {
-  gun:     { tree: 0, name: '정밀 사격',   icon: 'icon_assault',      max: 5, per: 0.06, fmt: v => `총기 피해 +${pct(v)}` },
-  reload:  { tree: 0, name: '빠른 손',     icon: 'clipa0',            max: 5, per: 0.08, fmt: v => `재장전 시간 -${pct(v)}` },
-  crit:    { tree: 0, name: '약점 포착',   icon: 'icon_marksman',     max: 5, per: 0.03, fmt: v => `치명타 확률 +${pct(v)} (피해 2배)` },
-  saver:   { tree: 0, name: '탄약 절약',   icon: 'ammoa0',            max: 3, per: 0.08, fmt: v => `${pct(v)} 확률로 탄을 쓰지 않음` },
-  hp:      { tree: 1, name: '강인함',      icon: 'media0',            max: 5, per: 15,   fmt: v => `최대 체력 +${v}` },
-  leech:   { tree: 1, name: '피의 갈증',   icon: 'bon1a0',            max: 3, per: 3,    fmt: v => `적을 처치할 때마다 체력 +${v}` },
-  stamina: { tree: 1, name: '단련된 몸',   icon: 'icon_syringe_blue', max: 3, per: 0.15, fmt: v => `스태미너 회복 +${pct(v)}, 소모 -${pct(v * 2 / 3)}` },
-  blade:   { tree: 1, name: '검술',        icon: 'icon_knife',        max: 5, per: 0.1,  fmt: v => `근접 피해 +${pct(v)}` },
-  blast:   { tree: 2, name: '폭파 전문가', icon: 'icon_gren_frag',    max: 3, per: 0.15, fmt: v => `내 폭발 피해 +${pct(v)} (수류탄·로켓·분쇄포)` },
-  dash:    { tree: 2, name: '회피 숙련',   icon: 'suita0',            max: 3, per: 0.12, fmt: v => `회피 대기시간 -${pct(v)}` },
-  scav:    { tree: 2, name: '보급 전문가', icon: 'bpaka0',            max: 3, per: 0.15, fmt: v => `줍는 골드·탄약 +${pct(v)}` },
-  medic:   { tree: 2, name: '응급 처치',   icon: 'stima0',            max: 3, per: 0.15, fmt: v => `메디킷 회복량 +${pct(v)}` },
+  gun:     { tree: 0, tier: 0, col: 0, name: '정밀 사격',   icon: 'icon_assault',      max: 5, per: 0.06, fmt: v => `총기 피해 +${pct(v)}` },
+  reload:  { tree: 0, tier: 0, col: 1, name: '빠른 손',     icon: 'clipa0',            max: 5, per: 0.08, fmt: v => `재장전 시간 -${pct(v)}` },
+  crit:    { tree: 0, tier: 1, col: 0, req: ['gun'], name: '약점 포착',   icon: 'icon_marksman',     max: 5, per: 0.03, fmt: v => `치명타 확률 +${pct(v)} (피해 2배)` },
+  saver:   { tree: 0, tier: 1, col: 1, req: ['reload'], name: '탄약 절약',   icon: 'ammoa0',            max: 3, per: 0.08, fmt: v => `${pct(v)} 확률로 탄을 쓰지 않음` },
+  prey:    { tree: 0, tier: 2, col: 0.5, req: ['crit', 'saver'], name: '거물 사냥', icon: 'icon_perk_prey', max: 3, per: 0.1, fmt: v => `정예·보스에게 주는 피해 +${pct(v)}` },
+  hp:      { tree: 1, tier: 0, col: 0, name: '강인함',      icon: 'media0',            max: 5, per: 15,   fmt: v => `최대 체력 +${v}` },
+  leech:   { tree: 1, tier: 1, col: 0, req: ['hp'], name: '피의 갈증',   icon: 'bon1a0',            max: 3, per: 3,    fmt: v => `적을 처치할 때마다 체력 +${v}` },
+  stamina: { tree: 1, tier: 0, col: 1, name: '단련된 몸',   icon: 'icon_syringe_blue', max: 3, per: 0.15, fmt: v => `스태미너 회복 +${pct(v)}, 소모 -${pct(v * 2 / 3)}` },
+  blade:   { tree: 1, tier: 1, col: 1, req: ['stamina'], name: '검술',        icon: 'icon_knife',        max: 5, per: 0.1,  fmt: v => `근접 피해 +${pct(v)}` },
+  regen:   { tree: 1, tier: 2, col: 0.5, req: ['leech', 'blade'], name: '재생 조직', icon: 'icon_perk_regen', max: 3, per: 1, fmt: v => `초당 체력 회복 +${v}` },
+  blast:   { tree: 2, tier: 1, col: 0, req: ['dash'], name: '폭파 전문가', icon: 'icon_gren_frag',    max: 3, per: 0.15, fmt: v => `내 폭발 피해 +${pct(v)} (수류탄·로켓·분쇄포)` },
+  dash:    { tree: 2, tier: 0, col: 0, name: '회피 숙련',   icon: 'suita0',            max: 3, per: 0.12, fmt: v => `회피 대기시간 -${pct(v)}` },
+  scav:    { tree: 2, tier: 0, col: 1, name: '보급 전문가', icon: 'bpaka0',            max: 3, per: 0.15, fmt: v => `줍는 골드·탄약 +${pct(v)}` },
+  medic:   { tree: 2, tier: 1, col: 1, req: ['scav'], name: '응급 처치',   icon: 'stima0',            max: 3, per: 0.15, fmt: v => `메디킷 회복량 +${pct(v)}` },
+  command: { tree: 2, tier: 2, col: 0.5, req: ['blast', 'medic'], name: '전술 지휘', icon: 'icon_perk_command', max: 3, per: 0.06, fmt: v => `스킬 대기시간 -${pct(v)}` },
 };
 
 // ===== 능력치 =====

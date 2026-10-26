@@ -149,7 +149,7 @@ function pipsHTML(d) { // 구역 1~9: 들어가 본 곳 · 지금 구역
 }
 function slotHTML(d, k, attrs) { // k: 슬롯 번호 또는 'auto' (거점 자동 저장)
   const no = k === 'auto' ? `<div class="no" style="font-size:15px">자동<small>거점</small></div>` : `<div class="no">${k + 1}<small>슬롯</small></div>`;
-  if (!d) return `<button class="sl empty" data-nav ${attrs}>${no}<div><div class="t1">빈 슬롯</div><div class="t2">아직 저장한 작전이 없습니다</div></div></button>`;
+  if (!d) return `<button class="sl empty" data-nav ${attrs}>${no}<div><div class="t1">빈 슬롯</div></div></button>`;
   const p = d.player || {};
   return `<button class="sl" data-nav ${attrs}>${no}
     <div><div class="t1">구역 ${d.stage} ${regName(d.stage)}${diffBadge(d.diff || 'normal')}</div>
@@ -306,8 +306,7 @@ function newGameScreen() {
     hard: '적은 단단하고 한 대 한 대가 치명적이다. 파밍과 성장이 모두 필요하다.' };
   const bar = (v, max) => `<div class="meter"><i style="--v:${v / max}"></i></div>`;
   screen(`<div class="center" style="position:absolute;inset:0"><div class="frm" style="width:min(980px,92vw)">
-      <div class="hd"><div class="grow"><div class="h1">난이도 선택</div></div>
-        <div class="muted" style="font-size:12px;max-width:360px;text-align:right">가장 깊은 코어의 오버마인드를 처치하고 탈출하라</div></div>
+      <div class="hd"><div class="grow"><div class="h1">난이도 선택</div></div></div>
       <div class="bd"><div class="dcs">${Object.entries(DIFFICULTY).map(([k, D]) => `
         <button class="dc" data-nav data-diff="${k}">${k === 'normal' ? '<span class="rec">추천</span>' : ''}
           <div class="art">${img(monIcon(art[k]), 130)}</div>
@@ -316,7 +315,7 @@ function newGameScreen() {
           <div class="stat"><span>적 체력</span>${bar(D.hp, 1.5)}<b>${Math.round(D.hp * 100)}%</b></div>
           <div class="stat"><span>받는 피해</span>${bar(D.dmg, 1.5)}<b>${Math.round(D.dmg * 100)}%</b></div>
         </button>`).join('')}</div></div>
-      <div class="ft"><span class="note">카드를 고르면 바로 시작합니다</span><button class="btn" data-nav id="nBack">뒤로</button></div>
+      <div class="ft"><span class="note"></span><button class="btn" data-nav id="nBack">뒤로</button></div>
     </div></div>`, { cls: 'dim', back: titleScreen, focus: '[data-diff="normal"]' });
   onAll('[data-diff]', b => fadeThen(() => newGame(b.dataset.diff)));
   on('nBack', titleScreen, 'uiBack');
@@ -331,9 +330,9 @@ function loadScreen(back) {
         <div class="slots">${[...(S.auto ? ['auto'] : []), ...S.slots.keys()].map(k => { const d = saveAt(S, k); return `<div class="sl-wrap">${slotHTML(d, k, `data-load="${k}" ${d ? '' : 'disabled'}`)}${d ? `<button class="del" data-nav data-del="${k}" title="지우기">지우기</button>` : '<span></span>'}</div>`; }).join('')}</div>
         <div><div class="sect">작전 기록</div><ul class="log">${log.length ? log.map(l => l.clear
           ? `<li class="clear"><b>${fmtTime(l.time).slice(5)}</b>★ 탈출 성공, ${DIFFICULTY[l.diff] ? DIFFICULTY[l.diff].name : ''}, ${fmtPlay(l.playtime)}</li>`
-          : `<li><b>${fmtTime(l.time).slice(5)}</b>${slotName(l.slot)}, 구역 ${l.stage}, 처치 ${l.kills}</li>`).join('') : '<li>아직 기록이 없습니다</li>'}</ul></div>
+          : `<li><b>${fmtTime(l.time).slice(5)}</b>${slotName(l.slot)}, 구역 ${l.stage}, 처치 ${l.kills}</li>`).join('') : ''}</ul></div>
       </div>
-      <div class="ft"><span class="note">불러오면 저장한 거점에서 다시 시작합니다</span><button class="btn" data-nav id="lBack">뒤로</button></div>
+      <div class="ft"><span class="note"></span><button class="btn" data-nav id="lBack">뒤로</button></div>
     </div></div>`, { cls: 'dim', back, focus: '[data-load]:not(:disabled)' });
   const slotOf = v => v === 'auto' ? 'auto' : +v;
   onAll('[data-load]', b => fadeThen(() => loadGame(slotOf(b.dataset.load))));
@@ -343,15 +342,14 @@ function loadScreen(back) {
 }
 
 // ===== 저장 (보급 거점의 기록 단말기) =====
-function saveScreen(title, note, doneLabel, onDone, saved = -1) {
+function saveScreen(title, doneLabel, onDone, saved = -1) {
   const S = readSaves();
   screen(`<div class="center" style="position:absolute;inset:0"><div class="frm" style="width:min(820px,92vw)">
-      <div class="hd"><div class="grow"><div class="eye cy">기록 단말기</div><div class="h1">${title}</div></div></div>
-      <div class="bd"><div class="muted" style="font-size:12px;line-height:1.6;margin-bottom:16px">${note}</div>
-        <div class="slots">${S.slots.map((d, k) => slotHTML(d, k, `data-save="${k}"`).replace('<div class="no">', `<div class="no"${k === saved ? ' style="color:var(--good)"' : ''}>`)).join('')}</div></div>
-      <div class="ft"><span class="note">${saved >= 0 ? `<span style="color:var(--good)">✔ 슬롯 ${saved + 1}에 저장했습니다</span>` : '저장할 슬롯을 고르세요'}</span><button class="btn" data-nav id="sDone">${doneLabel}</button></div>
+      <div class="hd"><div class="grow"><div class="h1">${title}</div></div></div>
+      <div class="bd"><div class="slots">${S.slots.map((d, k) => slotHTML(d, k, `data-save="${k}"`).replace('<div class="no">', `<div class="no"${k === saved ? ' style="color:var(--good)"' : ''}>`)).join('')}</div></div>
+      <div class="ft"><span class="note">${saved >= 0 ? `<span style="color:var(--good)">✔ 슬롯 ${saved + 1}에 저장했습니다</span>` : ''}</span><button class="btn" data-nav id="sDone">${doneLabel}</button></div>
     </div></div>`, { cls: 'dim', back: onDone, focus: saved >= 0 ? '#sDone' : 0 });
-  const save = k => { const ok = saveGame(k); if (ok) saveScreen(title, note, doneLabel, onDone, k); else confirmBox({ title: '저장하지 못했습니다', text: '브라우저 저장소를 쓸 수 없습니다.', ok: '확인', cancel: '닫기' }); };
+  const save = k => { const ok = saveGame(k); if (ok) saveScreen(title, doneLabel, onDone, k); else confirmBox({ title: '저장하지 못했습니다', text: '브라우저 저장소를 쓸 수 없습니다.', ok: '확인', cancel: '닫기' }); };
   onAll('[data-save]', b => { const k = +b.dataset.save; if (S.slots[k]) confirmBox({ title: `슬롯 ${k + 1}에 덮어쓸까요?`, text: `지금 저장된 작전 (구역 ${S.slots[k].stage}, Lv ${S.slots[k].player.clv || 1})은 사라집니다.`, ok: '덮어쓰기', danger: true, onOk: () => save(k) }); else save(k); }, 'uiMove');
   on('sDone', onDone, 'uiBack');
 }
@@ -366,20 +364,20 @@ function settingsScreen(back, tab = setTab) {
   const toggle = (k, label, sub = '') => `<button class="opt ${settings[k] ? 'on' : ''}" data-nav data-toggle="${k}"><span class="lbl">${label}${sub ? `<small>${sub}</small>` : ''}</span><span class="sw"></span><span class="val">${settings[k] ? '켜짐' : '꺼짐'}</span></button>`;
   const cur = MUSIC_INFO[Music.want];
   const body = {
-    sound: `<div class="sect">음량</div>${slider('master', '전체 음량')}${slider('music', '배경음악', 'Freedoom 사운드트랙 (MIDI를 게임 안 신시사이저로 연주)')}${slider('sfx', '효과음')}${slider('amb', '환경음', '환기구 바람·기계음, 멀리서 들리는 몬스터 기척')}
+    sound: `<div class="sect">음량</div>${slider('master', '전체 음량')}${slider('music', '배경음악')}${slider('sfx', '효과음')}${slider('amb', '환경음')}
       ${cur ? `<div class="obj" style="margin-top:18px"><small class="eye">재생 중</small>${escHtml(cur[0])} (${escHtml(cur[1])})</div>` : ''}`,
-    view: `<div class="sect">화면</div>${slider('shake', '화면 흔들림', '폭발·큰 공격에 맞을 때 화면이 흔들리는 정도')}${toggle('dmgNums', '피해 숫자', '적에게 준 피해를 머리 위에 숫자로')}${toggle('hurtFx', '피격 화면 효과', '맞을 때 화면 가장자리가 붉게 번쩍임')}
-      <button class="opt act" data-nav id="oFull"><span class="lbl">전체 화면<small>브라우저 창을 화면 가득 (F11과 같음)</small></span><span></span><span class="val">${document.fullscreenElement ? '켜짐' : '꺼짐'}</span></button>`,
-    game: `<div class="sect">안내</div>${toggle('tips', '첫 플레이 안내', '처음 만나는 것마다 왼쪽 아래에 안내 카드')}
+    view: `<div class="sect">화면</div>${slider('shake', '화면 흔들림')}${toggle('dmgNums', '피해 숫자')}${toggle('hurtFx', '피격 화면 효과')}
+      <button class="opt act" data-nav id="oFull"><span class="lbl">전체 화면</span><span></span><span class="val">${document.fullscreenElement ? '켜짐' : '꺼짐'}</span></button>`,
+    game: `<div class="sect">안내</div>${toggle('tips', '첫 플레이 안내')}
       <button class="opt act" data-nav id="oTips"><span class="lbl">본 안내 처음부터 다시 보기<small>지금까지 ${tipsSeen.size}개를 봤습니다</small></span><span></span><span class="val">초기화</span></button>
-      <div class="sect" style="margin-top:18px">전리품</div>${toggle('hideCommon', '바닥의 일반 등급 장비 숨기기', '하얀 이름의 장비는 바닥에 보이지 않고 줍지도 않음')}`,
+      <div class="sect" style="margin-top:18px">전리품</div>${toggle('hideCommon', '바닥의 일반 등급 장비 숨기기')}`,
     keys: keysHTML(),
   }[tab];
   screen(`<div class="center" style="position:absolute;inset:0"><div class="frm" style="width:min(${tab === 'keys' ? 1080 : 760}px,94vw)">
       <div class="hd"><div class="grow"><div class="h1">설정</div></div>
         <div class="tabs">${tabs.map(([id, t]) => `<button class="tab ${id === tab ? 'on' : ''}" data-nav data-tab="${id}">${t}</button>`).join('')}</div></div>
       <div class="bd scroll" style="max-height:min(560px,64vh)">${body}</div>
-      <div class="ft"><span class="note">바꾼 설정은 바로 적용되고 저장됩니다</span><button class="btn" data-nav id="oBack">뒤로</button></div>
+      <div class="ft"><span class="note"></span><button class="btn" data-nav id="oBack">뒤로</button></div>
     </div></div>`, { cls: 'dim', back, focus: `[data-tab="${tab}"]`, hints: '<span><kbd>←</kbd><kbd>→</kbd> 값 조절</span>' });
   onAll('[data-tab]', b => { if (b.dataset.tab !== tab) settingsScreen(back, b.dataset.tab); }, 'uiMove');
   for (const row of overlay.querySelectorAll('[data-slider]')) {
@@ -426,7 +424,7 @@ const GUIDE = [
   ['gem', '소켓과 보석 조합', 'icon_gem_ruby', `보석은 저절로 주워져 <b>보석 주머니</b>로 간다. 소켓(◇)이 있는 장비 위에 놓으면 끼워진다. 무기와 방어구에서 효과가 다르다. <b>일반 등급</b> 장비의 소켓을 정해진 보석으로 순서대로 꽉 채우면 <b style="color:#5fe0c8">보석 조합</b> 장비가 된다.`],
   ['set', '세트 장비', 'icon_vest_neon', `<b style="color:#4be05a">초록 이름</b>의 정해진 장비. 같은 세트를 2·3·4개 장착하면 세트 효과가 붙는다 (무기는 슬롯에 끼워 두기만 해도 센다). 보스, 고유 정예, 금고, 도박, 차원 균열에서 나온다.`],
   ['skill', '스킬 쉘과 공명', 'bfe1d0', `스킬은 <b>스킬 쉘</b>을 스킬 창 <b>[K]</b>의 칸(Z X V B)에 끼워야 쓴다. 같은 계열 쉘을 2·3·4개 끼우면 <b>계열 공명</b> Ⅰ·Ⅱ·Ⅲ. 스킬마다 동작이 바뀌는 고유 전설 쉘도 있다.`],
-  ['grow', '성장', 'pstra0', `레벨이 오를 때마다 특성 1점(스킬 창 <b>[K]</b>), 능력치 3점(인벤토리 <b>[I]</b>). 능력치(근력·민첩·기술·정신)는 스킬마다 다른 수치를 키운다. <b>강화칩</b>은 몸 능력, <b>강화장신구</b>는 한 계열의 스킬을 키운다.`],
+  ['grow', '성장', 'pstra0', `레벨이 오를 때마다 특성 1점(스킬 창 <b>[K]</b>), 능력치 3점(인벤토리 <b>[I]</b>). 특성은 사격·생존·전술 트리로, 위 단은 이어진 아래 칸을 배우고 레벨이 되어야 열린다. 능력치(근력·민첩·기술·정신)는 스킬마다 다른 수치를 키운다. <b>강화칩</b>은 몸 능력, <b>강화장신구</b>는 한 계열의 스킬을 키운다.`],
   ['super', '고유 정예와 금고', 'yskua0', `구역마다 이름 붙은 <b>고유 정예</b>가 부하와 함께 있다. 처치하면 금고 열쇠를 얻는다. 금빛 금고 문 뒤의 보물함을 [F]로 연다.`],
   ['spot', '필드 사건', 'tlp2a0', `<b>보급 캐시</b>: 열면 보급품, 대신 적이 몰려온다. <b>조난 신호기</b>: 켜고 곁을 지키면 보상.`],
   ['shrine', '신단', 'soula0', `필드 곳곳에 떠 있는 구체 (구역마다 ${SHRINE_PER}개까지). [F]로 쓰면 ${SHRINES.power.t}초 동안 강해진다: ${Object.values(SHRINES).map(S => `<b>${S.name}</b>(${S.desc.replace(/^\d+초 동안 /, '')})`).join(', ')}. 한 번에 하나만 걸린다.`],
@@ -449,7 +447,7 @@ function helpScreen(back, tab = helpTab, sel = guideSel) {
       <div class="hd"><div class="grow"><div class="h1">${tab === 'keys' ? '조작법' : '정거장 생존 지침'}</div></div>
         <div class="tabs"><button class="tab ${tab === 'keys' ? 'on' : ''}" data-nav data-tab="keys">조작</button><button class="tab ${tab === 'guide' ? 'on' : ''}" data-nav data-tab="guide">가이드</button></div></div>
       <div class="bd">${body}</div>
-      <div class="ft"><span class="note">게임 중에는 처음 만나는 것마다 안내 카드가 뜹니다 ([H] 닫기)</span><button class="btn" data-nav id="hBack">뒤로</button></div>
+      <div class="ft"><span class="note"></span><button class="btn" data-nav id="hBack">뒤로</button></div>
     </div></div>`, { cls: 'dim', back, focus: tab === 'guide' ? `[data-g="${sel}"]` : `[data-tab="${tab}"]` });
   onAll('[data-tab]', b => { if (b.dataset.tab !== tab) helpScreen(back, b.dataset.tab, sel); }, 'uiMove');
   for (const b of overlay.querySelectorAll('[data-g]')) b.onpick = () => { // 고른 항목의 설명 (마우스·키보드)
@@ -485,7 +483,7 @@ function pauseGame(from) {
   const p = player, box = !inBase && objectiveBox(), xpF = p.xp / xpNeed(p.clv);
   const where = rift ? `차원 균열 ${rift.tier}단계` : `구역 ${level} ${regName(level)}`;
   const items = [['res', '계속하기'], ['set', '설정'], ['man', '조작법과 가이드'], ['dbg', '디버그'], ['title', '메인 메뉴로']];
-  screen(`<div class="pz"><div class="h1">일시정지</div>
+  screen(`<div class="pz-wrap"><div class="pz"><div class="h1">일시정지</div>
       <nav class="mm">${items.map(([id, t], n) => `<button class="mi" data-nav id="p_${id}" style="--i:${n}"><span class="t">${t}</span></button>`).join('')}</nav></div>
     <aside class="pz-side frm" style="padding:22px 24px">
       <div class="eye cy">작전 현황</div><div class="h1" style="font-size:24px">${where}</div>
@@ -498,9 +496,8 @@ function pauseGame(from) {
         <div><small>골드</small><b style="color:var(--gold)">${p.gold.toLocaleString()}</b></div>
         <div><small>무기 슬롯</small><b>${slotsOpen()} / ${WEAPON_SLOTS.max}</b></div>
       </div>
-      <div class="muted" style="font-size:12px;margin-top:14px">저장은 보급 거점의 기록 단말기에서 합니다</div>
       <div class="muted" style="font-size:12px;margin-top:10px;letter-spacing:.15em">v${VERSION}</div>
-    </aside>`, { cls: 'dim', back: resumeGame, focus: from || 0 });
+    </aside></div>`, { cls: 'dim', back: resumeGame, focus: from || 0 });
   on('p_res', resumeGame);
   on('p_set', () => settingsScreen(() => pauseGame('#p_set')));
   on('p_man', () => helpScreen(() => pauseGame('#p_man')));
@@ -550,7 +547,7 @@ function teleportScreen(cur) {
         <div><div class="sect">보급 거점</div><div class="wlist">${rows}</div></div>
         ${escape ? '' : riftPanel()}
       </div>
-      <div class="ft"><span class="note">동행 중인 생존자도 함께 이동합니다</span><button class="btn" data-nav id="tClose">닫기</button></div>
+      <div class="ft"><span class="note"></span><button class="btn" data-nav id="tClose">닫기</button></div>
     </div></div>`, { cls: 'dim', back: closeMenu, focus: '[data-hub]:not(:disabled), [data-rift], #tClose' });
   onAll('[data-hub]', b => teleportTo(hubs[+b.dataset.hub]));
   onAll('[data-rift]', b => fadeThen(() => enterRift(+b.dataset.rift)));
@@ -558,11 +555,11 @@ function teleportScreen(cur) {
 }
 // 차원 균열 칸 (보스를 하나 처치하면 열림): 돌파한 단계 +1까지
 function riftPanel() {
-  if (!flags.bosses.length) return `<div><div class="sect">차원 균열</div><div class="obj" style="border-color:var(--violet);background:rgba(199,155,255,.06)">보스를 하나 처치하면 열린다. 단계가 오를수록 적이 강하고 보상이 좋다</div></div>`;
+  if (!flags.bosses.length) return `<div><div class="sect">차원 균열</div><div class="obj" style="border-color:var(--violet);background:rgba(199,155,255,.06)">보스를 하나 처치하면 열린다</div></div>`;
   const best = flags.rift || 0, top = Math.min(RIFT_TIERS.length, best + 1);
   return `<div><div class="sect">차원 균열</div>
     <div class="rts">${RIFT_TIERS.map((T, k) => `<button class="rt" data-nav data-rift="${k + 1}" ${k + 1 > top ? 'disabled' : ''}><b>${k + 1}</b><small>적 수준 ${T.lv}${T.hp > 1 ? '+' : ''}</small><div class="st">${k + 1 <= best ? '★' : ''}</div></button>`).join('')}</div>
-    <div class="muted" style="font-size:12px;line-height:1.6;margin-top:12px">적을 쓰러뜨려 균열을 채우면 <b style="color:var(--violet)">균열 수호자</b>가 나타난다. 돌파 ${best}/${RIFT_TIERS.length}단계</div></div>`;
+    <div class="muted" style="font-size:12px;margin-top:12px">돌파 ${best}/${RIFT_TIERS.length}단계</div></div>`;
 }
 // 균열의 패드 (들어온 패드·나가는 패드): 나갈지 묻기
 function riftPadScreen() {
@@ -570,7 +567,7 @@ function riftPadScreen() {
   const done = rift.done, f = Math.min(1, rift.prog / rift.need);
   screen(`<div class="center" style="position:absolute;inset:0"><div class="frm violet" style="width:min(520px,92vw)">
       <div class="hd"><div class="grow"><div class="eye" style="color:var(--violet)">차원 균열</div><div class="h1">${rift.tier}단계 ${done ? '돌파' : '진행 중'}</div></div></div>
-      <div class="bd"><div class="muted" style="font-size:12px;line-height:1.6">${done ? '균열을 돌파했다. 떨어진 보상을 다 챙겼는지 확인하자.' : '아직 돌파하지 못했다. 지금 나가면 보상은 없다.'}</div>
+      <div class="bd"><div class="muted" style="font-size:12px;line-height:1.6">${done ? '' : '지금 나가면 보상은 없다'}</div>
         ${done ? '' : `<div class="row" style="display:flex;justify-content:space-between;margin-top:16px;font-size:12px"><span class="muted">균열</span><b class="num">${Math.floor(f * 100)}%</b></div><div class="meter violet"><i style="--v:${f}"></i></div>`}</div>
       <div class="ft"><button class="btn violet" data-nav id="rOut">${done ? '거점으로 돌아가기' : '균열에서 나가기'}</button><button class="btn" data-nav id="rStay">${done ? '더 둘러보기' : '계속 싸우기'}</button></div>
     </div></div>`, { cls: 'dim', back: closeMenu, focus: done ? '#rOut' : '#rStay' });
