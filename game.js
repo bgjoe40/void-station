@@ -1128,7 +1128,7 @@ function setupMissions() {
     const R = regions[n], C = CAMPAIGN[n - 1].mission;
     R.mission = { type: 'purge', t: 0, reg: n };
     if (!C || flags.missions.includes(n)) continue;
-    if (C.type === 'hack') { const t = placeHackTerminal(C, R); if (t) { R.mission = { type: 'hack', time: C.time, term: t, prog: 0, on: false, done: false, near: false, nextWave: 2, t: 0, reg: n }; t.m = R.mission; } }
+    if (C.type === 'hack') { const t = placeHackTerminal(C, R); if (t) { R.mission = { type: 'hack', stages: C.stages, stage: 0, term: t, on: false, done: false, game: null, used: [], alarmT: -99, t: 0, reg: n }; t.m = R.mission; } } // 해킹: 보안 단계 (hack.js)
     else if (C.type === 'rescue') R.mission = { type: 'rescue', n: placeSurvivors(C.n, R), saved: 0, lost: 0, t: 0, reg: n };
     else { const k = placeNests(C.n, R); R.mission = { type: 'nest', n: k, left: k, t: 0, reg: n }; }
   }
@@ -3126,32 +3126,7 @@ function nestDeath(e) {
   missionReward(e.x, e.y, M.reg); missionDone(M);
 }
 
-// --- 해킹 ---
-function startHack(t) {
-  const M = t.m;
-  if (!M || M.on) return;
-  M.on = true; hackM = M; Snd.play('hack', t.i + 0.5, t.j + 0.5);
-  msg(`해킹 시작. ${M.time}초 동안 곁을 지켜라`, MISSIONS.hack.color);
-}
-// 단말기에서 r칸 안에 있는 동안만 진행 (벗어나면 멈춤). 진행 gap초마다 적 무리, 마지막 무리에는 정예
-function updateHack(dt) {
-  const M = hackM, H = MISSIONS.hack;
-  if (!M || !M.on || M.done) return;
-  const t = M.term;
-  M.near = Math.hypot(player.x - t.i - 0.5, player.y - t.j - 0.5) < H.r;
-  if (!M.near) {
-    if (gtime - (M.warnT ?? -9) > 5) { M.warnT = gtime; msg('단말기에서 멀어져 해킹이 멈췄다', '#f96'); }
-    return;
-  }
-  const q0 = Math.floor(M.prog / M.time * 4);
-  M.prog = Math.min(M.time, M.prog + dt);
-  if (M.prog >= M.nextWave && M.prog < M.time) { hackWave(M.nextWave + H.gap >= M.time); M.nextWave += H.gap; }
-  if (M.prog < M.time) return;
-  M.done = true; hackM = null; Snd.play('hackDone', t.i + 0.5, t.j + 0.5);
-  missionReward(t.fi + 0.5, t.fj + 0.5, M.reg); missionDone(M);
-}
-// 적 무리: 단말기에서 걸어서 9~20칸 떨어진, 지금 보이지 않는 곳 두 군데에서 나타나 곧장 달려옴
-function hackWave(last) { const M = hackM; spawnWave(M.term.fi, M.term.fj, M.reg, MISSIONS.hack.wave * (last ? 1.6 : 1), last); }
+// --- 해킹: 미니 게임 (hack.js — startHack, updateHack, hackWave) ---
 // (fi, fj)에서 걸어서 9~20칸 떨어진, 지금 보이지 않는 곳 두 군데에서 적이 나타나 곧장 달려옴 (mult: 방 하나 위협 예산의 배율, last: 정예 하나)
 function spawnWave(fi, fj, reg, mult, last) {
   if (enemies.filter(e => e.wave).length >= 40) return; // 이미 많이 몰려와 있으면 이번 무리는 건너뜀
@@ -3198,8 +3173,7 @@ function objectiveBox() {
   }
   if (M.type === 'hack' && !M.done) {
     if (!M.on) return { t: `해킹: ${M.term.name}에서 [F]`, col: '#8ff0e0', edge: '#6ff0d8' };
-    return { t: `해킹 ${Math.floor(M.prog / M.time * 100)}%${M.near ? '' : ': 단말기로 돌아가라'}`, col: M.near ? '#8ff0e0' : Math.sin(gtime * 8) > 0 ? '#fff' : '#ffb08a',
-      edge: M.near ? '#6ff0d8' : '#f86', frac: M.prog / M.time };
+    return { t: `해킹 ${M.stage}/${M.stages}단계`, col: '#8ff0e0', edge: '#6ff0d8', frac: M.stage / M.stages };
   }
   if (M.type === 'nest' && M.left > 0) return { t: `둥지 파괴 ${M.n - M.left}/${M.n}`, col: '#f0a8ff', edge: '#e07aff' };
   const shut = GATES[level] && !gateOpen(level), name = `구역 ${level} ${CAMPAIGN[level - 1].name}`;
@@ -5724,6 +5698,7 @@ canvas.addEventListener('mousedown', e => {
   if (state === 'intro') { if (e.button === 0) mouse.down = true; return; } // 컷신: 누르고 있으면 건너뜀 (introTick)
   if ((state === 'play' || state === 'trade') && hudMenuClick(e.button)) return; // HUD 메뉴 아이콘
   if (state === 'trade') { tradeMouseDown(e.button); return; }
+  if (state === 'play' && hackOpen && hackMouseDown(e.button)) return; // 해킹 창 (맨 위에 그려짐)
   if (state === 'play' && perkOpen && !held && perkMouseDown(e.button)) return; // 스킬 창이 인벤토리 위에 그려지므로 겹친 곳은 스킬 창 먼저 (들고 있는 것은 placeHeld)
   if (state === 'play' && invOpen && invMouseDown(e.button)) return;
   if (state === 'play' && codexOpen && codexMouseDown(e.button)) return;
@@ -5734,6 +5709,7 @@ addEventListener('mouseup', e => {
   if (e.button !== 0) return;
   mouse.down = false;
   if ((state === 'play' || state === 'trade') && invOpen) { mouse.x = e.clientX; mouse.y = e.clientY; invMouseUp(); }
+  if (state === 'play' && hackOpen) { mouse.x = e.clientX; mouse.y = e.clientY; hackMouseUp(); } // 전선 끌어다 놓기
 });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('wheel', e => {
@@ -5754,7 +5730,8 @@ function hudMenuClick(button) {
 function onKey(code) {
   if (state === 'intro') return; // 컷신: 누르고 있으면 건너뜀 (introTick)
   if (code === 'Escape') {
-    if (state === 'play' && codexOpen) codexOpen = false;
+    if (state === 'play' && hackOpen) closeHack();
+    else if (state === 'play' && codexOpen) codexOpen = false;
     else if (state === 'play' && perkOpen) perkOpen = false;
     else if (state === 'play' && invOpen) closeInventory();
     else if (state === 'play') pauseGame();
@@ -6733,9 +6710,9 @@ function drawTerminalLabels() {
     const x = SX(t.i + 0.5, t.j + 0.5), y = SY(t.i + 0.5, t.j + 0.5, 62), w = ctx.measureText(t.name).width;
     ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(x - w / 2 - 5, y - 13, w + 10, 18);
     ctx.fillStyle = `rgb(${t.col})`; ctx.fillText(t.name, x, y);
-    if (t === near) { ctx.fillStyle = '#ffd27a'; ctx.fillText(t.kind === 'hack' ? '[F] 해킹 시작' : t.kind === 'armory' ? '[F] 무기고 해제' : '[F] 사용', x, y - 18); }
+    if (t === near) { ctx.fillStyle = '#ffd27a'; ctx.fillText(t.kind === 'hack' ? (t.m && t.m.on ? '[F] 해킹 계속' : '[F] 해킹 시작') : t.kind === 'armory' ? '[F] 무기고 해제' : '[F] 사용', x, y - 18); }
     else if (t.kind === 'armory' && t.state !== 'idle') { ctx.fillStyle = t.state === 'done' ? '#9f9' : '#ffd27a'; ctx.fillText(t.state === 'done' ? '해제됨' : `해제 ${Math.floor(t.prog / t.A.time * 100)}%`, x, y - 18); }
-    else if (t.kind === 'hack' && t.m && t.m.on) { const M = t.m; ctx.fillStyle = M.done ? '#9f9' : '#8ff0e0'; ctx.fillText(M.done ? '해킹 완료' : `데이터 전송 ${Math.floor(M.prog / M.time * 100)}%`, x, y - 18); }
+    else if (t.kind === 'hack' && t.m && t.m.on) { const M = t.m; ctx.fillStyle = M.done ? '#9f9' : '#8ff0e0'; ctx.fillText(M.done ? '해킹 완료' : `해킹 ${M.stage}/${M.stages}`, x, y - 18); }
   }
 }
 function drawPipe(i, j, alongX) {
@@ -7071,19 +7048,10 @@ function drawLaser() {
 }
 // 바닥 표시 (조명 아래): 갇힌 생존자 발밑의 구조 신호 고리, 해킹 중 지켜야 하는 범위
 function drawMissionFloor() {
-  const M = hackM || PURGE;
   for (const s of survivors) {
     if (s.state !== 'wait' || !canSee(s.x, s.y)) continue;
     ctx.strokeStyle = `rgba(127,200,255,${0.45 + 0.35 * Math.sin(gtime * 5)})`; ctx.lineWidth = 2;
     isoEllipse(s.x, s.y, 0.5 + 0.08 * Math.sin(gtime * 5)); ctx.stroke(); ctx.lineWidth = 1;
-  }
-  if (M.type === 'hack' && M.on && !M.done) {
-    const x = M.term.i + 0.5, y = M.term.j + 0.5, a = 0.5 + 0.25 * Math.sin(gtime * 4);
-    if (M.near) { ctx.fillStyle = 'rgba(110,240,220,0.07)'; isoEllipse(x, y, MISSIONS.hack.r); ctx.fill(); }
-    ctx.setLineDash([12, 9]); ctx.lineDashOffset = -gtime * 24;
-    ctx.strokeStyle = M.near ? `rgba(110,240,220,${a})` : `rgba(255,150,80,${a + 0.2})`; ctx.lineWidth = 2;
-    isoEllipse(x, y, MISSIONS.hack.r); ctx.stroke();
-    ctx.setLineDash([]); ctx.lineWidth = 1;
   }
 }
 function drawBarrel(b) {
@@ -7755,6 +7723,7 @@ function render() {
   if (invOpen && (state === 'play' || state === 'trade')) drawInventory();
   if (perkOpen && (state === 'play' || state === 'trade')) drawPerks();
   if (codexOpen && state === 'play') drawCodex();
+  if (hackOpen && state === 'play') drawHack(); // 해킹 미니 게임 (hack.js)
   if (tipQ) { drawTooltip(...tipQ); tipQ = null; } // 창의 툴팁은 모든 창 위에
   drawCursor();
   if (state === 'ending') drawEnding();
@@ -8360,7 +8329,7 @@ function drawCursor() {
     const [w, h] = held.inst.s.size;
     ctx.globalAlpha = 0.85; drawItemBox(held.inst, x - w * CELL / 2, y - h * CELL / 2, w * CELL, h * CELL); ctx.globalAlpha = 1;
   }
-  if (state === 'trade' || (invOpen && (held || invHit(x, y))) || (perkOpen && perkHit(x, y)) || (codexOpen && codexHit(x, y))) { // 인벤토리·거래·성장·도감 창에서는 화살표
+  if (state === 'trade' || (invOpen && (held || invHit(x, y))) || (perkOpen && perkHit(x, y)) || (codexOpen && codexHit(x, y)) || (hackOpen && hackHit(x, y))) { // 인벤토리·거래·성장·도감·해킹 창에서는 화살표
     ctx.fillStyle = '#eee'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + 16); ctx.lineTo(x + 4, y + 12); ctx.lineTo(x + 11, y + 12); ctx.closePath(); ctx.fill(); ctx.stroke();
   } else {
@@ -8379,7 +8348,7 @@ function drawCursor() {
     ctx.fillStyle = '#000'; ctx.fillText('재장전', x + 1, y + 35); ctx.fillStyle = '#ffd27a'; ctx.fillText('재장전', x, y + 34);
   }
   const gt = guideTarget();
-  if (gt && !(perkOpen && perkHit(x, y)) && !(invOpen && invHit(x, y)) && !(codexOpen && codexHit(x, y))) drawExitGuide(x, y, gt); // 창 위에서는 숨김
+  if (gt && !(perkOpen && perkHit(x, y)) && !(invOpen && invHit(x, y)) && !(codexOpen && codexHit(x, y)) && !(hackOpen && hackHit(x, y))) drawExitGuide(x, y, gt); // 창 위에서는 숨김
 }
 // 길안내 목표: 자폭 중이면 탈출정, 생존자와 함께면 가장 가까운 거점 패드, 해킹 중 단말기에서 벗어나면 단말기
 function guideTarget() {
@@ -8388,7 +8357,7 @@ function guideTarget() {
   const esc = escape && pads.find(pd => pd.kind === 'escape');
   if (esc) return { i: esc.i, j: esc.j, label: '탈출정', col: '#5f8', text: '#7f9' };
   if (survivors.some(s => s.state === 'follow')) { const h = nearestHubPad(player.x, player.y); return { i: h.pad.i, j: h.pad.j, label: '대피', col: '#7fc8ff', text: '#9cf' }; }
-  if (hackM && hackM.on && !hackM.done && !hackM.near) return { i: hackM.term.i, j: hackM.term.j, label: '단말기', col: '#6ff0d8', text: '#8ff0e0' };
+  if (hackM && hackM.on && !hackM.done && !hackOpen) return { i: hackM.term.i, j: hackM.term.j, label: '단말기', col: '#6ff0d8', text: '#8ff0e0' };
   if (armoryOn && !armoryOn.near) return { i: armoryOn.i, j: armoryOn.j, label: '무기고', col: '#ffb060', text: '#ffd27a' };
   if (beaconOn && !beaconOn.near) return { i: Math.floor(beaconOn.x), j: Math.floor(beaconOn.y), label: '신호기', col: '#ffb060', text: '#ffd27a' };
   return null;
@@ -8569,7 +8538,7 @@ function resetWorld() {
   enemies = []; bullets = []; eshots = []; grenades = []; areas = []; parts = []; decals = []; pickups = []; barrels = [];
   texts = []; flashes = []; beams = []; corpses = []; fxs = [];
   assault = null; assaultCd = 0; combatT = 0; trialOn = null; sealMap.fill(0);
-  mission = PURGE; hackM = null; armoryOn = null; survivors = []; hazards = []; eventNotes = []; eventClock = 0; nextEvent = 0; lastEvent = null; beaconOn = null;
+  mission = PURGE; hackM = null; hackOpen = false; armoryOn = null; survivors = []; hazards = []; eventNotes = []; eventClock = 0; nextEvent = 0; lastEvent = null; beaconOn = null;
   turrets = []; mines = []; rings = []; drones = []; coils = []; wells = []; pillars = []; waves = []; decoys = []; delayed = [];
   if (player) { player.scd = {}; player.sk = {}; player.inv = 0; player.shrine = null; } // 스킬 대기시간·지속 효과는 장소를 옮길 때마다 처음부터
 }
@@ -8591,7 +8560,7 @@ function newGame(diff = 'normal') {
 function die(reason) {
   if (state !== 'play' && state !== 'trade') return;
   stowHeld(); // 커서로 들고 있던 장비·보석은 제자리로 (사라지지 않게)
-  trade = null; state = 'dead'; invOpen = false; perkOpen = false; codexOpen = false;
+  trade = null; state = 'dead'; invOpen = false; perkOpen = false; codexOpen = false; hackOpen = false;
   Snd.play('pdeath');
   if (escape || reason) { escape = null; Music.stop(2.5); setTimeout(() => gameOverScreen(reason || '탈출하지 못하고 정거장과 함께 사라졌다'), 900); return; }
   setTimeout(respawn, 1800);
@@ -8802,7 +8771,7 @@ function drawIntroClose(k, bar, txt) {
 // 가까이 있는 쓸 수 있는 단말기 (해킹 단말기는 해킹을 시작하기 전까지만)
 const nearestTerminal = () => {
   let best = null, bd = 1.7;
-  for (const t of terminals) { const d = Math.hypot(t.i + 0.5 - player.x, t.j + 0.5 - player.y); if (d < bd && (t.kind !== 'hack' || !(t.m && t.m.on)) && (t.kind !== 'armory' || t.state === 'idle')) { best = t; bd = d; } }
+  for (const t of terminals) { const d = Math.hypot(t.i + 0.5 - player.x, t.j + 0.5 - player.y); if (d < bd && (t.kind !== 'hack' || !(t.m && t.m.done)) && (t.kind !== 'armory' || t.state === 'idle')) { best = t; bd = d; } }
   return best;
 };
 function closeMenu() { hideOverlay(); state = 'play'; mouse.down = false; }

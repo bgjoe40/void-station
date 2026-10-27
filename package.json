@@ -1,7 +1,7 @@
 {
   "name": "void-station",
   "productName": "Void Station",
-  "version": "0.13.2",
+  "version": "0.14.0",
   "description": "VOID STATION 데스크톱 판 (Electron). 브라우저 판은 index.html 그대로",
   "private": true,
   "main": "electron/main.js",

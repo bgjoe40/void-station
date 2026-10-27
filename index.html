@@ -321,7 +321,7 @@
 <script>
   // 고친 파일을 바로 받도록 매번 새 주소로 불러옴 (브라우저가 예전 스크립트·그림을 캐시에서 꺼내 쓰지 않게) — 순서대로 실행
   window.BUILD = Date.now();
-  for (const f of ['data.js', 'assets/atlas.js', 'game.js', 'parts.js', 'menu.js', 'debug.js']) { const s = document.createElement('script'); s.src = `${f}?v=${BUILD}`; s.async = false; document.body.appendChild(s); }
+  for (const f of ['data.js', 'assets/atlas.js', 'game.js', 'parts.js', 'hack.js', 'menu.js', 'debug.js']) { const s = document.createElement('script'); s.src = `${f}?v=${BUILD}`; s.async = false; document.body.appendChild(s); }
 </script>
 </body>
 </html>

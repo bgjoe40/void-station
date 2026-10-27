@@ -7,7 +7,7 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const VERSION = /const VERSION = '([^']+)'/.exec(fs.readFileSync(path.join(ROOT, 'data.js'), 'utf8'))[1];
-const KEEP = /^\/(index\.html|(data|game|parts|menu|debug)\.js|package\.json|electron(\/main\.js)?|assets(\/.*)?)$/; // 앱에 넣을 것
+const KEEP = /^\/(index\.html|(data|game|parts|hack|menu|debug)\.js|package\.json|electron(\/main\.js)?|assets(\/.*)?)$/; // 앱에 넣을 것
 
 (async () => {
   const [dir] = await packager({
