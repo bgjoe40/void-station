@@ -1,7 +1,7 @@
 // ===== 게임 데이터 정의 (무기 / 탄약 / 수류탄 / 아이템 / 적) =====
 
 // 버전: GitHub에 커밋·푸시할 때마다 올림 (새 기능은 가운데 자리, 고침·작은 추가는 끝자리) — 타이틀·일시정지 화면에 표시, git 태그 v<버전>
-const VERSION = '0.13.1';
+const VERSION = '0.13.2';
 
 const CAT_NAMES = ['근접', '권총', '샷건', '라이플', '기관총', '에너지'];
 const MAX_LOAD = 30;   // 장착 + 가방 무기 무게 합이 넘으면 이동속도 감소
@@ -198,13 +198,13 @@ const UPGRADES = {
 const MODS = {
   neuro:  { name: '신경 가속',   slot: 'head', k: 'cdr',    per: 0.03, icon: 'icon_brain',        text: v => `스킬 대기시간 -${pct(v)}` },
   filter: { name: '면역 필터',   slot: 'head', k: 'res',    per: 0.10, icon: 'bon1a0',            text: v => `중독·화상·감전 시간 -${pct(v)}` },
-  frame:  { name: '강화 골격',   slot: 'body', k: 'hp',     per: 15,   icon: 'media0',            text: v => `최대 체력 +${v}` },
-  pouch:  { name: '탄약 주머니', slot: 'body', k: 'ammo',   per: 0.10, icon: 'ammoa0',            text: v => `탄약 최대치 +${pct(v)}` },
-  exo:    { name: '외골격 다리', slot: 'legs', k: 'load',   per: 2,    icon: 'arm1a0',            text: v => `적재량 +${v}` },
+  frame:  { name: '강화 골격',   slot: 'body', k: 'hp',     per: 20,   icon: 'media0',            text: v => `최대 체력 +${v}` },
+  pouch:  { name: '탄약 주머니', slot: 'body', k: 'ammo',   per: 0.15, icon: 'ammoa0',            text: v => `탄약 최대치 +${pct(v)}` },
+  exo:    { name: '외골격 다리', slot: 'legs', k: 'load',   per: 3,    icon: 'arm1a0',            text: v => `적재량 +${v}` },
   muscle: { name: '인공 근육',   slot: 'legs', k: 'spd',    per: 0.02, icon: 'icon_boots',        text: v => `이동 속도 +${pct(v)}` },
   servo:  { name: '서보 보조',   slot: 'arm',  k: 'reload', per: 0.04, icon: 'clipa0',            text: v => `재장전 시간 -${pct(v)}` },
   impact: { name: '충격 증폭',   slot: 'arm',  k: 'melee',  per: 0.05, icon: 'icon_knife',        text: v => `근접 피해 +${pct(v)}` },
-  lung:   { name: '인공 폐',     slot: 'chip', k: 'stam',   per: 10,   icon: 'icon_syringe_blue', text: v => `최대 스태미너 +${v}` },
+  lung:   { name: '인공 폐',     slot: 'chip', k: 'stam',   per: 15,   icon: 'icon_syringe_blue', text: v => `최대 스태미너 +${v}` },
   reso:   { name: '공명 회로',   slot: 'acc',  k: 'spow',   per: 0.03, line: true,                text: (v, t) => `${ATTRS[t].name} 스킬 위력 +${pct(v)}` },
 };
 const MOD_CAP = [1, 2, 3, 4, 4, 4];

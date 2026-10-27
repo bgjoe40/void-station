@@ -4862,7 +4862,7 @@ function drawPerks() {
 // ===== 수집 도감 [J] (실시간): 처치한 몬스터·보스·고유 정예, 찾은 고유 전설 (무기·쉘), 만든 보석 조합 =====
 // 이 브라우저의 모든 저장에서 함께 쌓임 (localStorage) — 못 찾은 것은 검은 그림자로
 const CODEX_KEY = 'voidstation.codex.v1';
-let codex = { mon: {}, sup: {}, uq: {}, suq: {}, rw: {}, set: {}, logs: {}, ach: {}, stat: {} }, codexDirty = false, codexSaveT = 0, codexOpen = false, codexTab = 'mon';
+let codex = { mon: {}, sup: {}, uq: {}, suq: {}, rw: {}, set: {}, logs: {}, ach: {}, stat: {} }, codexDirty = false, codexSaveT = 0, codexOpen = false, codexTab = 'mon', codexScroll = 0;
 try { const c = JSON.parse(localStorage.getItem(CODEX_KEY)); if (c) for (const k in codex) Object.assign(codex[k], c[k] || {}); } catch (e) { /* 저장소를 못 쓰면 이번 실행에서만 */ }
 function codexSave() { codexDirty = false; try { localStorage.setItem(CODEX_KEY, JSON.stringify(codex)); } catch (e) { /* 이번 실행에서만 */ } }
 function codexTick(dt) {
@@ -4993,7 +4993,10 @@ function codexGeom() {
   const pw = Math.min(W - 24, 880), ph = Math.min(VH - 16, 600), cw = 96, ch = 108, gap = 8;
   return { x: Math.round((W - pw) / 2), y: Math.max(8, Math.round((VH - ph) / 2)), pw, ph, cw, ch, gap, cols: Math.max(1, Math.floor((pw - 24 + gap) / (cw + gap))) };
 }
-const codexCard = (g, n) => ({ x: g.x + 12 + (n % g.cols) * (g.cw + g.gap), y: g.y + 64 + Math.floor(n / g.cols) * (g.ch + g.gap) });
+const codexCard = (g, n) => ({ x: g.x + 12 + (n % g.cols) * (g.cw + g.gap), y: g.y + 64 + Math.floor(n / g.cols) * (g.ch + g.gap) - codexScroll });
+// 카드가 보이는 곳 (탭 아래부터, 업적 탭은 보너스 줄 위까지), 카드가 넘치면 휠로 넘기는 만큼
+const codexView = g => ({ top: g.y + 62, h: g.ph - 62 - (codexTab === 'ach' ? 30 : 10) });
+const codexMaxScroll = g => Math.max(0, Math.ceil(codexCards(codexTab).length / g.cols) * (g.ch + g.gap) - g.gap + 2 - codexView(g).h);
 const codexTabW = g => Math.floor((g.pw - 24 + 6) / CODEX_TABS.length) - 6; // 탭 폭 (탭 수에 맞춰)
 const codexTabRect = (g, k) => [g.x + 12 + k * (codexTabW(g) + 6), g.y + 30, codexTabW(g), 24];
 const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)).join(','); // '#rrggbb' → 'r,g,b' (pxWell 빛)
@@ -5002,8 +5005,8 @@ function codexHit(mx, my) {
   if (mx < g.x || mx > g.x + g.pw || my < g.y || my > g.y + g.ph) return null;
   if (inRect(closeBtn(g.x, g.y, g.pw), mx, my)) return { close: true };
   for (let k = 0; k < CODEX_TABS.length; k++) if (inRect(codexTabRect(g, k), mx, my)) return { tab: CODEX_TABS[k][0] };
-  const n = codexCards(codexTab).length;
-  for (let i = 0; i < n; i++) { const c = codexCard(g, i); if (mx >= c.x && mx < c.x + g.cw && my >= c.y && my < c.y + g.ch) return { card: i }; }
+  const n = codexCards(codexTab).length, v = codexView(g);
+  if (my >= v.top && my < v.top + v.h) for (let i = 0; i < n; i++) { const c = codexCard(g, i); if (mx >= c.x && mx < c.x + g.cw && my >= c.y && my < c.y + g.ch) return { card: i }; }
   return { panel: true };
 }
 // 창 위를 클릭했으면 true (창 밖 클릭은 그대로 공격)
@@ -5011,7 +5014,7 @@ function codexMouseDown(button) {
   const h = codexHit(mouse.x, mouse.y);
   if (!h) return false;
   if (h.close) { if (button === 0) { codexOpen = false; Snd.play('menu'); } return true; }
-  if (button === 0 && h.tab && h.tab !== codexTab) { codexTab = h.tab; Snd.play('menu'); }
+  if (button === 0 && h.tab && h.tab !== codexTab) { codexTab = h.tab; codexScroll = 0; Snd.play('menu'); }
   return true;
 }
 function drawCodex() {
@@ -5023,6 +5026,9 @@ function drawCodex() {
     ctx.textAlign = 'center'; ctx.font = font(FS, true); ctx.fillStyle = on ? INK : HC.dim;
     ctx.fillText(fitText(`${label}  ${got}/${all.length}`, r[2] - 8), r[0] + r[2] / 2, r[1] + 16);
   });
+  const v = codexView(g), max = codexMaxScroll(g);
+  codexScroll = clamp(codexScroll, 0, max);
+  ctx.save(); ctx.beginPath(); ctx.rect(g.x, v.top, g.pw, v.h); ctx.clip(); // 넘치는 카드는 잘라서
   cards.forEach((c, n) => { // 카드: 찾은 것은 그 색의 빛과 아래 줄, 커서 아래는 호박색 테두리
     const q = codexCard(g, n), r = [q.x, q.y, g.cw, g.ch];
     pxWell(r, h && h.card === n, c.known ? hexRgb(c.col) : null);
@@ -5042,6 +5048,11 @@ function drawCodex() {
     ctx.font = font(FS); ctx.fillStyle = c.known ? HC.dim : '#3a3d44'; ctx.fillText(fitText(c.sub || '', g.cw - 8), q.x + g.cw / 2, q.y + g.ch - 9);
     if (c.frac !== undefined && !c.known) { ctx.fillStyle = '#26282e'; ctx.fillRect(q.x + 8, q.y + g.ch - 37, g.cw - 16, 4); ctx.fillStyle = HC.acc; ctx.fillRect(q.x + 8, q.y + g.ch - 37, Math.round((g.cw - 16) * clamp(c.frac, 0, 1)), 4); } // 업적 진행
   });
+  ctx.restore();
+  if (max > 0) { // 스크롤 막대 (오른쪽)
+    const th = Math.max(24, v.h * v.h / (v.h + max)), ty = v.top + (v.h - th) * codexScroll / max;
+    ctx.fillStyle = '#26282e'; ctx.fillRect(g.x + g.pw - 8, v.top, 3, v.h); ctx.fillStyle = HC.acc; ctx.fillRect(g.x + g.pw - 8, Math.round(ty), 3, Math.round(th));
+  }
   if (codexTab === 'ach') { // 지금 받는 업적 보너스 합계 (있을 때만)
     const keys = [...new Set(ACHIEVEMENTS.flatMap(A => Object.keys(A.bonus)))].filter(k => achSum(k) > 0);
     ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = HC.acc;
@@ -5725,7 +5736,10 @@ addEventListener('mouseup', e => {
   if ((state === 'play' || state === 'trade') && invOpen) { mouse.x = e.clientX; mouse.y = e.clientY; invMouseUp(); }
 });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
-canvas.addEventListener('wheel', e => { if (state === 'play') cycleWeapon(Math.sign(e.deltaY || e.deltaX)); }, { passive: true });
+canvas.addEventListener('wheel', e => {
+  if (state === 'play' && codexOpen && codexHit(e.clientX, e.clientY)) { codexScroll = clamp(codexScroll + Math.sign(e.deltaY) * 58, 0, codexMaxScroll(codexGeom())); return; } // 수집 도감: 카드 넘기기
+  if (state === 'play') cycleWeapon(Math.sign(e.deltaY || e.deltaX));
+}, { passive: true });
 
 // 인벤토리 [I]·스킬 창 [K] 열고 닫기 (둘은 함께 열 수 있고, 도감은 닫음)
 function toggleInv() { if (invOpen) closeInventory(); else { invOpen = true; codexOpen = false; } Snd.play('menu'); }
@@ -5750,6 +5764,7 @@ function onKey(code) {
     return;
   }
   if (state === 'trade' && code === 'KeyK') { toggleSkills(); return; } // 거래 중에도 스킬 창 (개조 자판기에서 장착한 쉘 고르기)
+  if (state === 'trade' && code in ITEM_KEYS) { useItem(ITEM_KEYS[code]); return; } // 거래 중에도 소모품 (자판기를 쓰는 동안에도 게임은 계속)
   if (state !== 'play') return;
   const p = player;
   if (code in ITEM_KEYS) useItem(ITEM_KEYS[code]); // 소모품 (메디킷 Q, 치료제 E, 아드레날린 T)
@@ -7311,8 +7326,7 @@ function drawTooltip(L, x, y, maxY = H) {
   for (const l of L) { ctx.font = l.b ? font(FM, true) : font(FS); w = Math.max(w, ctx.measureText(l.t).width); }
   w += 18; const h = L.length * 17 + 10;
   x = clamp(x, 6, W - w - 6); y = clamp(y, 6, maxY - h - 6);
-  ctx.fillStyle = 'rgba(10,10,8,0.94)'; ctx.fillRect(x, y, w, h);
-  ctx.strokeStyle = L[0].c; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+  const f = HC.fill; HC.fill = WIN_FILL; pxCard(x, y, w, h, false, L[0].c); HC.fill = f; // 창과 같은 모서리 픽셀 테두리, 윗변은 제목 색
   ctx.textAlign = 'left';
   L.forEach((l, i) => { ctx.font = l.b ? font(FM, true) : font(FS); ctx.fillStyle = l.c; ctx.fillText(l.t, x + 9, y + 19 + i * 17); });
 }
