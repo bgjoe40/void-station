@@ -87,6 +87,7 @@ const SFX = {
   missiles: [['dsrlaunc'], 0.6, 1.5], chain: [['dsplasma'], 0.9, 0.5], inferno: [['dsvilatk'], 0.8, 1], gravity: [['dsbospit'], 0.8, 0.6],
   implode: [['dsrxplod'], 0.9, 0.6], drain: [['dsbospn'], 0.6, 1.3],
   pillar: [['dsflame'], 0.9, 1, 0.08], // 감시자의 불기둥
+  gib: [['dsslop'], 0.75, 0.75, 0.06], // 산산이 터짐 (처치한 한 방이 최대 체력의 두 배를 넘음)
 };
 // 걸을 때 발소리를 내는 몬스터: [소리, 간격(초), 들리는 거리(칸)] — 크롤러는 여럿이라 가까이서만, 같은 소리는 겹치지 않게(SFX 간격)
 const ENEMY_STEP = { titan: ['stepBig', 0.55, 16], hivemother: ['stepMetal', 0.5, 16], brute: ['stepHeavy', 0.6, 12], mortar: ['stepHeavy', 0.8, 12], crawler: ['skitter', 0.8, 8], runner: ['skitter', 0.5, 8], juggernaut: ['stepBig', 0.8, 14],
@@ -229,6 +230,7 @@ const Snd = {
       case 'fireball': case 'fireHit': this.nz(0.4, 800, 0.4); break;
       case 'podHatch': case 'crate': this.nz(0.3, 500, 0.4); break;
       case 'bigHurt': this.nz(0.12, 400, 0.6); this.tn(70, 40, 0.15, 0.3, 'sine'); break;
+      case 'crit': this.tn(2200, 900, 0.07, 0.1); this.nz(0.08, 3500, 0.3, 'bandpass'); break; // 치명타: 날카로운 쇳소리
     }
   },
   // 몬스터 소리: kind = sight | death | pain | attack (같은 종류는 잠시 겹치지 않게)
@@ -1238,10 +1240,10 @@ function readLog(i) {
 }
 function drawLog() {
   const T = logNow;
-  if (!T || state !== 'play' || codexOpen) return;
+  if (!T || state !== 'play' || codexOpen || zoneCard) return; // 구역 카드가 사라진 뒤에 (그동안 시간도 멈춤)
   const L = LOGS[T.id], w = Math.min(500, W - 300), x = (W - w) / 2, tx = 70;
   ctx.font = font(FM);
-  const lines = wrapPx(`"${L.text}"`, w - tx - 16), h = 52 + lines.length * 19 + 18, y = 50;
+  const lines = wrapPx(`"${L.text}"`, w - tx - 16), h = 52 + lines.length * 19 + 18, y = escape ? 90 : bossBarOn() ? 82 : 50; // 자폭 시계·보스 체력 막대 아래
   ctx.globalAlpha = clamp(Math.min((T.max - T.t) / 0.25, T.t / 0.6), 0, 1);
   pxCard(x, y, w, h);
   ctx.fillStyle = 'rgba(80,200,255,0.08)'; ctx.fillRect(x + 12, y + 14, 48, 48); drawIcon(Math.floor(gtime * 3) % 2 ? 'pmapb0' : 'pmapa0', x + 16, y + 18, 40, 40);
@@ -1337,12 +1339,23 @@ function spawnNear(dt) {
   }
 }
 // 방 하나 채우기: 그 구역 기준의 적 (보스 방은 절반, 다음 구역 길목 방은 1.3배) + 통·보급품, 정예, 보스
+// 구역 1에서 착륙 지점(거점 패드)에 가장 가까운 방들: 위협 예산 START_EASE배 (가까운 순서 — 방 안에서 가장 가까운 칸까지 걸어가는 거리)
+function startEase(R, r) {
+  if (R.n !== 1) return 1;
+  if (!R.near) {
+    const h = hubs.find(q => q.reg === 1), d = bfs(h.pad.i, h.pad.j);
+    const far = q => { let m = 1e9; for (let j = q.y; j < q.y + q.h; j++) for (let i = q.x; i < q.x + q.w; i++) { const v = d[j * MW + i]; if (v >= 0 && v < m) m = v; } return m; };
+    R.near = R.rooms.filter(q => !q.hub).map(q => [far(q), q]).sort((a, b) => a[0] - b[0]).map(a => a[1]);
+  }
+  const k = R.near.indexOf(r);
+  return k >= 0 && k < START_EASE.length ? START_EASE[k] : 1;
+}
 function spawnRoom(r) {
   r.spawned = true;
   if (r.hub || r.vault) return; // 거점·금고에는 적이 없음
   if (r.super) { spawnSuper(r); return; }
   const lv = r.reg, R = regions[lv], bossHere = r.boss && !flags.bosses.includes(lv);
-  fillRoom(r, (ROOM_BUDGET[0] + ROOM_BUDGET[1] * lv) * curveAt(CURVE.room, lv) * rnd(0.7, 1.3) * (bossHere ? 0.5 : r === R.exit ? 1.3 : 1), enemyPool(lv), lv);
+  fillRoom(r, (ROOM_BUDGET[0] + ROOM_BUDGET[1] * lv) * curveAt(CURVE.room, lv) * rnd(0.7, 1.3) * (bossHere ? 0.5 : r === R.exit ? 1.3 : 1) * startEase(R, r), enemyPool(lv), lv);
   const made = enemies.filter(e => !e.dead && !e.elite && !e.d.nest && !e.d.bomb && roomAt(e.x, e.y) === r); // 폭주 해골은 정예가 되지 않음
   for (let k = 0; k < (r.elites || 0) && made.length; k++) { // 정예: 되도록 위협도 2 이상인 적에게 특성
     const strong = made.filter(e => e.d.cost >= 2), e = pick(strong.length ? strong : made);
@@ -1629,7 +1642,7 @@ function levelUpFx() {
 }
 
 function msg(t, col = '#cfe8c8') { const same = msgs.find(m => m.t === t); if (same) { same.life = 4; return; } msgs.unshift({ t, col, life: 4 }); if (msgs.length > 4) msgs.pop(); }
-function addText(x, y, t, col, z = 30) { texts.push({ x, y, z, t: String(t), col, life: 0.8 }); }
+function addText(x, y, t, col, z = 30, big = false) { texts.push({ x, y, z, t: String(t), col, life: big ? 1 : 0.8, big }); } // big: 큰 글씨 (치명타)
 
 // ===== 레벨 구성 =====
 function randomFloorIn(r, rad = 0.35) {
@@ -1843,7 +1856,7 @@ function hurtPlayer(dmg, sx, sy) {
     * (1 - defCut(gearDef() * (p.fx.curse > 0 ? ELITE_FX.curse.def : 1))) * (shrineOn('guard') ? 1 - SHRINES.guard.cut : 1); // 방어구 (저주 중이면 절반), 수호의 신단
   const ab = Math.min(p.armor, dmg * 0.6);
   p.armor -= ab; const real = dmg - ab; p.hp -= real;
-  hurtFlash = Math.min(1, hurtFlash + real / 35); hitFlash = 1; p.painT = 0.2; p.hitT = 0.16;
+  hurtFlash = Math.min(1, hurtFlash + real / Math.max(35, p.maxhp * 0.25)); hitFlash = 1; p.painT = 0.2; p.hitT = 0.16; // 붉기: 최대 체력의 1/4을 한 번에 잃으면 가장 붉게
   shake = Math.max(shake, Math.min(14, 3 + real * 0.25));
   addText(p.x, p.y, `-${Math.round(real)}`, '#f66', 44);
   blood(p.x, p.y, Math.min(14, 3 + Math.floor(real / 4)), '#a01414'); // 피 튐
@@ -1869,19 +1882,19 @@ function hitEnemy(e, dmg, kx = 0, ky = 0, silent = false, crit = false, guard = 
   const raw = dmg;
   if (e.d.armor && !silent && !meleeNow) dmg = Math.max(raw * 0.2, raw - e.d.armor * (1 - apNow)); // 장갑: 직접 맞은 한 발마다 덜 받음 (화상·중독 같은 지속 피해는 그대로, 근접은 무시, 철갑탄은 일부 무시)
   const blocked = guard || dmg < raw * 0.5; // 장갑·방패에 거의 막힘 → 회색 숫자 + 불꽃
-  const kb = e.d.fixed ? 0 : e.d.boss ? 0.15 : e.d.heavy ? 0.25 : 1;
+  const kb = (e.d.fixed ? 0 : e.d.boss ? 0.15 : e.d.heavy ? 0.25 : 1) * (crit ? 1.5 : 1); // 치명타는 더 밀려남
   e.hp -= dmg; e.flash = 0.08; e.kx += kx * kb; e.ky += ky * kb;
   if (!e.aggro) { aggro(e); alertNear(e.x, e.y, 5); }
   if (e.d.blink) e.reveal = Math.max(e.reveal || 0, e.d.blink.reveal); // 그림자 추적자: 맞으면 잠시 드러남 (화상·중독도)
   if (!silent) {
     if (guard) { spark(e.x + Math.cos(e.face) * (e.r + 0.3), e.y + Math.sin(e.face) * (e.r + 0.3), 5, '#9cf', 3); Snd.play('armorHit', e.x, e.y); }
     else if (blocked) { spark(e.x, e.y, 3, '#dde', 2.5); Snd.play('armorHit', e.x, e.y); } else blood(e.x, e.y, 3, e.d.blood);
-    if (settings.dmgNums) addText(e.x + rnd(-.2, .2), e.y, crit ? `${Math.round(dmg)}!` : Math.round(dmg), blocked ? '#9aa' : crit ? '#ff7a40' : '#ffe9a0'); // 설정의 피해 숫자
-    Snd.play('hit');
-    if (Math.random() < (e.d.boss ? 0.08 : 0.35) && e.hp > 0) { e.painT = 0.15; Snd.mon(e, 'pain'); }
+    if (settings.dmgNums) addText(e.x + rnd(-.2, .2), e.y, crit ? `${Math.round(dmg)}!` : Math.round(dmg), blocked ? '#9aa' : crit ? '#ff7a40' : '#ffe9a0', 30, crit && !blocked); // 설정의 피해 숫자 (치명타는 크게)
+    Snd.play(crit && !blocked ? 'crit' : 'hit');
+    if (e.hp > 0 && ((crit && !e.d.boss) || Math.random() < (e.d.boss ? 0.08 : 0.35))) { e.painT = 0.15; Snd.mon(e, 'pain'); } // 치명타에는 늘 움찔
   }
   if (!silent && e.elite && e.elite.includes('spark') && !(e.sparkCd > 0)) eliteSpark(e); // 전기를 품은: 맞으면 전기 불꽃
-  if (e.hp <= 0) killEnemy(e);
+  if (e.hp <= 0) { if (!silent && dmg >= Math.max(60, e.maxhp * 2)) e.gib = true; killEnemy(e); } // 최대 체력의 두 배가 넘는 한 방: 산산이 터짐
 }
 // 전기를 품은 정예: 맞을 때마다 (대기시간마다) 전기 불꽃 n개가 사방으로 — 맞으면 감전
 function eliteSpark(e) {
@@ -1965,6 +1978,13 @@ function chainBolt(e, dmg, n, skip = []) {
 function alertNear(x, y, r) { for (const o of enemies) if (!o.aggro && Math.hypot(o.x - x, o.y - y) < r) aggro(o); }
 // 몬스터가 플레이어를 알아챔 (발견 소리)
 function aggro(e) { if (!e.aggro && !e.ceil) { e.aggro = true; Snd.mon(e, 'sight'); } } // 천장의 매복자는 떨어질 때 깨어남
+// 산산이 터짐: 살점이 사방으로 튀고 체액이 넓게 번짐, 질척한 소리
+function gibBurst(e) {
+  for (let k = 0; k < 10; k++) { const a = rnd(0, 6.28), s = rnd(1.5, 4.5); parts.push({ x: e.x, y: e.y, z: rnd(10, 30), vx: Math.cos(a) * s, vy: Math.sin(a) * s, vz: rnd(60, 160), g: 340, life: rnd(0.5, 0.9), max: 0.9, col: e.d.blood, size: pick([3, 4, 5]) }); }
+  blood(e.x, e.y, 20, e.d.blood);
+  for (let k = 0; k < 3; k++) bloodSplat(e.x + rnd(-0.6, 0.6), e.y + rnd(-0.6, 0.6), rnd(0.25, 0.45), e.d.blood, false);
+  Snd.play('gib', e.x, e.y);
+}
 function killEnemy(e) {
   e.dead = true; kills++; codexKill(e);
   const xp = xpFor(e); // 캐릭터 경험치 (정예·보스는 숫자로 보여줌)
@@ -1975,6 +1995,9 @@ function killEnemy(e) {
   if (B) { heal(player, B.heal); if (B.ext > 0) { const add = Math.min(1, B.ext); B.ext -= add; B.t += add; B.max = Math.max(B.max, B.t); } }
   if (e.shatter && e.freeze > 0) frostShatter(e); // 영원한 겨울: 얼어 있던 적은 산산조각
   blood(e.x, e.y, 16, e.d.blood); bloodSplat(e.x, e.y, e.r * 1.6 + 0.3, e.d.blood); // 쓰러진 자리의 체액
+  const stop = e.d.boss ? 0.12 : e.super ? 0.08 : e.elite || e.d.cost >= 5 ? 0.05 : 0; // 보스·고유 정예·정예·큰 적(위협도 5 이상): 처치하는 순간 아주 잠깐 멈추고 흔들림
+  if (stop) { hitStop = Math.max(hitStop, stop); shake = Math.max(shake, e.d.boss ? 18 : 8); }
+  if (e.gib && !e.d.boss && !e.d.fixed) gibBurst(e);
   if ((!e.d.fixed || e.d.corpse) && !e.voided && !e.d.bomb && !e.d.nocorpse) corpses.push({ x: e.x, y: e.y, type: e.type, face: e.face, t: 0 }); // 오버마인드는 터져 사라짐, 우주로 빨려 나간 적도 남지 않음
   if (e.d.ward) { addFx('misl', 'bcd', e.x, e.y, 30, 0.4, 0.7); spark(e.x, e.y, 14, '#7df', 4); } // 수호 드론: 터지며 사라짐 (보호막도 꺼짐)
   if (e.venom && !e.d.fixed) areas.push({ type: 'gas', x: e.x, y: e.y, r: 1.8, t: 3, max: 3, safe: true }); // 맹독 살포기: 플레이어는 안전한 독가스
@@ -2627,6 +2650,7 @@ function updateEscape(dt) {
     die('정거장 자폭에 휘말렸다');
   }
 }
+const bossBarOn = () => enemies.some(e => e.d.boss && !e.dead && e.aggro); // 보스 체력 막대가 떠 있음
 function drawBossBar() {
   let boss = null, bd = 1e9; // 싸우는 중인 가장 가까운 보스 (구역 보스가 여럿 깨어 있을 수 있음)
   for (const e of enemies) if (e.d.boss && !e.dead && e.aggro) { const d = Math.hypot(e.x - player.x, e.y - player.y); if (d < bd) { bd = d; boss = e; } }
@@ -2893,7 +2917,7 @@ function spawnWave(fi, fj, reg, mult, last) {
   Snd.play('alarm'); msg(last ? '마지막 적 무리!' : '적 무리 접근!', '#f96');
 }
 
-// 화면 왼쪽 위 목표 표시: { t: 글, col: 글자색, edge: 테두리색, frac: 진행 막대 (해킹) } — 지금 구역의 임무, 없으면 구역 이름과 길목 상태
+// 화면 왼쪽 위 목표 표시: { t: 글, col: 글자색, edge: 테두리색, frac: 진행 막대 (해킹) } — 지금 구역의 임무, 없으면 구역 이름 (닫힌 격벽이면 붉은 테두리). 아래 줄은 zoneSteps
 function objectiveBox() {
   const M = mission, R = regions[level];
   if (!R) return null;
@@ -2907,8 +2931,18 @@ function objectiveBox() {
   }
   if (M.type === 'nest' && M.left > 0) return { t: `둥지 파괴 ${M.n - M.left}/${M.n}`, col: '#f0a8ff', edge: '#e07aff' };
   const shut = GATES[level] && !gateOpen(level), name = `구역 ${level} ${CAMPAIGN[level - 1].name}`;
-  if (shut) return { t: `${name}: ${GATES[level] === 'boss' ? `${ENEMIES[bossKindFor(level)].name}이(가) 길목을 막고 있다` : '단말기를 해킹해 코어 격벽을 열어라'}`, col: '#ffb08a', edge: '#f86' };
-  return { t: name, col: '#cfe8c8', edge: '#5a6a50' };
+  if (shut && GATES[level] === 'mission') return { t: `${name}: 단말기를 해킹해 코어 격벽을 열어라`, col: '#ffb08a', edge: '#f86' }; // 보스 격벽은 아래 줄의 보스
+  return { t: name, col: '#cfe8c8', edge: shut ? '#f86' : '#5a6a50' };
+}
+// 구역 할 일 (목표 아래 줄): 키카드 · 보스 · 다음 구역 — [글, 색]. 이룬 것은 흐리게, 다음 구역은 키카드를 다 모으고 격벽이 열려 있으면 초록 (작은 지도의 화살표 색)
+function zoneSteps() {
+  const R = regions[level], dim = '#5c6658', out = [];
+  if (!R) return out;
+  const got = R.locks.filter(c => keysHeld.has(`${level}:${c}`)).length, keys = got >= R.locks.length, bk = (R.bossRoom && R.bossRoom.boss) || R.exit.boss;
+  if (R.locks.length) out.push([`키카드 ${got}/${R.locks.length}`, keys ? dim : '#e8dcc0']);
+  if (bk) out.push([`${ENEMIES[bk].name} 처치`, flags.bosses.includes(level) ? dim : '#ff9a7a']);
+  if (regions[level + 1]) out.push([`→ 구역 ${level + 1}`, keys && gateOpen(level) ? '#5f8' : '#a8b8a0']);
+  return out;
 }
 // ===== 구역 돌발 상황: 정전 · 독가스 누출 · 선체 파손 (EVENTS, EVENT_PLAN) =====
 let eventClock = 0, nextEvent = 0, lastEvent = null; // 돌발 상황 시계, 다음 시각, 지난번 종류
@@ -3167,10 +3201,10 @@ const shellSlotOf = id => player.shells.findIndex(s => s && s.id === id);
 // 새로 얻은 쉘: 같은 스킬이 없고 빈 칸이 있으면 장착, 아니면 가방. 실패하면 null
 function addShell(sh) {
   const p = player, k = p.shells.indexOf(null);
-  if (k >= 0 && shellSlotOf(sh.id) < 0) { p.shells[k] = sh; return 'equip'; }
+  if (k >= 0 && shellSlotOf(sh.id) < 0) { p.shells[k] = sh; tip('skills'); return 'equip'; }
   const spot = bagFit(sh);
   if (!spot) return null;
-  sh.gx = spot.gx; sh.gy = spot.gy; p.bag.push(sh);
+  sh.gx = spot.gx; sh.gy = spot.gy; p.bag.push(sh); tip('skills');
   return 'bag';
 }
 // 가방의 쉘 우클릭: 같은 스킬을 낀 칸과 바꾸거나 빈 칸에
@@ -5619,7 +5653,7 @@ function update(dt) {
   updateMisc(dt);
   updateTips(dt);
   codexTick(dt);
-  if (logNow && (logNow.t -= dt) <= 0) logNow = null;
+  if (logNow && !zoneCard && (logNow.t -= dt) <= 0) logNow = null;
   if (!inBase) { ambientTick(dt); heartbeat(dt); }
 }
 
@@ -5661,7 +5695,7 @@ function tip(id, icon) {
 }
 function updateTips(dt) {
   if (tipNow && (tipNow.t -= dt) <= 0) { tipNow = null; tipGap = 0.6; }
-  if (!tipNow && tipQueue.length && (tipGap -= dt) <= 0) { // 다음 안내 (보여 준 순간 본 것으로 기록)
+  if (!tipNow && tipQueue.length && !zoneCard && (tipGap -= dt) <= 0) { // 다음 안내 (구역 카드가 사라진 뒤, 보여 준 순간 본 것으로 기록)
     tipNow = { ...tipQueue.shift(), t: TIP_TIME, max: TIP_TIME };
     tipsSeen.add(tipNow.id);
     try { localStorage.setItem(TIPS_KEY, JSON.stringify([...tipsSeen])); } catch (e) { /* 이번 실행에서만 기억 */ }
@@ -6854,27 +6888,20 @@ function render() {
   if (!scene && !cine) { drawLootLabels(); drawEliteLabels(); drawTerminalLabels(); drawMissionLabels(); drawHazardLabels(); }
 
   // 떠오르는 숫자
-  ctx.textAlign = 'center'; ctx.font = font(FM, true);
+  ctx.textAlign = 'center';
   for (const t of texts) {
     const x = SX(t.x, t.y), y = SY(t.x, t.y, t.z);
+    ctx.font = font(t.big ? FL : FM, true);
     ctx.globalAlpha = clamp(t.life / 0.5, 0, 1);
     ctx.fillStyle = '#000'; ctx.fillText(t.t, x + 1, y + 1);
     ctx.fillStyle = t.col; ctx.fillText(t.t, x, y);
   }
   ctx.globalAlpha = 1;
 
-  // 피격 비네트
-  if (settings.hurtFx && (hurtFlash > 0 || p.hp < p.maxhp * 0.25)) { // 설정의 피격 화면 효과
-    const a = Math.max(hurtFlash * 0.6, p.hp < p.maxhp * 0.25 ? 0.25 + 0.15 * Math.sin(gtime * 6) : 0);
-    const g = ctx.createRadialGradient(W / 2, VH / 2, VH * 0.3, W / 2, VH / 2, VH * 0.85);
-    g.addColorStop(0, 'rgba(255,0,0,0)'); g.addColorStop(1, `rgba(200,0,0,${a})`);
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, VH);
-  }
-  if (settings.hurtFx && hitFlash > 0) { // 맞은 순간 화면 가장자리가 붉게 번쩍
-    const g = ctx.createRadialGradient(W / 2, VH / 2, VH * 0.34, W / 2, VH / 2, VH * 0.85);
-    g.addColorStop(0, 'rgba(255,30,20,0)'); g.addColorStop(1, `rgba(255,30,20,${0.3 * hitFlash})`);
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, VH);
-  }
+  // 피격 비네트: 화면 가장자리만 (가운데는 맑게)
+  const low = p.hp < p.maxhp * 0.25;
+  if (settings.hurtFx && (hurtFlash > 0 || low)) edgeGlow('200,0,0', Math.max(hurtFlash * 0.5, low ? 0.22 + 0.1 * Math.sin(gtime * 6) : 0), 0.6); // 설정의 피격 화면 효과
+  if (settings.hurtFx && hitFlash > 0) edgeGlow('255,30,20', 0.3 * hitFlash, 0.75); // 맞은 순간 가장자리가 붉게 번쩍
   if (escape) { ctx.fillStyle = `rgba(255,20,0,${0.06 + 0.05 * Math.sin(gtime * 6)})`; ctx.fillRect(0, 0, W, VH); } // 자폭 경보등
   if (buff('berserk')) { ctx.fillStyle = `rgba(255,40,20,${0.04 + 0.02 * Math.sin(gtime * 8)})`; ctx.fillRect(0, 0, W, VH); } // 광폭화
   if (p.fx.shock > 0) { ctx.fillStyle = `rgba(120,200,255,${0.05 + Math.random() * 0.06})`; ctx.fillRect(0, 0, W, VH); }
@@ -7263,6 +7290,15 @@ function drawMinimap() {
     ctx.globalAlpha = 0.4 + 0.3 * Math.sin(gtime * 6 + e.x * 1.7); ctx.fillStyle = e.aggro ? '#ff6a5a' : '#cfc8b8';
     ctx.fillRect(Math.round(ex - q), Math.round(ey - q), 2 * q, 2 * q); ctx.globalAlpha = 1;
   }
+  const NX = !inBase && R && regions[level + 1]; // 다음 구역 (입구 방) 쪽을 가리키는 초록 화살표: 지도 안이면 그 자리, 밖이면 가장자리
+  if (NX) {
+    const [tx, ty] = at(NX.entry.cx + 0.5, NX.entry.cy + 0.5), cx = x0 + w / 2, cy = y0 + h / 2, dx = tx - cx, dy = ty - cy, ins = 8 * s1;
+    const s = Math.min(1, (w / 2 - ins) / Math.max(Math.abs(dx), 1e-6), (h / 2 - ins) / Math.max(Math.abs(dy), 1e-6));
+    const ax = cx + dx * s, ay = cy + dy * s, l = Math.hypot(dx, dy) || 1, ux = dx / l, uy = dy / l, r = 7 * s1;
+    ctx.globalAlpha = 0.75 + 0.25 * Math.sin(gtime * 5); ctx.fillStyle = '#5f8'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(ax + ux * r, ay + uy * r); ctx.lineTo(ax - ux * r * 0.7 - uy * r * 0.8, ay - uy * r * 0.7 + ux * r * 0.8); ctx.lineTo(ax - ux * r * 0.7 + uy * r * 0.8, ay - uy * r * 0.7 - ux * r * 0.8);
+    ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.globalAlpha = 1;
+  }
   // 플레이어: 바라보는 방향 삼각형
   const [px, py] = at(player.x, player.y), a = player.aim, ax = Math.cos(a) - Math.sin(a), ay = (Math.cos(a) + Math.sin(a)) / 2, l = Math.hypot(ax, ay);
   const ux = ax / l, uy = ay / l, r = 5 * s1;
@@ -7287,15 +7323,23 @@ function drawTopInfo() {
   // 메시지 로그 (거래 창이 열려 있으면 가려지므로 생략)
   ctx.textAlign = 'left'; ctx.font = font(FM);
   let top = 26;
-  const box = !inBase && !trade && objectiveBox(); // 구역 목표: 임무 진행 / 구역 이름과 길목(봉쇄 격벽) 상태
+  const box = !inBase && !trade && objectiveBox(); // 구역 목표: 임무 진행 / 구역 이름, 아래 줄에 할 일 (키카드 · 보스 · 다음 구역)
   if (box) {
+    const st = zoneSteps(), bar = box.frac === undefined ? 0 : 6;
+    ctx.font = font(FS);
+    const sep = ctx.measureText(' · ').width, sw = st.map(([t]) => ctx.measureText(t).width), w2 = sw.reduce((s, v) => s + v, 0) + sep * Math.max(0, st.length - 1);
     ctx.font = font(FM, true);
-    const w = ctx.measureText(box.t).width + 22, h = box.frac === undefined ? 28 : 34;
+    const w = Math.max(ctx.measureText(box.t).width, w2) + 22, h = 28 + bar + (st.length ? 17 : 0);
     pxCard(10, 8, w, h, false, box.edge);
     ctx.fillStyle = box.col; ctx.fillText(box.t, 21, 28);
-    if (box.frac !== undefined) { // 해킹 진행 막대
+    if (bar) { // 해킹 진행 막대
       ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(21, 34, w - 22, 4);
       ctx.fillStyle = box.edge; ctx.fillRect(21, 34, (w - 22) * box.frac, 4);
+    }
+    if (st.length) { // 할 일
+      ctx.font = font(FS);
+      let x = 21;
+      st.forEach(([t, c], k) => { if (k) { ctx.fillStyle = '#5c6658'; ctx.fillText(' · ', x, 44 + bar); x += sep; } ctx.fillStyle = c; ctx.fillText(t, x, 44 + bar); x += sw[k]; });
     }
     top = 30 + h; ctx.font = font(FM);
   }
@@ -7415,6 +7459,13 @@ function hudTick(dt) {
   if (hudFx.slot !== p.slot) { if (hudFx.slot >= 0) hudFx.name = 2.5; hudFx.slot = p.slot; }
   if (hudFx.xp !== p.xp) { if (hudFx.xp >= 0) hudFx.xpT = 2; hudFx.xp = p.xp; }
   hudFx.name = Math.max(0, hudFx.name - dt); hudFx.xpT = Math.max(0, hudFx.xpT - dt);
+}
+// 화면 가장자리 빛: 가운데(화면 반지름의 r0배)는 맑고 모서리로 갈수록 col (화면 비율의 타원)
+function edgeGlow(col, a, r0) {
+  ctx.save(); ctx.translate(W / 2, VH / 2); ctx.scale(W / 2, VH / 2);
+  const g = ctx.createRadialGradient(0, 0, r0, 0, 0, 1.3);
+  g.addColorStop(0, `rgba(${col},0)`); g.addColorStop(1, `rgba(${col},${a})`);
+  ctx.fillStyle = g; ctx.fillRect(-1, -1, 2, 2); ctx.restore();
 }
 function drawZoneCard() {
   const c = zoneCard, a = Math.min(1, c.t / 0.4, (ZONE_CARD_T - c.t) / 0.8);
