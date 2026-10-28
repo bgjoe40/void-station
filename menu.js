@@ -162,7 +162,7 @@ function slotHTML(d, k, attrs) { // k: 슬롯 번호 또는 'auto' (거점 자�
 const TITLE_SEED = 7340021;
 let titleCam = null; // { pts: [[x, y]], cum, len, s, wait, fade }
 function titleBackground() {
-  inBase = true; rift = null; player = newPlayer(); resetWorld();
+  inBase = true; player = newPlayer(); resetWorld();
   flags = { bosses: [], missions: [], keys: [], hubs: [], visited: [], logs: [], armory: [] };
   msgs = []; hurtFlash = 0; invOpen = false; held = null; trade = null; titleCam = null;
   try { withSeed(TITLE_SEED, genField); } catch (e) { genBase(); placePlayer(...BASE_SPAWN); return; }
@@ -256,7 +256,7 @@ function titleScreen() {
   Music.play(MUSIC.title);
   const S = readSaves(), last = latestSlot(), L = last !== -1 ? saveAt(S, last) : null, clears = S.log.filter(l => l.clear);
   const achN = Object.keys(codex.ach || {}).length, logN = Object.keys(codex.logs || {}).length;
-  const all = ['mon', 'boss', 'uq', 'set', 'rw'].map(t => codexCards(t)), got = all.reduce((a, c) => a + c.filter(x => x.known).length, 0), tot = all.reduce((a, c) => a + c.length, 0);
+  const all = ['mon', 'boss', 'uq'].map(t => codexCards(t)), got = all.reduce((a, c) => a + c.filter(x => x.known).length, 0), tot = all.reduce((a, c) => a + c.length, 0);
   const items = [
     ['cont', '이어하기', L ? `${slotName(last)}, 구역 ${L.stage} ${regName(L.stage)}, Lv ${L.player.clv || 1}, ${timeAgo(L.time)}` : '저장한 작전이 없습니다', !L],
     ['new', '새 작전', ''],
@@ -281,7 +281,6 @@ function titleScreen() {
         <div class="row"><span>수집 도감</span><b>${got} / ${tot}</b></div><div class="meter cy"><i style="--v:${tot ? got / tot : 0}"></i></div>
         <div class="row"><span>업적</span><b>${achN} / ${ACHIEVEMENTS.length}</b></div><div class="meter"><i style="--v:${achN / ACHIEVEMENTS.length}"></i></div>
         <div class="row"><span>데이터 기록</span><b>${logN} / ${LOGS.length}</b></div>
-        <div class="row"><span>차원 균열 최고 돌파</span><b>${codex.stat && codex.stat.rift ? codex.stat.rift + '단계' : '없음'}</b></div>
         <div class="row"><span>탈출 성공</span><b>${clears.length ? clears.length + '회' : '없음'}</b></div></div>
     </aside>
     <div class="t-foot"><span>그래픽, 소리, 음악: Freedoom (BSD)&nbsp;&nbsp;&nbsp;아이콘: knekko, MELLE, AlejandroHaibi (CC0)</span>
@@ -413,29 +412,24 @@ function keysHTML() {
     ${rows.map(([ks, what, sub]) => `<div class="krow"><span class="keys">${ks.map(k => k === '~' ? '~' : `<kbd>${k}</kbd>`).join('')}</span><span>${what}${sub ? `<small>${sub}</small>` : ''}</span></div>`).join('')}</div>`).join('')}</div>`;
 }
 const GUIDE = [
-  ['hub', '보급 거점', 'icon_case_white', `정거장 곳곳의 <b>안전 지대</b>. 몬스터와 적 탄환이 들어오지 못하고, 안에서는 싸울 수 없다. 자판기 앞에서 <b>[F]</b>: 보급(상점), 회수(판매), 개조(장비 개조, 강화, 소켓, 재련), 기록(저장), 보관함(창고).<br>가운데 <b>순간이동 패드</b>로 찾아 둔 다른 거점에 간다. 쓰러지면 마지막으로 들른 거점에서 다시 일어난다 (골드 ${Math.round(DEATH_GOLD * 100)}% 잃음).`],
+  ['hub', '보급 거점', 'icon_case_white', `정거장 곳곳의 <b>안전 지대</b>. 몬스터와 적 탄환이 들어오지 못하고, 안에서는 싸울 수 없다. 자판기 앞에서 <b>[F]</b>: 보급(상점), 회수(판매), 개조(장비 개조, 파츠, 분해), 기록(저장), 보관함(창고).<br>가운데 <b>순간이동 패드</b>로 찾아 둔 다른 거점에 간다. 쓰러지면 마지막으로 들른 거점에서 다시 일어난다 (골드 ${Math.round(DEATH_GOLD * 100)}% 잃음).`],
   ['gate', '봉쇄 격벽과 키카드', 'bkeya0', `다음 구역으로 가는 길목의 붉은 <b>봉쇄 격벽</b>은 구역 3·6의 보스를 처치하거나 구역 8의 통제 단말기를 해킹해야 열린다.<br><b>파란, 노란, 빨간 보안문</b>은 그 구역에서 같은 색 키카드를 주워야 열린다.`],
   ['mission', '구역 임무', 'sswva1', `섬멸 말고도 <b>생존자 구출</b>(거점 패드까지 데려가기), <b>해킹</b>(단말기의 보안 단계: 전선 연결, 암호 찾기, 순서 기억, 회로 연결), <b>둥지 파괴</b>가 있다. 화면 왼쪽 위에 목표, 미니맵에 위치가 나온다.`],
   ['event', '돌발 상황', 'tlmpa0', `구역 2부터 가끔: <b>정전</b>(손전등만 남음), <b>독가스 누출</b>(치료제), <b>선체 파손</b>(구멍에서 멀어지거나 다른 방으로). 보급 거점 안은 안전하다.`],
   ['melee', '근접 무기', 'icon_knife', `총과 역할이 다르다. <b>근접으로 처치</b>하면 체력이 조금 차고 탄약(장착한 총 중 가장 모자란 탄)이 튀어나온다. 정예·보스는 더 많이.<br>휘두르면 날아오는 <b>적 탄을 쳐내고</b>, <b>장갑을 무시</b>하며 <b>방패를 3배로</b> 부순다. 기절·빙결한 적에게는 더 아프고, 돌진·투척·불기둥·되살리는 주문 같은 <b>준비 동작을 끊는다</b>.<br><b>전동 체인톱</b>은 누르고 있는 동안 계속 갈아 내고 처치하면 탄약이 반드시 넉넉히 나온다(탄은 못 쳐냄). <b>방전 진압봉</b>은 기절시키고 번개가 가까운 적 셋에게 튄다. <b>플라즈마 블레이드</b>는 넓게 휘두르고 쳐낸 탄을 앞쪽의 적에게 되돌려 보낸다.`],
   ['attach', '무기 파츠', 'att_scope', `조준경, 소음기, 탄창 같은 무기 부품. 총은 <b>총구, 조준경, 탄창, 개머리판, 하부</b>, 근접 무기는 <b>날, 손잡이, 모듈</b> 칸에 하나씩 끼운다. 끼운 파츠는 무기 그림에도 붙어 보인다.<br>적과 상자에서 떨어지고(일반, 고급, 희귀) 보급 자판기의 <b>파츠</b> 탭에서도 판다. 끼우고 빼는 것은 <b>보급 거점의 개조 자판기</b>(파츠 개조 탭)에서만 한다. 무기를 클릭해 고르고, 가방의 파츠를 끌어다 놓거나 우클릭한다.`],
-  ['mod', '장비 개조', 'arm1a0', `개조 자판기의 <b>개조·강화</b> 탭에서 고른 방어구에 개조를 단다. 장비 종류마다 달 수 있는 개조가 정해져 있다: ${Object.entries(ARMOR_SLOTS).map(([s, n]) => `${n}(${Object.values(MODS).filter(M => M.slot === s).map(M => M.name).join(', ')})`).join(', ')}.<br>한 장비에 올릴 수 있는 단계는 등급에 따라 일반 ${MOD_CAP[0]}, 고급 ${MOD_CAP[1]}, 희귀 ${MOD_CAP[2]}, 전설 이상 ${MOD_CAP[3]}. 단계마다 골드와 <b>부품</b>(분해로 얻음)이 들고, 효과는 그 장비를 장착했을 때만 난다.`],
+  ['mod', '장비 개조', 'arm1a0', `개조 자판기의 <b>장비 개조</b> 탭에서 고른 방어구에 개조를 단다. 장비 종류마다 달 수 있는 개조가 정해져 있다: ${Object.entries(ARMOR_SLOTS).map(([s, n]) => `${n}(${Object.values(MODS).filter(M => M.slot === s).map(M => M.name).join(', ')})`).join(', ')}.<br>한 장비에 올릴 수 있는 단계는 등급에 따라 일반 ${MOD_CAP[0]}, 고급 ${MOD_CAP[1]}, 희귀 ${MOD_CAP[2]}, 전설 이상 ${MOD_CAP[3]}. 단계마다 골드와 <b>부품</b>(분해로 얻음)이 들고, 효과는 그 장비를 장착했을 때만 난다.`],
   ['slots', '무기 슬롯과 무기고', 'icon_assault', `무기 슬롯은 처음 <b>2칸</b>. 어떤 무기든 끼울 수 있다. 구역 2·5의 잠긴 <b>무기고 단말기</b>를 [F]로 해제하고 버티면 한 칸씩 늘어난다 (최대 4칸).`],
   ['gear', '장비 등급과 고유 전설', 'icon_revolver', `등급: 일반, <b style="color:#66aaff">고급</b>, <b style="color:#ffdd55">희귀</b>, <b style="color:#ff9933">전설</b>, <b style="color:#dcc283">★ 고유 전설</b>(이름과 고유 효과, 바닥에서 빛기둥). 무기 위에서 [F]로 줍고, 인벤토리에서 끌어서 장착한다.`],
-  ['gem', '소켓과 보석 조합', 'icon_gem_ruby', `보석은 저절로 주워져 <b>보석 주머니</b>로 간다. 소켓(◇)이 있는 장비 위에 놓으면 끼워진다. 무기와 방어구에서 효과가 다르다. <b>일반 등급</b> 장비의 소켓을 정해진 보석으로 순서대로 꽉 채우면 <b style="color:#5fe0c8">보석 조합</b> 장비가 된다.`],
-  ['set', '세트 장비', 'icon_vest_neon', `<b style="color:#4be05a">초록 이름</b>의 정해진 장비. 같은 세트를 2·3·4개 장착하면 세트 효과가 붙는다 (무기는 슬롯에 끼워 두기만 해도 센다). 보스, 고유 정예, 금고, 도박, 차원 균열에서 나온다.`],
   ['skill', '스킬 쉘과 공명', 'bfe1d0', `스킬은 <b>스킬 쉘</b>을 스킬 창 <b>[K]</b>의 칸(Z X V B)에 끼워야 쓴다. 같은 계열 쉘을 2·3·4개 끼우면 <b>계열 공명</b> Ⅰ·Ⅱ·Ⅲ. 스킬마다 동작이 바뀌는 고유 전설 쉘도 있다.`],
   ['grow', '성장', 'pstra0', `레벨이 오를 때마다 특성 1점(스킬 창 <b>[K]</b>), 능력치 3점(인벤토리 <b>[I]</b>). 특성은 사격·생존·전술 트리로, 위 단은 이어진 아래 칸을 배우고 레벨이 되어야 열린다. 능력치(근력·민첩·기술·정신)는 스킬마다 다른 수치를 키운다. <b>강화칩</b>은 몸 능력, <b>강화장신구</b>는 한 계열의 스킬을 키운다.`],
   ['super', '고유 정예와 금고', 'yskua0', `구역마다 이름 붙은 <b>고유 정예</b>가 부하와 함께 있다. 처치하면 금고 열쇠를 얻는다. 금빛 금고 문 뒤의 보물함을 [F]로 연다.`],
-  ['spot', '필드 사건', 'tlp2a0', `<b>보급 캐시</b>: 열면 보급품, 대신 적이 몰려온다. <b>조난 신호기</b>: 켜고 곁을 지키면 보상.`],
+  ['spot', '필드 사건', 'tlp2a0', `<b>보급 캐시</b>: 열면 보급품, 대신 적이 몰려온다.`],
   ['shrine', '신단', 'soula0', `필드 곳곳에 떠 있는 구체 (구역마다 ${SHRINE_PER}개까지). [F]로 쓰면 ${SHRINES.power.t}초 동안 강해진다: ${Object.values(SHRINES).map(S => `<b>${S.name}</b>(${S.desc.replace(/^\d+초 동안 /, '')})`).join(', ')}. 한 번에 하나만 걸린다.`],
   ['trial', '시련의 방', 'icon_case_gold', `구역 ${TRIAL.from}부터 대부분의 구역에 하나씩. 가운데에 봉인된 보물함이 있고, 들어서면 입구가 <b>붉은 막</b>으로 잠긴 채 적 무리가 ${TRIAL.waves}번 몰려온다. 모두 처치하면 막이 걷히고 보물함이 열린다. 쓰러지면 다시 도전할 수 있다.`],
-  ['assault', '거점 습격', 'icon_case_white', `구역 ${ASSAULT.from}부터 가끔, 보급 거점에 들어가면 경보가 울리고 몬스터 무리가 ${ASSAULT.waves}번 몰려와 <b>안전막</b>을 두드린다. 습격 중에는 거점 안에서도 싸울 수 있다.<br>모두 처치하면 골드, 경험치, 장비. <b>안전막이 버티면 보상이 더 크다</b>. 막이 다 깎이면 꺼져서 적이 안으로 들어온다.`],
   ['boss', '구역 보스', 'cybra1', `구역마다 깊숙한 큰 방에 보스가 있다 (구역 3·6은 길목, 9는 코어). 패턴이 다 다르고 체력이 절반 밑이면 <b>격노</b>한다.`],
   ['thief', '보물 약탈자', 'sthfa1', `금빛 제복의 약탈자. 들키면 달아나다 몇 초 뒤 차원 틈으로 사라진다. 맞을 때마다 골드를 흘리고, 잡으면 보물이 쏟아진다.`],
-  ['rift', '차원 균열', 'pinsa0', `보급 거점의 순간이동 패드에서 (보스를 하나 처치하면 열림). 적을 쓰러뜨려 균열을 채우면 <b>균열 수호자</b>가 나타나고, 처치하면 단계 돌파 보상. 몇 번이든 다시 할 수 있다.`],
-  ['log', '데이터 기록과 업적', 'pmapa0', `구역마다 휴대 단말기 둘. 주우면 승무원의 기록이 재생된다. <b>업적</b>을 이루면 모든 저장에 작은 영구 보너스. 둘 다 [J] 수집 도감에 모인다.`],
-  ['gamble', '도박', 'icon_case_gold', `보급 자판기의 도박 탭. 골드를 내고 정체를 모르는 장비를 산다. 고급 이상이 나오고, 아주 드물게 고유 전설과 세트 장비.`],
+  ['log', '데이터 기록과 업적', 'pmapa0', `구역마다 휴대 단말기 둘. 주우면 승무원의 기록이 재생된다. <b>업적</b>은 모든 저장에서 함께 쌓인다. 둘 다 [J] 수집 도감에 모인다.`],
 ];
 let helpTab = 'keys', guideSel = 'hub';
 const guideDet = sel => { const G = GUIDE.find(g => g[0] === sel) || GUIDE[0]; return `<div class="gh">${G[2] ? img(G[2], 128) : ''}<div><div class="h1" style="font-size:24px">${G[1]}</div></div></div><p>${G[3]}</p>`; };
@@ -482,7 +476,7 @@ function creditsScreen(back) {
 function pauseGame(from) {
   state = 'pause'; mouse.down = false; closeInventory();
   const p = player, box = !inBase && objectiveBox(), xpF = p.xp / xpNeed(p.clv);
-  const where = rift ? `차원 균열 ${rift.tier}단계` : `구역 ${level} ${regName(level)}`;
+  const where = `구역 ${level} ${regName(level)}`;
   const items = [['res', '계속하기'], ['set', '설정'], ['man', '조작법과 가이드'], ['dbg', '디버그'], ['title', '메인 메뉴로']];
   screen(`<div class="pz-wrap"><div class="pz"><div class="h1">일시정지</div>
       <nav class="mm">${items.map(([id, t], n) => `<button class="mi" data-nav id="p_${id}" style="--i:${n}"><span class="t">${t}</span></button>`).join('')}</nav></div>
@@ -535,45 +529,20 @@ function endingScreen() {
   on('eTitle', toTitle);
 }
 
-// ===== 순간이동 패드: 찾아 둔 거점 + 차원 균열 =====
+// ===== 순간이동 패드: 찾아 둔 거점 =====
 function teleportScreen(cur) {
   state = 'menu'; mouse.down = false; closeInventory();
   const found = hubs.filter(h => h.found).length;
   const rows = hubs.map(h => h.found
     ? `<button class="wr ${h === cur ? 'here' : ''}" data-nav data-hub="${h.n}" ${h === cur ? 'disabled' : ''}><span class="rn">${h.reg}</span><span><div class="w1">${escHtml(h.name)}</div><div class="w2">구역 ${h.reg} ${regName(h.reg)}</div></span><span class="go">${h === cur ? '현재 위치' : '이동 ›'}</span></button>`
     : `<div class="wr lock"><span class="rn">${h.reg}</span><span><div class="w1">미발견 거점</div><div class="w2">구역 ${h.reg} ${regName(h.reg)}</div></span><span class="go">잠김</span></div>`).join('');
-  screen(`<div class="center" style="position:absolute;inset:0"><div class="frm" style="width:min(${escape ? 560 : 980}px,94vw)">
+  screen(`<div class="center" style="position:absolute;inset:0"><div class="frm" style="width:min(560px,94vw)">
       <div class="hd"><div class="grow"><div class="eye cy">순간이동 패드</div><div class="h1">${escHtml(cur.name)}</div></div><div class="muted num" style="font-size:12px">찾은 거점 ${found} / ${hubs.length}</div></div>
-      <div class="bd" style="display:grid;grid-template-columns:${escape ? '1fr' : '1fr 1fr'};gap:26px">
-        <div><div class="sect">보급 거점</div><div class="wlist">${rows}</div></div>
-        ${escape ? '' : riftPanel()}
-      </div>
+      <div class="bd"><div class="sect">보급 거점</div><div class="wlist">${rows}</div></div>
       <div class="ft"><span class="note"></span><button class="btn" data-nav id="tClose">닫기</button></div>
-    </div></div>`, { cls: 'dim', back: closeMenu, focus: '[data-hub]:not(:disabled), [data-rift], #tClose' });
+    </div></div>`, { cls: 'dim', back: closeMenu, focus: '[data-hub]:not(:disabled), #tClose' });
   onAll('[data-hub]', b => teleportTo(hubs[+b.dataset.hub]));
-  onAll('[data-rift]', b => fadeThen(() => enterRift(+b.dataset.rift)));
   on('tClose', closeMenu, 'uiBack');
-}
-// 차원 균열 칸 (보스를 하나 처치하면 열림): 돌파한 단계 +1까지
-function riftPanel() {
-  if (!flags.bosses.length) return `<div><div class="sect">차원 균열</div><div class="obj" style="border-color:var(--violet);background:rgba(199,155,255,.06)">보스를 하나 처치하면 열린다</div></div>`;
-  const best = flags.rift || 0, top = Math.min(RIFT_TIERS.length, best + 1);
-  return `<div><div class="sect">차원 균열</div>
-    <div class="rts">${RIFT_TIERS.map((T, k) => `<button class="rt" data-nav data-rift="${k + 1}" ${k + 1 > top ? 'disabled' : ''}><b>${k + 1}</b><small>적 수준 ${T.lv}${T.hp > 1 ? '+' : ''}</small><div class="st">${k + 1 <= best ? '★' : ''}</div></button>`).join('')}</div>
-    <div class="muted" style="font-size:12px;margin-top:12px">돌파 ${best}/${RIFT_TIERS.length}단계</div></div>`;
-}
-// 균열의 패드 (들어온 패드·나가는 패드): 나갈지 묻기
-function riftPadScreen() {
-  state = 'menu'; mouse.down = false; closeInventory();
-  const done = rift.done, f = Math.min(1, rift.prog / rift.need);
-  screen(`<div class="center" style="position:absolute;inset:0"><div class="frm violet" style="width:min(520px,92vw)">
-      <div class="hd"><div class="grow"><div class="eye" style="color:var(--violet)">차원 균열</div><div class="h1">${rift.tier}단계 ${done ? '돌파' : '진행 중'}</div></div></div>
-      <div class="bd"><div class="muted" style="font-size:12px;line-height:1.6">${done ? '' : '지금 나가면 보상은 없다'}</div>
-        ${done ? '' : `<div class="row" style="display:flex;justify-content:space-between;margin-top:16px;font-size:12px"><span class="muted">균열</span><b class="num">${Math.floor(f * 100)}%</b></div><div class="meter violet"><i style="--v:${f}"></i></div>`}</div>
-      <div class="ft"><button class="btn violet" data-nav id="rOut">${done ? '거점으로 돌아가기' : '균열에서 나가기'}</button><button class="btn" data-nav id="rStay">${done ? '더 둘러보기' : '계속 싸우기'}</button></div>
-    </div></div>`, { cls: 'dim', back: closeMenu, focus: done ? '#rOut' : '#rStay' });
-  on('rOut', () => fadeThen(() => leaveRift(done ? `차원 균열 ${rift.tier}단계에서 돌아왔다` : '균열을 포기하고 거점으로 돌아왔다')));
-  on('rStay', closeMenu, 'uiBack');
 }
 
 // ===== 시작 =====

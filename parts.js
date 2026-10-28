@@ -41,7 +41,7 @@ function okAttach(id, att) {
 
 // --- 효과 ---
 const attV = (v, r) => Array.isArray(v) ? v[r] : v;
-const addProc = (s, k, v) => { s.gemProc = s.gemProc || {}; s.gemProc[k] = (s.gemProc[k] || 0) + v; }; // 명중 시 확률 효과 (보석과 같은 자리 — weaponHit)
+const addProc = (s, k, v) => { s.proc = s.proc || {}; s.proc[k] = (s.proc[k] || 0) + v; }; // 명중 시 확률 효과 (weaponHit)
 const ATT_APPLY = {
   dmg: (s, v) => { s.dmg *= 1 + v; }, spread: (s, v) => { s.spread = (s.spread || 0) * (1 - v); }, crit: (s, v) => { s.crit += v; },
   range: (s, v) => { s.range = (s.range || 16) * (1 + v); }, rangeN: (s, v) => { s.range = (s.range || 16) + v; }, speed: (s, v) => { s.speed = (s.speed || 28) * (1 + v); },
@@ -249,7 +249,7 @@ function drawAttachStats(g, w, prev, L) {
     ctx.fillStyle = INK; ctx.fillText(same ? `${fmtStat(b, d)}${unit}` : `${fmtStat(a, d)} → `, x + 58, y);
     if (!same) { const tw = ctx.measureText(`${fmtStat(a, d)} → `).width; ctx.fillStyle = (low ? b < a : b > a) ? '#7f7' : '#f77'; ctx.fillText(`${fmtStat(b, d)}${unit}`, x + 58 + tw, y); }
   });
-  const fx = [to.quiet && '소음', to.thermal && '열상', to.ap && `장갑 ${pct(to.ap)} 무시`, ...Object.entries(to.gemProc || {}).map(([k, v]) => `${{ fire: '화상', cryo: '둔화', shock: '기절', poison: '중독' }[k]} ${pct(v)}`)].filter(Boolean);
+  const fx = [to.quiet && '소음', to.thermal && '열상', to.ap && `장갑 ${pct(to.ap)} 무시`, ...Object.entries(to.proc || {}).map(([k, v]) => `${{ fire: '화상', cryo: '둔화', shock: '기절', poison: '중독' }[k]} ${pct(v)}`)].filter(Boolean);
   if (fx.length) { ctx.font = font(FS); ctx.fillStyle = '#9cf'; ctx.fillText(fitText('◆ ' + fx.join(', '), L.W0), g.gx, L.statY + 15 + Math.ceil(rows.length / 2) * 14); }
 }
 // 개조 자판기에서 들고 있던 파츠를 놓음: 거래 창 위(고른 무기) 또는 인벤토리의 무기 위면 끼움. 처리했으면 true

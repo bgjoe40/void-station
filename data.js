@@ -1,7 +1,7 @@
 // ===== 게임 데이터 정의 (무기 / 탄약 / 수류탄 / 아이템 / 적) =====
 
 // 버전: GitHub에 커밋·푸시할 때마다 올림 (새 기능은 가운데 자리, 고침·작은 추가는 끝자리) — 타이틀·일시정지 화면에 표시, git 태그 v<버전>
-const VERSION = '0.14.0';
+const VERSION = '0.15.0';
 
 const CAT_NAMES = ['근접', '권총', '샷건', '라이플', '기관총', '에너지'];
 const MAX_LOAD = 30;   // 장착 + 가방 무기 무게 합이 넘으면 이동속도 감소
@@ -149,8 +149,6 @@ const RARITY = [
   { name: '전설', color: '#ff9933', glow: '255,153,51',  weight: 2,  affixes: [3, 4] },
   // 고유 전설: 무작위로는 나오지 않음 (UNIQUES에 정해진 이름·옵션·고유 효과, UNIQUE_DROP 확률로만 떨어짐)
   { name: '고유 전설', color: '#dcc283', glow: '220,194,131', weight: 0, affixes: [2, 2] },
-  // 세트: 무작위로는 나오지 않음 (SET_ITEMS에 정해진 이름·옵션, 같은 세트를 여럿 장착하면 세트 효과 — SET_DROP 확률로만 떨어짐)
-  { name: '세트', color: '#4be05a', glow: '75,224,90', weight: 0, affixes: [2, 2] },
 ];
 
 // 랜덤 옵션: min~max 범위에서 굴림 (등급이 높을수록 높은 값), gun: 총기 전용, needSpread: 탄퍼짐이 있는 총만
@@ -193,7 +191,7 @@ const UPGRADES = {
   bag: { name: '확장 배낭', desc: '가방 한 줄 추가 (+10칸)', icon: 'bpaka0', max: 2, gold: [1500, 3000], parts: [15, 30] },
 };
 // 장비 개조 (개조 자판기): 장비 종류(slot)마다 달 수 있는 개조. 그 장비를 장착했을 때만 효과 (k: 더하는 효과 — gearV·accV, per: 한 단계)
-// 한 장비의 개조 단계 합은 등급별 MOD_CAP까지 (일반·고급·희귀·전설·고유 전설·세트), 그 장비의 n번째 단계 비용은 MOD_COST
+// 한 장비의 개조 단계 합은 등급별 MOD_CAP까지 (일반·고급·희귀·전설·고유 전설), 그 장비의 n번째 단계 비용은 MOD_COST
 // line: 강화장신구 계열의 스킬에만 (그 장신구의 계열), icon이 없으면 장비 그림
 const MODS = {
   neuro:  { name: '신경 가속',   slot: 'head', k: 'cdr',    per: 0.03, icon: 'icon_brain',        text: v => `스킬 대기시간 -${pct(v)}` },
@@ -207,11 +205,11 @@ const MODS = {
   lung:   { name: '인공 폐',     slot: 'chip', k: 'stam',   per: 15,   icon: 'icon_syringe_blue', text: v => `최대 스태미너 +${v}` },
   reso:   { name: '공명 회로',   slot: 'acc',  k: 'spow',   per: 0.03, line: true,                text: (v, t) => `${ATTRS[t].name} 스킬 위력 +${pct(v)}` },
 };
-const MOD_CAP = [1, 2, 3, 4, 4, 4];
+const MOD_CAP = [1, 2, 3, 4, 4];
 const MOD_COST = { gold: [200, 400, 700, 1100], parts: [4, 8, 14, 20] };
 // ===== 방어구 · 강화칩 · 강화장신구 =====
 // 인벤토리의 인체 모양 장비 칸 (GEAR_SLOTS: 칸 → 끼우는 종류, 팔 장비는 왼팔·오른팔 어디든)
-// def: 방어 (받는 피해 감소 = 방어 / (방어 + ARMOR_K)), 등급마다 방어 +ARMOR_RARITY_DEF, 강화 단계마다 +ENHANCE_DMG
+// def: 방어 (받는 피해 감소 = 방어 / (방어 + ARMOR_K)), 등급마다 방어 +ARMOR_RARITY_DEF
 // attr: 강화칩·강화장신구의 기본 능력치 [종류, 수치] (강화 단계마다 +1). 강화장신구는 이 계열의 스킬을 키움 (옵션의 line)
 // weight: 무게 (무기와 함께 적재량), size: 가방 칸, minLvl: 이 구역부터 드롭·상점, icon: 아틀라스 그림 (knekko)
 const ARMOR_SLOTS = { head: '머리', body: '몸통', legs: '다리', arm: '팔', chip: '강화칩', acc: '강화장신구' };
@@ -287,38 +285,9 @@ const ARMOR_AFFIXES = {
 const ARMOR_DROP = 0.35;         // 떨어지는 장비 중 방어구 비율 (나머지는 무기)
 const ARMOR_SLOT_DROP = { head: 1, body: 1, legs: 1, arm: 1, chip: 0.7, acc: 0.7 }; // 방어구 종류 가중치 (종류를 먼저 고르고 그 안에서 바탕)
 const ARMOR_STOCK = 10;          // 상점의 방어구 진열 수 (팔·강화칩·강화장신구 포함)
-// 분해·재련 (개조실): 분해하면 부품 (등급별 SALVAGE + 강화 단계마다 2), 재련은 옵션 하나를 다시 굴림 (등급별 부품·골드)
-const SALVAGE = [1, 3, 8, 20, 40, 40];
-const REFORGE = { parts: [0, 4, 10, 20, 0, 0], gold: [0, 60, 150, 300, 0, 0] };
-const ENHANCE_MAX = 5;           // 무기 강화 최대 +5
-const ENHANCE_DMG = 0.08;        // 강화 1단계당 피해(방어구는 방어) +8%
-const RARITY_VALUE = [1, 1.6, 2.6, 4.5, 7, 6];  // 등급별 무기 가치 배율 (판매·강화 비용)
-
-// ===== 소켓 · 보석 (디아블로2식) =====
-// 무기·방어구에 빈 소켓이 있으면 보석을 끌어다 놓아 끼움 — 무기에 끼우면 weapon 효과, 방어구에 끼우면 armor 효과 [옵션, 등급별 수치]
-// 등급: 조각난 · (보통) · 완벽한 — 개조 자판기에서 같은 보석 3개를 한 등급 위 하나로 합성. icon: 아틀라스 그림 (MELLE, CC0)
-const GEM_GRADES = ['조각난', '', '완벽한'];
-const GEMS = {
-  ruby:     { name: '루비',       color: '#ff5a6a', icon: 'icon_gem_ruby',     weapon: ['fire',   [0.08, 0.14, 0.22]], armor: ['hp',    [15, 30, 50]] },
-  sapphire: { name: '사파이어',   color: '#5a9aff', icon: 'icon_gem_sapphire', weapon: ['cryo',   [0.08, 0.14, 0.22]], armor: ['stam',  [10, 20, 35]] },
-  emerald:  { name: '에메랄드',   color: '#4ee08a', icon: 'icon_gem_emerald',  weapon: ['poison', [0.08, 0.14, 0.22]], armor: ['res',   [0.08, 0.15, 0.25]] },
-  topaz:    { name: '토파즈',     color: '#ffc040', icon: 'icon_gem_topaz',    weapon: ['crit',   [0.03, 0.05, 0.08]], armor: ['gold',  [0.10, 0.20, 0.35]] },
-  amethyst: { name: '자수정',     color: '#c070ff', icon: 'icon_gem_amethyst', weapon: ['rate',   [0.04, 0.07, 0.11]], armor: ['defN',  [3, 6, 10]] },
-  diamond:  { name: '다이아몬드', color: '#e0f0ff', icon: 'icon_gem_diamond',  weapon: ['elite',  [0.10, 0.18, 0.30]], armor: ['regen', [0.4, 0.8, 1.5]] },
-};
-// 보석 효과 설명 (옵션 키별)
-const GEM_FX = {
-  fire: v => `명중 시 ${pct(v)} 확률로 화상`, cryo: v => `명중 시 ${pct(v)} 확률로 둔화`, poison: v => `명중 시 ${pct(v)} 확률로 중독`,
-  crit: v => `치명타 확률 +${pct(v)}`, rate: v => `공격속도 +${pct(v)}`, elite: v => `정예·보스에게 피해 +${pct(v)}`,
-  hp: v => `최대 체력 +${v}`, stam: v => `최대 스태미너 +${v}`, res: v => `중독·화상·감전 시간 -${pct(v)}`,
-  gold: v => `골드 획득 +${pct(v)}`, defN: v => `방어 +${v}`, regen: v => `초당 체력 회복 +${v.toFixed(1)}`,
-};
-const GEM_PRICE = [80, 260, 800];                   // 등급별 값 (판매가 = 값 x SELL_RATE)
-const GEM_DROP = { kill: 0.012, elite: 0.5, crate: 0.06 }; // 보석이 떨어질 확률 (보스·고유 정예·금고 보물함은 반드시)
-const SOCKET_ROLL = [0.5, 0.35, 0.25, 0.15];        // 등급별(일반·고급·희귀·전설) 소켓이 붙어 나올 확률 — 붙으면 1~최대 개 (일반 장비에 잘 붙음)
-const SOCKET_COST = { parts: [4, 10, 20], gold: [120, 350, 800] }; // 개조 자판기에서 소켓 뚫기: 지금 소켓 수(0·1·2)에 따라
-const UNSOCKET_GOLD = 100;                          // 보석 빼기: 끼운 보석 하나당 (보석은 가방으로)
-const GEM_UP_GOLD = [60, 200];                      // 합성: 조각난 3개 → 보통 1개, 보통 3개 → 완벽한 1개
+// 분해 (개조실): 분해하면 등급별 SALVAGE개의 부품
+const SALVAGE = [1, 3, 8, 20, 40];
+const RARITY_VALUE = [1, 1.6, 2.6, 4.5, 7];  // 등급별 무기 가치 배율 (판매)
 
 // ===== 무기 파츠 (parts.js): 무기마다 칸에 하나씩 — 보급 거점의 개조 자판기 '파츠 개조' 탭에서만 끼우고 뺌 =====
 // 칸: 총은 총구·조준경·탄창·개머리판·하부 (에너지·로켓처럼 탄을 쏘지 않는 무기는 총구 없음, 자동이 아닌 권총은 개머리판 없음), 근접은 날·손잡이·모듈
@@ -367,78 +336,7 @@ const ATTACH_DROP = { kill: 0.015, elite: 0.4, crate: 0.08, boss: 2, thief: 2 };
 const ATTACH_ON_LOOT = 0.3;          // 희귀 이상 무기가 맞는 파츠 하나를 달고 나올 확률
 const ATTACH_STOCK = 12;             // 보급 자판기 '파츠' 진열 수
 const BURST_GAP = 0.07;              // 점사 무기의 발과 발 사이 (초)
-const PICKUP_MAGNET = { r: 2.2, v: 10 };            // 골드·보석: 이 거리(칸) 안이면 v칸/초로 끌려와 저절로 주워짐 (보석은 가방 칸을 차지하지 않는 보석 주머니로)
-
-// ===== 보석 조합 (디아블로2의 룬워드처럼) =====
-// '일반' 등급 장비(고유 전설 제외)의 소켓을 정해진 보석으로 정해진 순서대로 꽉 채우면 이름 있는 장비로 바뀜 — 소켓 수가 조합식의 보석 수와 딱 맞아야 함
-// 보석 등급은 상관없음 (보석마다의 효과도 그대로 붙음). 보석을 빼면 조합이 풀림. type: weapon(무기) · head · body · legs(방어구 부위)
-// stats: 붙는 효과 (설명은 RW_FX, 효과는 game.js — 무기는 weaponStats·weaponHit, 방어구는 gearV), flavor: 한 줄
-const RW_COLOR = '#5fe0c8', RW_GLOW = '95,224,200';
-const RW_TYPE = { weapon: '무기', head: '머리 방어구', body: '몸 방어구', legs: '다리 방어구' };
-const RW_VALUE = 4.5; // 보석 조합 장비의 가치 배율 (판매가 — 전설 등급만큼)
-const RUNEWORDS = {
-  hellfire: { name: '업화',          type: 'weapon', gems: ['ruby', 'ruby', 'diamond'],         stats: { dmg: 0.3, burn: 1, elite: 0.2 }, flavor: '타오르는 것은 적만이 아니다.' },
-  fang:     { name: '혹한의 송곳니', type: 'weapon', gems: ['sapphire', 'sapphire'],            stats: { dmg: 0.15, freeze: 0.2 },       flavor: '물린 자리부터 얼어붙는다.' },
-  thunder:  { name: '뇌신',          type: 'weapon', gems: ['sapphire', 'diamond', 'sapphire'], stats: { chain: 0.15, rate: 0.1 },        flavor: '하늘이 없는 곳에도 벼락은 친다.' },
-  execute:  { name: '처형인',        type: 'weapon', gems: ['topaz', 'diamond'],                stats: { exec: 2, crit: 0.1 },           flavor: '마지막 한 발은 자비다.' },
-  frenzy:   { name: '광란',          type: 'weapon', gems: ['amethyst', 'ruby'],                stats: { frenzy: 0.3, rate: 0.1 },       flavor: '멈추면 죽는다. 그러니 멈추지 않는다.' },
-  plague:   { name: '역병',          type: 'weapon', gems: ['emerald', 'emerald', 'topaz'],     stats: { plague: 1, dmg: 0.15 },         flavor: 'B-3 격리 구역의 공기를 탄창에 담았다.' },
-  pact:     { name: '피의 계약',     type: 'weapon', gems: ['ruby', 'amethyst'],                stats: { leech: 0.04, dmg: 0.1 },        flavor: '대가는 언제나 피로 치른다.' },
-  phoenix:  { name: '불사조',        type: 'body',   gems: ['ruby', 'diamond', 'ruby'],         stats: { phoenix: 90, hp: 30 },          flavor: '재가 되어도 다시 일어난다.' },
-  urchin:   { name: '고슴도치',      type: 'body',   gems: ['amethyst', 'amethyst'],            stats: { thorns: 0.6, defN: 8 },         flavor: '건드리는 쪽이 더 아프다.' },
-  giant:    { name: '거인의 심장',   type: 'body',   gems: ['amethyst', 'ruby', 'amethyst'],    stats: { hp: 60, regen: 1 },             flavor: '심장 하나로 두 사람 몫을 뛴다.' },
-  command:  { name: '지휘관의 관',   type: 'head',   gems: ['topaz', 'amethyst'],               stats: { cdr: 0.15, gold: 0.3 },         flavor: '명령은 짧게, 보상은 크게.' },
-  seer:     { name: '예언자의 눈',   type: 'head',   gems: ['diamond', 'emerald'],              stats: { gcrit: 0.05, res: 0.4 },        flavor: '총알이 날아오기 전에 이미 보았다.' },
-  wind:     { name: '바람걸음',      type: 'legs',   gems: ['sapphire', 'topaz'],               stats: { dash: 0.4, spd: 0.1 },          flavor: '발자국보다 먼저 도착한다.' },
-  stride:   { name: '사냥꾼의 보폭', type: 'legs',   gems: ['emerald', 'sapphire'],             stats: { spd: 0.08, stam: 30 },          flavor: '쫓는 쪽이 지치는 법은 없다.' },
-};
-// 보석 조합 효과 설명 (stats 키별)
-const RW_FX = {
-  dmg: v => `피해 +${pct(v)}`, rate: v => `공격속도 +${pct(v)}`, crit: v => `치명타 확률 +${pct(v)}`, elite: v => `정예·보스에게 피해 +${pct(v)}`,
-  burn: () => '맞은 적은 반드시 불탐', freeze: v => `명중 시 ${pct(v)} 확률로 1.2초 얼림`, chain: v => `명중 시 ${pct(v)} 확률로 번개가 가까운 적 3마리에게 튐 (피해 60%)`,
-  exec: v => `체력 30% 밑의 적에게 피해 ${v}배`, frenzy: v => `적을 처치하면 3초 동안 공격속도 +${pct(v)}`, plague: () => '맞은 적은 반드시 중독, 중독된 적이 죽으면 독가스',
-  leech: v => `준 피해의 ${pct(v)}만큼 체력 회복`,
-  hp: v => `최대 체력 +${v}`, regen: v => `초당 체력 회복 +${v}`, defN: v => `방어 +${v}`, spd: v => `이동속도 +${pct(v)}`, stam: v => `최대 스태미너 +${v}`,
-  gold: v => `골드 획득 +${pct(v)}`, res: v => `중독·화상·감전 시간 -${pct(v)}`, cdr: v => `스킬 대기시간 -${pct(v)}`, dash: v => `회피 대시 대기시간 -${pct(v)}`,
-  thorns: v => `근접 공격한 적에게 그 공격의 ${pct(v)}를 되돌려줌`, phoenix: v => `죽을 피해를 받으면 체력 50%로 되살아남 (${v}초마다)`, gcrit: v => `모든 무기의 치명타 확률 +${pct(v)}`,
-};
-
-// ===== 세트 장비 (디아블로의 초록 이름): 정해진 바탕 장비·옵션 — 같은 세트를 2·3·4개 장착하면 세트 효과 =====
-// 무기는 무기 슬롯(1~4번)에 끼워 두기만 해도 셈 (손에 들지 않아도). bonus: 장착 수별 효과 (설명은 SET_FX, 효과는 game.js — gearV·gearDef·weaponHit·gainXp)
-const SETS = {
-  pioneer: { name: '개척자의 유산', flavor: '정거장에 처음 발을 디딘 이들이 남긴 장비.',          bonus: { 2: { hp: 30 }, 3: { gold: 0.25, xp: 0.1 } } },
-  bulwark: { name: '철벽 수비대',   flavor: '마지막 방어선은 사람이 아니라 장비였다.',          bonus: { 2: { defN: 15 }, 3: { thorns: 0.5 }, 4: { hp: 60, res: 0.3 } } },
-  shadow:  { name: '그림자 사냥꾼', flavor: '보이지 않는 사냥꾼은 두 번 쏘지 않는다.',          bonus: { 2: { gcrit: 0.06 }, 3: { spd: 0.08, dash: 0.25 } } },
-  inferno: { name: '화염 부대',     flavor: '소독은 철저하게. 재까지.',                          bonus: { 2: { elite: 0.15 }, 3: { gburn: 0.25 } } },
-  storm:   { name: '폭풍 기술단',   flavor: '정거장의 동력을 몸에 두르고 다니던 기술자들.',      bonus: { 2: { cdr: 0.1 }, 3: { gdmg: 0.12 }, 4: { gchain: 0.12 } } },
-};
-// set: 세트, base: 바탕 장비 (무기·방어구), name: 이름, affixes: 정해진 옵션 (무기는 AFFIXES, 방어구는 ARMOR_AFFIXES) — 바탕이 나오는 구역부터 떨어짐
-const SET_ITEMS = {
-  pio_helm:  { set: 'pioneer', base: 'cap',         name: '개척자의 헬멧',       affixes: [{ k: 'hp', v: 25 }, { k: 'regen', v: 1 }] },
-  pio_vest:  { set: 'pioneer', base: 'vest',        name: '개척자의 조끼',       affixes: [{ k: 'def', v: 0.3 }, { k: 'stam', v: 20 }] },
-  pio_gun:   { set: 'pioneer', base: 'autopistol',  name: '개척자의 권총',       affixes: [{ k: 'dmg', v: 0.25 }, { k: 'mag', v: 0.4 }] },
-  bul_helm:  { set: 'bulwark', base: 'scout',       name: '수비대 정찰모',       affixes: [{ k: 'def', v: 0.35 }, { k: 'stat', type: 'str', v: 5 }] },
-  bul_plate: { set: 'bulwark', base: 'heavy',       name: '수비대 중장갑',       affixes: [{ k: 'hp', v: 40 }, { k: 'def', v: 0.25 }] },
-  bul_legs:  { set: 'bulwark', base: 'greaves',     name: '수비대 각반',         affixes: [{ k: 'res', v: 0.3 }, { k: 'stam', v: 20 }] },
-  bul_ham:   { set: 'bulwark', base: 'hammer',      name: '수비대 파쇄 망치',    affixes: [{ k: 'dmg', v: 0.3 }, { k: 'rate', v: 0.12 }] },
-  sha_rifle: { set: 'shadow',  base: 'marksman',    name: '사냥꾼의 침묵',       affixes: [{ k: 'crit', v: 0.15 }, { k: 'reload', v: 0.25 }] },
-  sha_boots: { set: 'shadow',  base: 'boots',       name: '사냥꾼의 발소리',     affixes: [{ k: 'spd', v: 0.08 }, { k: 'stat', type: 'agi', v: 5 }] },
-  sha_knife: { set: 'shadow',  base: 'knife',       name: '사냥꾼의 이빨',       affixes: [{ k: 'dmg', v: 0.35 }, { k: 'crit', v: 0.12 }] },
-  inf_gun:   { set: 'inferno', base: 'autoshotgun', name: '화염 부대 진압총',    affixes: [{ k: 'elem', type: 'fire', v: 0.35 }, { k: 'rate', v: 0.12 }] },
-  inf_vest:  { set: 'inferno', base: 'carrier',     name: '화염 부대 방화복',    affixes: [{ k: 'res', v: 0.45 }, { k: 'hp', v: 30 }] },
-  inf_mask:  { set: 'inferno', base: 'visor',       name: '화염 부대 방독면',    affixes: [{ k: 'cdr', v: 0.08 }, { k: 'def', v: 0.25 }] },
-  sto_gun:   { set: 'storm',   base: 'plasma',      name: '폭풍 기술단 방전총',  affixes: [{ k: 'dmg', v: 0.2 }, { k: 'elem', type: 'shock', v: 0.25 }] },
-  sto_suit:  { set: 'storm',   base: 'neon',        name: '폭풍 기술단 전도복',  affixes: [{ k: 'hp', v: 45 }, { k: 'stat', type: 'tec', v: 6 }] },
-  sto_legs:  { set: 'storm',   base: 'neonleg',     name: '폭풍 기술단 하의',    affixes: [{ k: 'spd', v: 0.06 }, { k: 'stat', type: 'psi', v: 6 }] },
-  sto_helm:  { set: 'storm',   base: 'visor',       name: '폭풍 기술단 헬멧',    affixes: [{ k: 'cdr', v: 0.1 }, { k: 'stat', type: 'tec', v: 4 }] },
-};
-// 세트 효과 설명 (보석 조합과 같은 키는 RW_FX 그대로)
-const SET_FX = {
-  ...RW_FX, xp: v => `경험치 +${pct(v)}`, gdmg: v => `모든 무기 피해 +${pct(v)}`, gburn: v => `모든 무기 명중 시 ${pct(v)} 확률로 불태움`,
-  gchain: v => `무기 명중 시 ${pct(v)} 확률로 번개가 가까운 적 3마리에게 튐 (피해 60%)`, elite: v => `모든 무기: 정예·보스에게 피해 +${pct(v)}`,
-};
-// 세트 장비가 떨어질 확률: 보스(두 번째 전리품), 고유 정예, 금고 보물함, 임무 보상, 정예, 그 밖의 적 처치
-const SET_DROP = { boss: 0.35, super: 0.3, vault: 0.2, mission: 0.15, elite: 0.05, kill: 0.0003 };
+const PICKUP_MAGNET = { r: 2.2, v: 10 };            // 골드: 이 거리(칸) 안이면 v칸/초로 끌려와 저절로 주워짐
 
 // ===== 고유 전설 장비 =====
 // base: 바탕 무기, affixes: 정해진 옵션, effect: 고유 효과 설명 (효과는 game.js에서 키 이름으로 처리), flavor: 붉은 글씨 한 줄, tracer: 탄 색
@@ -469,14 +367,6 @@ const UNIQUES = {
 // 고유 전설이 떨어질 확률: 보스(첫 번째 전리품), 정예, 임무 보상, 그 밖의 적 처치 (바탕 무기가 나오는 구역부터)
 const UNIQUE_DROP = { boss: 0.35, elite: 0.06, mission: 0.12, kill: 0.00025 };
 const SELL_RATE = 0.4;           // 판매가 = 가치 x 0.4
-// 도박 (보급 자판기의 '도박' 탭): 골드를 내고 정체를 모르는 장비를 삼 — 종류만 고르고 바탕 장비·등급은 무작위 (일반 등급은 안 나옴)
-// 값 = 이 구역에서 나오는 그 종류 바탕 장비의 평균 값 x mul x (1 + lvl x 구역), odds: 등급 가중치 (uq: 고유 전설, set: 세트 장비 — 없는 종류는 전설로)
-const GAMBLE = { mul: 2.2, lvl: 0.1, odds: { 1: 64, 2: 25, 3: 7, uq: 2, set: 2 } };
-const GAMBLE_CATS = [
-  { name: '근접 무기', cat: 0 }, { name: '권총', cat: 1 }, { name: '샷건', cat: 2 }, { name: '라이플', cat: 3 }, { name: '기관총', cat: 4 },
-  { name: '에너지 무기', cat: 5 }, { name: '머리 방어구', slot: 'head' }, { name: '몸통 방어구', slot: 'body' }, { name: '다리 방어구', slot: 'legs' },
-  { name: '팔 방어구', slot: 'arm' }, { name: '강화칩', slot: 'chip' }, { name: '강화장신구', slot: 'acc' }, { name: '스킬 쉘', shell: true },
-];
 
 // ranged: 원거리 공격 정보 (volley: 한 번에 부채꼴로 쏘는 수, burst: 간격 gap초로 이어 쏘는 연사 수), keep: 유지 거리,
 // loot: 무기 드롭 확률, lootBonus: 상위 등급 보너스
@@ -581,12 +471,12 @@ const ENEMIES = {
   // 보물 약탈자: 방이 채워질 때 드물게 하나 (THIEF — 구역 출현 표에는 없음). 싸우지 않고, 들키면 멀어지는 쪽으로 달아나다 차원 틈으로 사라짐
   thief: { name: '보물 약탈자', hp: 240, spd: 5.0, r: 0.3, dmg: 0, atkRate: 99, gold: 0, blood: '#a01414', loot: 0, cost: 0, thief: true },
 };
-// 보물 약탈자: room — 방이 채워질 때 나타날 확률 (구역마다 한 번까지, 차원 균열은 rift), escape — 들킨 뒤 사라지기까지 (초),
-// drop — 체력이 이 비율만큼 깎일 때마다 골드를 흘림, 처치 보상: 골드 무더기 piles개 (gold x 구역), 보석 gems개, 장비 items개, 고유 전설·세트 확률, 경험치 xp x 구역
-const THIEF = { room: 0.04, rift: 0.06, escape: 15, drop: 0.15, piles: 8, gold: [30, 70], gems: 3, items: 2, unique: 0.1, set: 0.25, xp: 40 };
+// 보물 약탈자: room — 방이 채워질 때 나타날 확률 (구역마다 한 번까지), escape — 들킨 뒤 사라지기까지 (초),
+// drop — 체력이 이 비율만큼 깎일 때마다 골드를 흘림, 처치 보상: 골드 무더기 piles개 (gold x 구역), 장비 items개, 고유 전설 확률, 경험치 xp x 구역
+const THIEF = { room: 0.04, escape: 15, drop: 0.15, piles: 8, gold: [30, 70], items: 2, unique: 0.1, xp: 40 };
 // 방 하나의 위협 예산 = 앞 값 + 뒤 값 x 구역 (±30%) — 구역 1 약 115마리, 구역 9 약 210마리 (예전의 4~5배)
 const ROOM_BUDGET = [10.5, 6];
-// 난이도 곡선 (구역 1~9): 앞 구역은 적을 덜, 약하게 해서 서서히 어려워지게. 1이면 원래대로 (차원 균열에는 쓰지 않음)
+// 난이도 곡선 (구역 1~9): 앞 구역은 적을 덜, 약하게 해서 서서히 어려워지게. 1이면 원래대로
 // room: 방·적 무리·시련의 적 수 (위협 예산)와 고유 정예의 부하 수, hp·dmg: 적 체력·피해, elite: 정예·고유 정예가 더 받는 체력·피해 몫, boss: 보스 체력
 // 적이 적은 만큼 일반 적 한 마리의 경험치·골드·장비 확률은 1 / room 배 (구역마다 얻는 양은 비슷하게)
 const CURVE = {
@@ -796,7 +686,7 @@ const ELITE_FX = {
   aura: { r: 5, spd: 1.3, atk: 0.75 }, curse: { range: 7, cd: 5, t: 4, def: 0.5 }, spark: { n: 3, cd: 0.45, speed: 5, life: 1.3, dmg: 6 },
 };
 // 고유 정예 (디아블로2의 슈퍼 유니크): 구역마다 이름 붙은 정예 하나가 부하를 거느리고 정해진 방을 지킴
-// 처치하면 좋은 장비·보석, 그 구역의 금고 열쇠 (불러오면 다시 나타남). base: 바탕 몬스터, affixes: 정예 특성, minions: [[종류, 수]], hp: 체력 배율 (정예 배율에 더해)
+// 처치하면 좋은 장비, 그 구역의 금고 열쇠 (불러오면 다시 나타남). base: 바탕 몬스터, affixes: 정예 특성, minions: [[종류, 수]], hp: 체력 배율 (정예 배율에 더해)
 const SUPERS = [
   { name: '녹슨 정비공 그룬',  base: 'xenoid',     affixes: ['fast'],                 minions: [['crawler', 5]],                  hp: 2 },
   { name: '울부짖는 보모',     base: 'spitter',    affixes: ['regen'],                minions: [['runner', 4]],                   hp: 3 },
@@ -808,9 +698,9 @@ const SUPERS = [
   { name: '포격 지휘관',       base: 'mortar',     affixes: ['multi', 'aura'],        minions: [['gunner', 3]],                   hp: 1.5 },
   { name: '군체의 대변자',     base: 'juggernaut', affixes: ['fire', 'aura', 'curse'], minions: [['brute', 2]],                   hp: 1.6 },
 ];
-// 필드 사건: per — 구역마다 놓는 수 (보급 캐시: 열면 보급품, 대신 매복 / 조난 신호기: 켜고 time초 동안 r칸 안에서 지키면 보상, gap초마다 적 무리)
+// 필드 사건: per — 구역마다 놓는 보급 캐시 수 (열면 보급품, 대신 매복), vault: 금고 수
 // vault — 금고 보물함 수 [구역 1~4, 5~9]
-const FIELD_EVENTS = { per: [1, 2, 2, 2, 2, 2, 2, 2, 2], beacon: { time: 25, r: 4, gap: 7 }, vault: [2, 3] };
+const FIELD_EVENTS = { per: [1, 2, 2, 2, 2, 2, 2, 2, 2], vault: [2, 3] };
 const BOSS_EVERY = 3;   // 이 구역마다 보스 등장 (3, 6): 타이탄과 하이브 마더, 마지막 구역은 오버마인드
 const BOSS_DROPS = 2;   // 보스가 떨어뜨리는 무기 수 (상위 등급 보너스)
 // 구역 보스: 그 구역 입구에서 먼 쪽의 가장 큰 빈 방에 하나 (길을 막지는 않음 — 구역 3·6의 보스와 9의 오버마인드는 길목에). 처치하면 다시 나오지 않음
@@ -864,26 +754,6 @@ const ARMORIES = [
   { reg: 5, name: '중화기 보관소 단말기', time: 40, gap: 9, wave: 0.7,  r: 4 },
 ];
 
-// ===== 차원 균열 (보급 거점의 순간이동 패드에서): 무작위 전투 구역 — 적을 쓰러뜨려 균열을 채우면 균열 수호자, 처치하면 단계 돌파 =====
-// 보스를 하나 처치하면 열림. 돌파한 단계 +1까지 고를 수 있음 (저장마다 진행 기록 flags.rift). 들어가면 필드는 불러올 때처럼 새로 채워짐
-// lv: 적 구성·기본 강함의 구역, hp: 적 체력 배율, dmg: 받는 피해 배율 (lv 위에 더 곱함)
-const RIFT_TIERS = [
-  { lv: 2, hp: 1,    dmg: 1 },
-  { lv: 3, hp: 1,    dmg: 1 },
-  { lv: 4, hp: 1.05, dmg: 1 },
-  { lv: 5, hp: 1.1,  dmg: 1.05 },
-  { lv: 6, hp: 1.15, dmg: 1.05 },
-  { lv: 7, hp: 1.2,  dmg: 1.1 },
-  { lv: 8, hp: 1.3,  dmg: 1.15 },
-  { lv: 9, hp: 1.45, dmg: 1.2 },
-  { lv: 9, hp: 1.75, dmg: 1.35 },
-  { lv: 9, hp: 2.1,  dmg: 1.5 },
-];
-// dense: 방마다 적 예산 배율, need: 균열이 차는 데 필요한 처치 위협도 (방 예산 합의 비율 — 정예는 4배로 셈), elites: 정예가 있는 방 수 (단계마다),
-// guardian: 수호자 체력 배율, reward: 돌파 보상 (골드·경험치 x 단계, 세트 장비 확률 [기본, 단계마다 +], 보석 수)
-const RIFT = { dense: 1.15, need: 0.55, elites: t => 1 + Math.floor(t / 2), guardian: 1.3, reward: { gold: 150, xp: 120, set: [0.25, 0.07], gems: 2 } };
-// 균열 수호자: [종류, 나오기 시작하는 단계]
-const RIFT_GUARDIANS = [['crusher', 1], ['broodmother', 1], ['titan', 3], ['argus', 3], ['plaguegiant', 5], ['hivemother', 5], ['voidpriest', 7], ['executioner', 7]];
 
 // ===== 캠페인 (구역 9개) =====
 // 구역 이름과 브리핑 (처음 들어갈 때 표시). 구역 9 코어의 오버마인드를 처치하면 정거장 자폭이 시작되고,
@@ -936,27 +806,22 @@ const INTRO = {
   close: [7.6, 11.2], roarAt: 8.0, line2: 8.7, shot: 9.7, seal: 11.6, end: 12.8,
 };
 
-// ===== 업적: 이루면 작은 영구 보너스 (이 브라우저의 모든 저장에 적용 — 수집 도감 [J]의 업적 탭) =====
-// stat: 진행 수치 (game.js achProgress), goal: 목표, bonus: 보너스 (설명은 SET_FX, 효과는 세트 효과와 같은 곳 — gearV·gearDef·gainXp)
+// ===== 업적: 수집 도감 [J]의 업적 탭 (기록만 — 이 브라우저의 모든 저장에서 함께 쌓임) =====
+// stat: 진행 수치 (game.js achProgress), goal: 목표
 const ACHIEVEMENTS = [
-  { id: 'kill100',  name: '첫 사냥',            icon: 'icon_knife',       stat: 'kills',     goal: 100,  desc: '몬스터 100마리 처치',               bonus: { hp: 5 } },
-  { id: 'kill1000', name: '학살자',             icon: 'icon_mg',          stat: 'kills',     goal: 1000, desc: '몬스터 1000마리 처치',              bonus: { gdmg: 0.02 } },
-  { id: 'kill5000', name: '정거장의 악몽',      icon: 'icon_bfg',         stat: 'kills',     goal: 5000, desc: '몬스터 5000마리 처치',              bonus: { gdmg: 0.03 } },
-  { id: 'species',  name: '생태 조사',          icon: 'trooa1',           stat: 'species',   goal: 15,   desc: '몬스터 15종 처치',                  bonus: { gcrit: 0.01 } },
-  { id: 'boss3',    name: '거물 사냥',          icon: 'cybra1',           stat: 'bosses',    goal: 3,    desc: '보스 3종 처치',                     bonus: { elite: 0.03 } },
-  { id: 'boss9',    name: '보스 사냥꾼',        icon: 'bbrna0',           stat: 'bosses',    goal: 9,    desc: '보스 9종 모두 처치',                bonus: { xp: 0.05 } },
-  { id: 'super5',   name: '현상금 사냥꾼',      icon: 'yskua0',           stat: 'supers',    goal: 5,    desc: '고유 정예 5명 처치',                bonus: { gold: 0.05 } },
-  { id: 'unique5',  name: '보물 사냥꾼',        icon: 'icon_case_gold',   stat: 'uniques',   goal: 5,    desc: '고유 전설 5종 찾기',                bonus: { gold: 0.05 } },
-  { id: 'set8',     name: '세트 수집가',        icon: 'icon_vest_neon',   stat: 'sets',      goal: 8,    desc: '세트 장비 8종 찾기',                bonus: { defN: 3 } },
-  { id: 'setfull',  name: '완벽한 한 벌',       icon: 'icon_helm_visor',  stat: 'setfull',   goal: 1,    desc: '세트 하나를 모두 장착',             bonus: { defN: 5 } },
-  { id: 'rw3',      name: '보석 세공사',        icon: 'icon_gem_diamond', stat: 'runewords', goal: 3,    desc: '보석 조합 3종 만들기',              bonus: { cdr: 0.02 } },
-  { id: 'log9',     name: '기록 보관인',        icon: 'pmapa0',           stat: 'logs',      goal: 9,    desc: '데이터 기록 9개 듣기',              bonus: { stam: 10 } },
-  { id: 'log18',    name: '케르베로스-7의 진실', icon: 'pmapb0',          stat: 'logs',      goal: 18,   desc: '데이터 기록 18개 모두 듣기',        bonus: { xp: 0.05 } },
-  { id: 'rescue5',  name: '구조대',             icon: 'sswva1',           stat: 'rescued',   goal: 5,    desc: '생존자 5명 대피 (모든 저장 합)',    bonus: { hp: 10 } },
-  { id: 'lv10',     name: '베테랑',             icon: 'pstra0',           stat: 'level',     goal: 10,   desc: '레벨 10 달성',                      bonus: { stam: 10 } },
-  { id: 'rift3',    name: '균열 탐험가',        icon: 'pinsa0',           stat: 'rift',      goal: 3,    desc: '차원 균열 3단계 돌파',              bonus: { hp: 10 } },
-  { id: 'rift7',    name: '균열 정복자',        icon: 'pinva0',           stat: 'rift',      goal: 7,    desc: '차원 균열 7단계 돌파',              bonus: { gdmg: 0.03 } },
-  { id: 'win',      name: '탈출',               icon: 'tlp2a0',           stat: 'win',       goal: 1,    desc: '오버마인드를 처치하고 탈출',        bonus: { spd: 0.03 } },
+  { id: 'kill100',  name: '첫 사냥',            icon: 'icon_knife',       stat: 'kills',     goal: 100,  desc: '몬스터 100마리 처치' },
+  { id: 'kill1000', name: '학살자',             icon: 'icon_mg',          stat: 'kills',     goal: 1000, desc: '몬스터 1000마리 처치' },
+  { id: 'kill5000', name: '정거장의 악몽',      icon: 'icon_bfg',         stat: 'kills',     goal: 5000, desc: '몬스터 5000마리 처치' },
+  { id: 'species',  name: '생태 조사',          icon: 'trooa1',           stat: 'species',   goal: 15,   desc: '몬스터 15종 처치' },
+  { id: 'boss3',    name: '거물 사냥',          icon: 'cybra1',           stat: 'bosses',    goal: 3,    desc: '보스 3종 처치' },
+  { id: 'boss9',    name: '보스 사냥꾼',        icon: 'bbrna0',           stat: 'bosses',    goal: 9,    desc: '보스 9종 모두 처치' },
+  { id: 'super5',   name: '현상금 사냥꾼',      icon: 'yskua0',           stat: 'supers',    goal: 5,    desc: '고유 정예 5명 처치' },
+  { id: 'unique5',  name: '보물 사냥꾼',        icon: 'icon_case_gold',   stat: 'uniques',   goal: 5,    desc: '고유 전설 5종 찾기' },
+  { id: 'log9',     name: '기록 보관인',        icon: 'pmapa0',           stat: 'logs',      goal: 9,    desc: '데이터 기록 9개 듣기' },
+  { id: 'log18',    name: '케르베로스-7의 진실', icon: 'pmapb0',          stat: 'logs',      goal: 18,   desc: '데이터 기록 18개 모두 듣기' },
+  { id: 'rescue5',  name: '구조대',             icon: 'sswva1',           stat: 'rescued',   goal: 5,    desc: '생존자 5명 대피 (모든 저장 합)' },
+  { id: 'lv10',     name: '베테랑',             icon: 'pstra0',           stat: 'level',     goal: 10,   desc: '레벨 10 달성' },
+  { id: 'win',      name: '탈출',               icon: 'tlp2a0',           stat: 'win',       goal: 1,    desc: '오버마인드를 처치하고 탈출' },
 ];
 
 // ===== 구역 임무 =====
@@ -1003,17 +868,13 @@ const EVENTS = {
 
 // 배경음악: Freedoom 사운드트랙(MIDI, BSD)을 게임 안 신시사이저로 연주. zones는 구역 1~9 순서
 const MUSIC = {
-  title: 'd_e2m2', base: 'd_e3m8', escape: 'd_dm17', ending: 'd_victor', rift: 'd_e1m7', // base: 보급 거점 안, rift: 차원 균열
+  title: 'd_e2m2', base: 'd_e3m8', escape: 'd_dm17', ending: 'd_victor', // base: 보급 거점 안
   zones: ['d_map21', 'd_e1m1', 'd_e4m8', 'd_e2m6', 'd_map23', 'd_map22', 'd_e4m3', 'd_e1m7', 'd_map30'],
   combat: ['d_map20', 'd_dm32', 'd_map13'], // 전투 곡: 구역 1~3 · 4~6 · 7~9 (COMBAT_MUSIC)
 };
 // 전투 음악: 플레이어를 알아챈 적이 r칸 안에 있으면 전투 곡으로, 그런 적이 없어지고 hold초 뒤 원래 곡으로
 const COMBAT_MUSIC = { r: 12, hold: 6 };
 
-// 거점 습격: 구역 from부터, 보급 거점에 들어갈 때 chance 확률로 delay초 뒤 경보 → warn초 뒤 적 무리 waves번 (gap초 간격, 크기 wave, 마지막엔 정예)이 안전막을 두드림.
-// 습격 중에는 거점 안에서도 싸울 수 있음. 안전막 체력 hp + lvHp x 구역 — 막에 붙은 적은 초당 (피해 x atk)씩, 막에 맞은 적 탄은 그 피해의 절반만큼 깎음 (다 깎이면 안전막이 꺼져 적이 들어옴).
-// 모두 처치하면 보상 (골드 gold x 구역, 경험치 xp x 구역 — 막이 버텼으면 hold배), 거점에서 far칸 넘게 멀어지면 흩어짐. 다음 습격까지 cd초
-const ASSAULT = { from: 2, chance: 0.35, delay: [5, 10], warn: 5, waves: 3, gap: 13, wave: 0.85, hp: 300, lvHp: 120, atk: 0.6, far: 24, gold: [70, 110], xp: 50, hold: 1.5, cd: 300 };
 
 // 신단: 구역마다 SHRINE_PER개 (빈 방 가운데쯤) — [F]로 쓰면 t초 동안 효과 (한 번에 하나 — 새로 쓰면 바뀜). 그림은 Freedoom의 파워업 구체
 const SHRINES = {
@@ -1111,12 +972,9 @@ const TIPS = {
   thief:     { title: '보물 약탈자', icon: 'sthfa1', lines: ['놓치면 사라진다. 달려서 쫓아라'] },
   shrine:    { title: '신단', icon: 'soula0', lines: ['[F]로 쓰면 20초 동안 강해진다'] },
   trial:     { title: '시련의 방', icon: 'icon_case_gold', lines: ['들어서면 입구가 잠긴다. 적 무리를 모두 처치하라'] },
-  assault:   { title: '거점 습격', icon: 'icon_case_white', lines: ['거점 안에서도 싸울 수 있다. 안전막을 지켜라'] },
   armory:    { title: '무기고', icon: null, lines: ['해제하면 무기 슬롯이 한 칸 늘어난다'] },
-  rift:      { title: '차원 균열', icon: 'pinsa0', lines: ['적을 쓰러뜨려 균열을 채우면 수호자가 나타난다'] },
   log:       { title: '데이터 기록', icon: 'pmapa0', lines: ['[J] 수집 도감에서 다시 들을 수 있다'] },
-  ach:       { title: '업적', icon: null, lines: ['업적을 이루면 작은 영구 보너스가 붙는다'] },
-  set:       { title: '◆ 세트 장비', icon: null, lines: ['같은 세트를 2개 이상 장착하면 세트 효과가 붙는다'] },
+  ach:       { title: '업적', icon: null, lines: ['이룬 업적은 수집 도감 [J]에 모인다'] },
   unique:    { title: '★ 고유 전설', icon: null, lines: ['고유 효과가 있는 특별한 장비다'] },
   poison:    { title: '중독', icon: 'icon_pills', lines: ['치료제 [E]로 풀 수 있다'] },
   shock:     { title: '감전', icon: 'suita0', lines: ['치료제 [E]로 풀 수 있다'] },
@@ -1124,13 +982,10 @@ const TIPS = {
   lowhp:     { title: '체력이 낮다', icon: 'icon_medkit', lines: ['메디킷 [Q]로 회복한다'] },
   bagfull:   { title: '가방이 가득 참', icon: 'bpaka0', lines: ['창고에 맡기거나 회수 자판기에서 팔아라'] },
   noammo:    { title: '탄약이 떨어짐', icon: 'clipa0', lines: ['다른 무기로 바꿔라. 근접 무기는 탄약이 필요 없다'] },
-  gem:       { title: '보석과 소켓', icon: 'icon_gem_ruby', lines: ['소켓(◇)이 있는 장비 위에 보석을 끌어다 놓는다'] },
   super:     { title: '고유 정예', icon: null, lines: ['금고 열쇠를 지닌 강적이다'] },
-  vault:     { title: '금고', icon: 'yskua0', lines: ['[F]로 열면 장비와 보석이 쏟아진다'] },
-  event:     { title: '필드 사건', icon: 'tlp2a0', lines: ['[F]로 열거나 켜면 적이 몰려온다. 버티면 보상'] },
+  vault:     { title: '금고', icon: 'yskua0', lines: ['[F]로 열면 장비가 쏟아진다'] },
+  event:     { title: '필드 사건', icon: 'tlp2a0', lines: ['[F]로 열면 보급품, 대신 적이 몰려온다'] },
   resonance: { title: '계열 공명', icon: null, lines: ['같은 계열 쉘을 여러 개 끼우면 위력이 오른다'] },
-  runeword:  { title: '보석 조합', icon: 'icon_gem_diamond', lines: ['일반 장비의 소켓을 정해진 보석으로 채우면 특별한 장비가 된다'] },
-  pouch:     { title: '보석 주머니', icon: 'icon_gem_emerald', lines: ['보석은 가방이 아닌 보석 주머니에 들어간다'] },
   shielder:  { title: '방패 해병', icon: 'cpsha1', lines: ['옆이나 뒤로 돌아가서 공격하라'] },
   bomber:    { title: '폭주 해골', icon: 'skula1', lines: ['붉은 원 밖으로 피하라'] },
   assassin:  { title: '그림자 추적자', icon: 'sasna1', lines: ['맞히면 잠시 드러난다'] },
@@ -1138,7 +993,6 @@ const TIPS = {
   lurker:    { title: '매복자', icon: null, lines: ['바닥의 그림자가 짙어지면 비켜라'] },
   burrower:  { title: '굴착자', icon: null, lines: ['흙더미가 흔들리면 곧 솟아오른다'] },
   warden:    { title: '수호 드론', icon: null, lines: ['주변 적에게 보호막을 씌운다. 드론부터 노려라'] },
-  gamble:    { title: '도박', icon: 'icon_case_gold', lines: ['골드로 정체를 모르는 장비를 산다'] },
   codex:     { title: '수집 도감', icon: null, lines: ['[J] 처치한 적과 찾은 장비가 모인다'] },
   curse:     { title: '저주', icon: null, lines: ['저주하는 정예가 보이면 방어가 절반이 된다'] },
   escape:    { title: '탈출', icon: null, lines: ['커서 옆 화살표를 따라 탈출정으로 가라'] },

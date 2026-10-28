@@ -51,7 +51,7 @@ function dbgList(tab) {
     ...SYNTH_ONLY.map(k => ({ id: k, name: `${k}: 합성음`, key: k, head: '합성 효과음 (Freedoom에 없음)' })),
     ...(META.sounds || []).map(n => ({ id: 'raw_' + n, name: n, raw: n, head: '원본 효과음 파일 전체' })),
   ];
-  const role = { title: '타이틀', base: '보급 거점', escape: '탈출 (자폭)', ending: '엔딩', rift: '차원 균열' };
+  const role = { title: '타이틀', base: '보급 거점', escape: '탈출 (자폭)', ending: '엔딩' };
   return [...Object.entries(role).map(([k, r]) => ({ id: MUSIC[k], role: r })), ...MUSIC.zones.map((m, n) => ({ id: m, role: `구역 ${n + 1} ${CAMPAIGN[n].name}` }))]
     .map(o => ({ ...o, name: `${o.role}: ${(MUSIC_INFO[o.id] || [o.id])[0]}`, song: o.id }));
 }
