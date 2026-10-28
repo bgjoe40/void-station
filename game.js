@@ -486,7 +486,7 @@ let tiles, rooms, lamps, roomOf, wallTex, levelTheme, terminals = [];
 let doors = []; // 자동문: { cells, open(0~1), x, y, key(보안문 색), locked } — 가까이 가면 천장으로 올라가 열림
 const doorOf = new Int16Array(MW * MH).fill(-1);
 const safeMap = new Uint8Array(MW * MH); // 보급 거점 방 = 안전 지대: 몬스터가 들어오지 못하고 적 탄환이 막히며, 안에서는 다치지도 싸우지도 않음
-// 구역 테마 (구역마다 돌아가며): 방 바닥, 통로 바닥, 벽, 가끔 섞이는 장식 벽 — Freedoom 텍스처 이름
+// 구역 테마 (막마다 ACTS의 themes로 고름): 방 바닥, 통로 바닥, 벽, 가끔 섞이는 장식 벽 — Freedoom 텍스처 이름
 const THEMES = [
   { floors: ['aqf001', 'aqf029', 'aqf031', 'floor7_1'], corridor: 'aqf004', walls: ['startan2', 'starbr2'], accents: ['comptall', 'compwerd'] },
   { floors: ['floor0_6', 'aqf051', 'floor0_5', 'flat5_4'], corridor: 'flat4', walls: ['starg3', 'stargr1'], accents: ['compsta1', 'spacew3'] },
@@ -669,7 +669,9 @@ function buildWalls() {
   }
 }
 // 텍스처: 방마다 바닥·벽을 테마에서 고르고 (필드는 구역마다 돌아가며, 보급 거점은 기지 모습, theme을 주면 그것만), 벽은 붙어 있는 방을 따름 (가끔 컴퓨터 패널 등 장식)
-const themeOf = reg => THEMES[(reg - 1) % THEMES.length];
+const actOf = lv => ACTS[clamp(Math.floor(((lv || 1) - 1) / 3), 0, 2)]; // 그 구역의 막 (ACTS)
+const themeIdx = reg => { const n = clamp(reg || 1, 1, 9); return actOf(n).themes[(n - 1) % 3]; };
+const themeOf = reg => THEMES[themeIdx(reg)];
 function applyTheme(theme) {
   levelTheme = theme || THEMES[0];
   rooms.forEach((r, n) => {
@@ -1097,7 +1099,8 @@ function placeFieldLamps() {
     if (r.hub) continue;
     let x = r.x + irnd(1, r.w - 2);
     for (let k = 0; k < 12 && keepClear[r.y * MW + x]; k++) x = r.x + irnd(1, r.w - 2);
-    lamps.push({ x: x + 0.5, y: r.y + 0.6, col: pick(['255,70,40', '255,150,60', '255,150,60', '120,200,255']), ph: rnd(0, 6), flick: Math.random() < 0.35 });
+    const A = actOf(r.reg); // 막마다 조명 색·깜박임
+    lamps.push({ x: x + 0.5, y: r.y + 0.6, col: pick(A.lamps), ph: rnd(0, 6), flick: Math.random() < A.flick });
   }
   for (const t of terminals) if (t.kind === 'shop' || t.kind === 'save') lamps.push({ x: t.i + 0.5, y: t.j + 0.9, col: '170,210,255', ph: rnd(0, 6), flick: false });
   for (const h of hubs) lamps.push({ x: h.pad.i + 0.5, y: h.pad.j + 0.5, col: '90,200,255', ph: 0, flick: false, exit: true });
@@ -1262,11 +1265,17 @@ function combatTick(dt) {
   const p = player, R = COMBAT_MUSIC.r;
   combatT = enemies.some(e => e.aggro && !e.dead && Math.abs(e.x - p.x) < R && Math.abs(e.y - p.y) < R && Math.hypot(e.x - p.x, e.y - p.y) < R) ? COMBAT_MUSIC.hold : Math.max(0, combatT - dt);
 }
+// 구역 첫 진입·막 완료 카드: lines = [[글, 크기, 색], ...], t: 나온 지 (ZONE_CARD_T초 동안)
+const ZONE_CARD_T = 4;
+let zoneCard = null;
+const showCard = lines => { zoneCard = { lines, t: 0 }; };
 function enterRegion(n) {
   const C = CAMPAIGN[n - 1], R = regions[n], first = !flags.visited.includes(n);
   level = n; mission = R.mission; exitDist = null;
   if (!first) return;
   flags.visited.push(n);
+  const A = actOf(n);
+  showCard((n - 1) % 3 ? [[`구역 ${n}`, FS, A.col], [C.name, 24, INK]] : [[A.name, FS, A.col], [A.title, 24, INK], [`구역 ${n} · ${C.name}`, FS, HC.dim]]);
   if (n > 1) { // 새 구역 보너스 (예전의 구역 클리어 보너스)
     const g = REGION_BONUS.gold * (n - 1), xp = REGION_BONUS.xp * (n - 1);
     player.gold += g; gainXp(xp); msg(`구역 ${n} 첫 진입: +${g}G, 경험치 +${xp}`, '#ffd27a');
@@ -1612,9 +1621,9 @@ function randomFloorIn(r, rad = 0.35) {
   return { x: r.cx + 0.5, y: r.cy + 0.5 };
 }
 // 이 구역에 나오는 일반 적과 가중치 (보스·소환물 제외)
-function enemyPool(lv = level) {
+function enemyPool(lv = level) { // 그 막의 적 (ACTS의 foes) 중 이 구역까지 나온 것
   const w = {};
-  for (const k in ENEMIES) if (ENEMIES[k].from && ENEMIES[k].from <= lv) w[k] = ENEMIES[k].w;
+  for (const k of actOf(lv).foes) if (ENEMIES[k].from <= lv) w[k] = ENEMIES[k].w;
   return w;
 }
 // 정예로 만들기: 특성 n개 (겹치지 않게) — 체력·피해 증가, 이름 앞에 특성
@@ -1981,7 +1990,11 @@ function killEnemy(e) {
     msg(`${e.d.name} 처치!`, '#ffd27a');
     if (!flags.bosses.includes(e.lv)) {
       flags.bosses.push(e.lv);
-      if (WEAPON_SLOTS.bosses.includes(e.lv)) { msg(`★ 무기 슬롯 ${slotsOpen()}번이 열렸다`, '#ffd27a'); tip('slots'); } // 막 보스: 무기 슬롯 한 칸
+      if (WEAPON_SLOTS.bosses.includes(e.lv)) { // 막 보스: 무기 슬롯 한 칸, 막 완료 카드
+        const A = actOf(e.lv);
+        msg(`★ 무기 슬롯 ${slotsOpen()}번이 열렸다`, '#ffd27a'); tip('slots');
+        showCard([[`${A.name} ${A.title}`, FS, A.col], ['완료', 24, INK], [`무기 슬롯 ${slotsOpen()}번`, FS, '#ffd27a']]);
+      }
     }
     if (GATES[e.lv] === 'boss') { msg('봉쇄 격벽이 열렸다', '#9f9'); Snd.play('unlock'); }
     if (e.d.boss === 'brain') startEscape(e);
@@ -2891,7 +2904,7 @@ function updateEvents(dt) {
     if (hazards.length || level < P.from || level >= CAMPAIGN.length || inHub() || escape) nextEvent = eventClock + 10;
     else if (Math.random() >= P.chance) nextEvent = eventClock + rnd(...P.gap);
     else {
-      const type = pick(Object.keys(EVENTS).filter(k => k !== lastEvent));
+      const ev = actOf(level).events, type = pick(ev.length > 1 ? ev.filter(k => k !== lastEvent) : ev); // 막마다 두 가지를 번갈아
       if (startEvent(type)) { lastEvent = type; nextEvent = eventClock + rnd(...P.gap); } else nextEvent = eventClock + 10; // 일어날 자리가 없으면 조금 뒤에
     }
   }
@@ -5572,6 +5585,7 @@ function updateMisc(dt) {
 
 function update(dt) {
   gtime += dt;
+  if (zoneCard && (zoneCard.t += dt) > ZONE_CARD_T) zoneCard = null;
   updatePlayer(dt);
   if (trade && trade.at && Math.hypot(player.x - trade.at.x, player.y - trade.at.y) > TRADE_RANGE) closeTrade(); // 자판기에서 걸어서 멀어지면 거래 창을 닫음
   if (state !== 'play' && state !== 'trade') return;
@@ -5595,7 +5609,7 @@ let ambT = 6, heartT = 0;
 // 매 프레임: 지금 장소에 맞는 바람·기계음 (정전이면 기계가 멈추고, 죽거나 엔딩이면 조용히)
 function updateAmbience() {
   if (!Snd.ctx) return;
-  let A = state === 'title' ? AMBIENCE.title : inBase ? AMBIENCE.base : AMBIENCE.zones[(level - 1) % AMBIENCE.zones.length];
+  let A = state === 'title' ? AMBIENCE.title : inBase ? AMBIENCE.base : AMBIENCE.zones[themeIdx(level)];
   if (state === 'dead' || state === 'ending') A = { wind: 0, hum: 0, freq: A.freq };
   else if (!inBase && isBlackout()) A = { wind: A.wind * 0.6, hum: 0, freq: A.freq };
   Amb.set(A.wind, A.hum, A.freq);
@@ -6773,6 +6787,8 @@ function render() {
   }
   ctx.lineCap = 'butt';
 
+  const G = !inBase && level && !scene && !cine ? actOf(level).grade : null; // 막마다 화면 색조 (조명 아래, 곱하기)
+  if (G) { ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = `rgba(${G[0]},${G[1]},${G[2]},${G[3]})`; ctx.fillRect(0, 0, W, VH); ctx.globalCompositeOperation = 'source-over'; }
   drawLighting();
   drawSkillOverlay(); // 드론·톱날·특이점 구체: 플레이어 곁의 효과라 어둠에 가리지 않게 조명 위에
   drawPillars();      // 감시자의 불기둥 예고
@@ -6856,6 +6872,7 @@ function render() {
   drawLog();
   ctx.restore();
   drawHUD();
+  if (zoneCard && (state === 'play' || state === 'trade')) drawZoneCard();
   if (state === 'trade') drawTrade();
   if (invOpen && (state === 'play' || state === 'trade')) drawInventory();
   if (perkOpen && (state === 'play' || state === 'trade')) drawPerks();
@@ -6984,7 +7001,7 @@ function drawLighting() {
   lctx.globalCompositeOperation = 'source-over';
   lctx.clearRect(0, 0, W, VH);
   const dark = !inBase && isBlackout(); // 정전: 더 어둡고 조명이 꺼짐 (출구 패드 불빛만)
-  lctx.fillStyle = state === 'title' || state === 'intro' ? 'rgba(0,0,0,0.58)' : inBase ? 'rgba(0,0,0,0.42)' : area ? `rgba(0,0,0,${dark ? 0.94 : 0.88})` : 'rgba(0,0,0,0.72)'; // 타이틀은 조명만, 기지는 밝게, 시야 밖은 어둡게
+  lctx.fillStyle = state === 'title' || state === 'intro' ? 'rgba(0,0,0,0.58)' : inBase ? 'rgba(0,0,0,0.42)' : area ? (dark ? 'rgba(0,0,0,0.94)' : `rgba(${actOf(level).shade},${actOf(level).dark})`) : 'rgba(0,0,0,0.72)'; // 타이틀은 조명만, 기지는 밝게, 시야 밖은 어둡게
   lctx.fillRect(0, 0, W, VH);
   lctx.globalCompositeOperation = 'destination-out';
   const punch = (x, y, r, a) => {
@@ -7380,6 +7397,19 @@ function hudTick(dt) {
   if (hudFx.xp !== p.xp) { if (hudFx.xp >= 0) hudFx.xpT = 2; hudFx.xp = p.xp; }
   hudFx.name = Math.max(0, hudFx.name - dt); hudFx.xpT = Math.max(0, hudFx.xpT - dt);
 }
+function drawZoneCard() {
+  const c = zoneCard, a = Math.min(1, c.t / 0.4, (ZONE_CARD_T - c.t) / 0.8);
+  if (a <= 0) return;
+  const h = c.lines.reduce((s, [, sz]) => s + sz + 10, 16), y0 = Math.round(VH * 0.2);
+  ctx.save(); ctx.globalAlpha = a;
+  const band = ctx.createLinearGradient(0, 0, W, 0);
+  band.addColorStop(0, 'rgba(0,0,0,0)'); band.addColorStop(0.5, 'rgba(0,0,0,0.6)'); band.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = band; ctx.fillRect(0, y0, W, h);
+  ctx.textAlign = 'center';
+  let y = y0 + 6;
+  for (const [t, sz, col] of c.lines) { y += sz + 2; ctx.font = font(sz, true); ctx.fillStyle = col; ctx.fillText(t, W / 2, y); y += 8; }
+  ctx.restore();
+}
 function drawHUD() {
   const p = player, U = Z, m = HUD_M * U, ch = HUD_CARD_H * U, top = hudBottom();
   // 왼쪽 아래: 체력 (큰 숫자, 칸 막대), 방어 (방패, 작은 숫자), 기력 (가는 막대)
@@ -7668,7 +7698,7 @@ function resetWorld() {
   escape = null; hurtDirs = []; hitFlash = 0; hitStop = 0; crateHp = new Map(); crateHitT = new Map();
   enemies = []; bullets = []; eshots = []; grenades = []; areas = []; parts = []; decals = []; pickups = []; barrels = [];
   texts = []; flashes = []; beams = []; corpses = []; fxs = [];
-  combatT = 0; trialOn = null; sealMap.fill(0);
+  combatT = 0; trialOn = null; sealMap.fill(0); zoneCard = null;
   mission = PURGE; hackM = null; hackOpen = false; survivors = []; hazards = []; eventNotes = []; eventClock = 0; nextEvent = 0; lastEvent = null;
   turrets = []; mines = []; rings = []; drones = []; coils = []; wells = []; pillars = []; waves = []; decoys = []; delayed = [];
   if (player) { player.scd = {}; player.sk = {}; player.inv = 0; player.shrine = null; } // 스킬 대기시간·지속 효과는 장소를 옮길 때마다 처음부터

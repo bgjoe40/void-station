@@ -1,7 +1,7 @@
 // ===== 게임 데이터 정의 (무기 / 탄약 / 수류탄 / 아이템 / 적) =====
 
 // 버전: GitHub에 커밋·푸시할 때마다 올림 (새 기능은 가운데 자리, 고침·작은 추가는 끝자리) — 타이틀·일시정지 화면에 표시, git 태그 v<버전>
-const VERSION = '0.17.0';
+const VERSION = '0.18.0';
 
 const CAT_NAMES = ['근접', '권총', '샷건', '라이플', '기관총', '에너지'];
 const MAX_LOAD = 30;   // 장착 + 가방 무기 무게 합이 넘으면 이동속도 감소
@@ -388,24 +388,24 @@ const ENEMIES = {
              dodge: { chance: 0.5, cd: 1.8, v: 8, dur: 0.22, h: 16, min: 2.5 } },
   spitter: { name: '스피터',     hp: 50,  spd: 1.9, r: 0.35, dmg: 8,  atkRate: 1.0, gold: 25,  blood: '#bd2', loot: 0.08, keep: 4.5, from: 2, w: 3, cost: 2,
              ranged: { type: 'acid', dmg: 9, rate: 1.8, range: 8, speed: 8 } },
-  sparker: { name: '스파크 드론', hp: 45,  spd: 2.4, r: 0.3,  dmg: 6,  atkRate: 1.0, gold: 30,  blood: '#9cf', loot: 0.08, keep: 4, fly: true, from: 3, w: 3, cost: 2,
+  sparker: { name: '스파크 드론', hp: 45,  spd: 2.4, r: 0.3,  dmg: 6,  atkRate: 1.0, gold: 30,  blood: '#9cf', loot: 0.08, keep: 4, fly: true, from: 4, w: 3, cost: 2,
              ranged: { type: 'shock', dmg: 7, rate: 2.2, range: 7, speed: 12 } },
   brute:   { name: '브루트',     hp: 320, spd: 1.7, r: 0.55, dmg: 34, atkRate: 1.5, gold: 120, blood: '#8b3', loot: 0.4, lootBonus: 1, knock: 9, from: 3, w: 1.5, cost: 5,
              lob: { type: 'ball', dmg: 16, rate: 3.6, min: 3, range: 10, speed: 7.5, wind: 0.35 } }, // 녹색 에너지 구체를 던짐 (Doom의 바론처럼)
   // 철갑 거수: 아주 느리지만 맷집이 세다 — 장갑 때문에 기관총·산탄 같은 약한 탄은 거의 안 통하고, 강한 한 방(저격·리볼버·강타·폭발)이 잘 통함
-  juggernaut: { name: '철갑 거수', hp: 600, spd: 0.9, r: 0.62, dmg: 32, atkRate: 1.8, gold: 150, blood: '#a43', loot: 0.45, lootBonus: 1, knock: 11, armor: 8, heavy: true, from: 4, w: 1.2, cost: 6 },
+  juggernaut: { name: '철갑 거수', hp: 600, spd: 0.9, r: 0.62, dmg: 32, atkRate: 1.8, gold: 150, blood: '#a43', loot: 0.45, lootBonus: 1, knock: 11, armor: 8, heavy: true, from: 7, w: 1.2, cost: 6 },
   // 후반 적 (4~7구역부터)
   // 차저: 보이면 웅크렸다가(붉게 번쩍) 일직선으로 돌진, 맞으면 크게 밀려남. 벽에 박으면 잠시 기절
-  charger: { name: '차저',       hp: 120, spd: 3.0, r: 0.4,  dmg: 14, atkRate: 0.9, gold: 40,  blood: '#c55', loot: 0.1,  knock: 5, from: 4, w: 3, cost: 3,
+  charger: { name: '차저',       hp: 120, spd: 3.0, r: 0.4,  dmg: 14, atkRate: 0.9, gold: 40,  blood: '#c55', loot: 0.1,  knock: 5, from: 5, w: 3, cost: 3,
              charge: { range: 7, wind: 0.55, speed: 11, dur: 0.55, stun: 1.2, cd: 3, mul: 2.2 } },
   // 감염 해병: 거리를 두고 5발씩 연사
-  gunner:  { name: '감염 해병',   hp: 80,  spd: 1.9, r: 0.33, dmg: 8,  atkRate: 1.0, gold: 35,  blood: '#a33', loot: 0.15, keep: 5, from: 5, w: 3, cost: 3,
+  gunner:  { name: '감염 해병',   hp: 80,  spd: 1.9, r: 0.33, dmg: 8,  atkRate: 1.0, gold: 35,  blood: '#a33', loot: 0.15, keep: 5, from: 7, w: 3, cost: 3,
              ranged: { type: 'bullet', dmg: 5, rate: 2.8, range: 10, speed: 18, burst: 5, gap: 0.09, spread: 0.1 } },
   // 브루더: 떠다니며 크롤러를 낳음 (최대 max마리), 죽으면 크롤러 deathSpawn마리가 쏟아짐
   brooder: { name: '브루더',     hp: 200, spd: 1.3, r: 0.5,  dmg: 10, atkRate: 1.2, gold: 70,  blood: '#c7a', loot: 0.12, keep: 6, fly: true, from: 6, w: 2, cost: 4,
              spawn: { type: 'crawler', rate: 5, max: 3 }, deathSpawn: 2 },
   // 모르타르: 느리고 단단함, 화염탄 3발을 부채꼴로
-  mortar:  { name: '모르타르',   hp: 380, spd: 1.0, r: 0.65, dmg: 22, atkRate: 1.6, gold: 110, blood: '#b62', loot: 0.35, lootBonus: 1, knock: 8, keep: 6.5, from: 7, w: 2, cost: 5,
+  mortar:  { name: '모르타르',   hp: 380, spd: 1.0, r: 0.65, dmg: 22, atkRate: 1.6, gold: 110, blood: '#b62', loot: 0.35, lootBonus: 1, knock: 8, keep: 6.5, from: 8, w: 2, cost: 5,
              ranged: { type: 'fireball', dmg: 12, rate: 3.4, range: 11, speed: 6, volley: 3, spread: 0.22, snd: 'fireball' } },
   // 감시자: 움직이지 않고 원거리 공격만 — 발밑의 붉은 원을 보면 바로 비켜라
   watcher: { name: '감시자',     hp: 130, spd: 0,   r: 0.42, dmg: 0,  atkRate: 99,  gold: 40,  blood: '#a43', loot: 0.15, fixed: true, corpse: true, roomMax: 2, from: 2, w: 1.6, cost: 3,
@@ -413,7 +413,7 @@ const ENEMIES = {
   // 방패 해병: 앞을 푸른 에너지 방패로 막음 — 정면(arc 라디안 부채꼴)에서 온 탄·근접 공격은 cut만큼 덜 받음 (폭발·스킬·지속 피해는 그대로,
   // 기절·빙결 중에는 방패가 꺼짐). react초마다 그때 플레이어가 있던 쪽을 정하고 천천히(turn 라디안/초) 돌아서므로 옆·뒤로 돌아가면 그대로 들어감,
   // 공격할 때(근접·사격)는 drop초 동안 방패가 내려감. 방패 내구도 = 최대 체력 x hp — 막은 공격의 피해만큼 닳고 다 닳으면 부서짐
-  shielder: { name: '방패 해병',   hp: 150, spd: 1.7, r: 0.38, dmg: 16, atkRate: 1.1, gold: 45,  blood: '#a33', loot: 0.15, knock: 6, from: 3, w: 2, cost: 3,
+  shielder: { name: '방패 해병',   hp: 150, spd: 1.7, r: 0.38, dmg: 16, atkRate: 1.1, gold: 45,  blood: '#a33', loot: 0.15, knock: 6, from: 4, w: 2, cost: 3,
               shield: { arc: 1.5, cut: 0.85, turn: 0.9, react: 0.6, drop: 0.8, hp: 0.6 } },
   // 폭주 해골: 불붙은 해골이 날아와 near칸 안에 들면 불이 붙어 fuse초 뒤 터짐 (반경 r칸, 피해 dmg — 플레이어·생존자·설치물·다른 적 모두)
   // 그 전에 쏘아 떨어뜨리면 그 자리에서 early배로 약하게 터짐. 시체를 남기지 않고 정예가 되지 않음
@@ -421,23 +421,23 @@ const ENEMIES = {
               bomb: { near: 1.3, fuse: 0.65, r: 2.2, dmg: 36, early: 0.6 } },
   // 그림자 추적자: 거의 보이지 않음 (동작 추적기에는 잡힘). min~range칸 떨어지면 cd초마다 플레이어 등 뒤 back칸으로 순간이동해 기습,
   // 그 기습으로 한 대 치면 flee칸 밖으로 다시 사라짐 (걸어와서 싸울 때는 그대로). 맞으면 reveal초 동안 드러남
-  assassin: { name: '그림자 추적자', hp: 95, spd: 3.3, r: 0.38, dmg: 18, atkRate: 1.0, gold: 45,  blood: '#a5c', loot: 0.12, from: 4, w: 2, cost: 3,
+  assassin: { name: '그림자 추적자', hp: 95, spd: 3.3, r: 0.38, dmg: 18, atkRate: 1.0, gold: 45,  blood: '#a5c', loot: 0.12, from: 5, w: 2, cost: 3,
               blink: { cd: 4.5, min: 3.5, range: 13, back: 1.3, flee: 5, reveal: 2.5 } },
   // 되살리는 자: 거리를 두고 다니며 rate초마다 range칸 안의 가장 가까운 시체를 wind초 주문 뒤 일으켜 세움 (체력 hp배, 동시에 max마리까지)
   // 되살아난 적은 경험치·전리품이 없음 — 먼저 처치할 것
-  summoner: { name: '되살리는 자', hp: 170, spd: 1.6, r: 0.42, dmg: 8,  atkRate: 1.2, gold: 70,  blood: '#7b4', loot: 0.2, keep: 6, roomMax: 1, from: 5, w: 1.2, cost: 4,
+  summoner: { name: '되살리는 자', hp: 170, spd: 1.6, r: 0.42, dmg: 8,  atkRate: 1.2, gold: 70,  blood: '#7b4', loot: 0.2, keep: 6, roomMax: 1, from: 8, w: 1.2, cost: 4,
               raise: { rate: 6, range: 8, wind: 0.9, max: 5, hp: 0.7 } },
   // 매복자: 천장에 붙어 숨어 있음 (보이지 않고 맞지 않음 — 바닥에 옅은 그림자만 어른거림). 플레이어가 drop칸 안에 오면 그 바로 위로 기어가 warn초 동안 그림자가 짙어진 뒤
   // fall초 만에 떨어져 덮침 (r칸 안이면 피해 hit + knock만큼 밀려남). 내려온 뒤로는 빠르게 붙어 할퀴는 근접 적 (무리로 몰려올 때는 천장에 붙지 않음)
-  lurker:   { name: '매복자',     hp: 120, spd: 3.3, r: 0.4,  dmg: 15, atkRate: 0.8, gold: 35,  blood: '#a5c', loot: 0.12, from: 3, w: 2, cost: 3,
+  lurker:   { name: '매복자',     hp: 120, spd: 3.3, r: 0.4,  dmg: 15, atkRate: 0.8, gold: 35,  blood: '#a5c', loot: 0.12, from: 4, w: 2, cost: 3,
               ceiling: { drop: 2.8, warn: 0.6, fall: 0.3, r: 1.1, hit: 24, knock: 7 } },
   // 굴착자: 플레이어를 알아채면 바닥 밑으로 파고들어 (dig초, 땅속에서는 보이지 않고 맞지 않음 — 흙더미가 움직이는 자국만) spd칸/초로 다가오고, near칸 안에 들거나 max초가 지나면
   // warn초 동안 땅이 흔들린 뒤 솟아오르며 r칸 안을 쳐 올림 (피해 hit + 밀려남). up초 동안 땅 위에서 싸우다가 다시 파고듦
-  burrower: { name: '굴착자',     hp: 160, spd: 2.2, r: 0.4,  dmg: 16, atkRate: 1.0, gold: 45,  blood: '#a73', loot: 0.15, from: 4, w: 1.8, cost: 3,
+  burrower: { name: '굴착자',     hp: 160, spd: 2.2, r: 0.4,  dmg: 16, atkRate: 1.0, gold: 45,  blood: '#a73', loot: 0.15, from: 8, w: 1.8, cost: 3,
               burrow: { spd: 4.2, near: 1.4, max: 6, warn: 0.6, r: 1.3, hit: 20, knock: 6, up: 4.5, dig: 0.5 } },
   // 수호 드론: 떠다니며 거리를 두고, range칸 안의 다른 적 n마리까지 보호막을 씌움 — 보호막을 받은 적은 직접 맞는 피해를 cut만큼 덜 받음 (지속 피해는 그대로, 보스는 제외).
   // 드론을 쓰러뜨리면 보호막이 모두 꺼짐. 스스로는 공격하지 않고 약함, 터지며 사라짐 (시체 없음)
-  warden:   { name: '수호 드론',   hp: 60,  spd: 2.6, r: 0.3,  dmg: 0,  atkRate: 99,  gold: 40,  blood: '#9cf', loot: 0.12, keep: 6, fly: true, roomMax: 1, nocorpse: true, from: 5, w: 1.5, cost: 3,
+  warden:   { name: '수호 드론',   hp: 60,  spd: 2.6, r: 0.3,  dmg: 0,  atkRate: 99,  gold: 40,  blood: '#9cf', loot: 0.12, keep: 6, fly: true, roomMax: 1, nocorpse: true, from: 7, w: 1.5, cost: 3,
               ward: { range: 5.5, n: 4, cut: 0.6 } },
   // 보스: 다음 구역으로 가는 길목 방(코어는 가장 안쪽 방)을 지키고, 쓰러뜨리면 봉쇄 격벽이 열림 (boss 값이 공격 방식)
   titan:      { name: '타이탄',     hp: 1600, spd: 1.5, r: 0.75, dmg: 40, atkRate: 1.6, gold: 800, blood: '#9c3', lootBonus: 3, knock: 10, boss: 'titan' },
@@ -659,17 +659,17 @@ const ELITE_FX = {
   aura: { r: 5, spd: 1.3, atk: 0.75 }, curse: { range: 7, cd: 5, t: 4, def: 0.5 }, spark: { n: 3, cd: 0.45, speed: 5, life: 1.3, dmg: 6 },
 };
 // 고유 정예 (디아블로2의 슈퍼 유니크): 구역마다 이름 붙은 정예 하나가 부하를 거느리고 정해진 방을 지킴
-// 처치하면 좋은 장비, 그 구역의 금고 열쇠 (불러오면 다시 나타남). base: 바탕 몬스터, affixes: 정예 특성, minions: [[종류, 수]], hp: 체력 배율 (정예 배율에 더해)
+// 처치하면 좋은 장비, 그 구역의 금고 열쇠 (불러오면 다시 나타남). base: 바탕 몬스터, affixes: 정예 특성, minions: [[종류, 수]] (그 막의 적), hp: 체력 배율 (정예 배율에 더해)
 const SUPERS = [
   { name: '녹슨 정비공 그룬',  base: 'xenoid',     affixes: ['fast'],                 minions: [['crawler', 5]],                  hp: 2 },
   { name: '울부짖는 보모',     base: 'spitter',    affixes: ['regen'],                minions: [['runner', 4]],                   hp: 3 },
   { name: '하역장 도살자',     base: 'brute',      affixes: ['iron', 'shield'],       minions: [['xenoid', 3]],                   hp: 1.5 },
-  { name: '실험체 제로',       base: 'charger',    affixes: ['fire', 'blink'],        minions: [['spitter', 3]],                  hp: 2 },
+  { name: '실험체 제로',       base: 'charger',    affixes: ['fire', 'blink'],        minions: [['sparker', 3]],                  hp: 2 },
   { name: '살점 조각가',       base: 'juggernaut', affixes: ['regen', 'curse'],       minions: [['crawler', 6]],                  hp: 1.4 },
-  { name: '산란 여왕',         base: 'brooder',    affixes: ['fire', 'iron'],         minions: [['runner', 4]],                   hp: 1.6 },
-  { name: '변압기 볼코프',     base: 'gunner',     affixes: ['spark', 'multi'],       minions: [['gunner', 2], ['charger', 1]],   hp: 2.5 },
+  { name: '산란 여왕',         base: 'brooder',    affixes: ['fire', 'iron'],         minions: [['crawler', 4]],                   hp: 1.6 },
+  { name: '변압기 볼코프',     base: 'gunner',     affixes: ['spark', 'multi'],       minions: [['gunner', 2], ['warden', 1]],    hp: 2.5 },
   { name: '포격 지휘관',       base: 'mortar',     affixes: ['multi', 'aura'],        minions: [['gunner', 3]],                   hp: 1.5 },
-  { name: '군체의 대변자',     base: 'juggernaut', affixes: ['fire', 'aura', 'curse'], minions: [['brute', 2]],                   hp: 1.6 },
+  { name: '군체의 대변자',     base: 'juggernaut', affixes: ['fire', 'aura', 'curse'], minions: [['burrower', 2]],                hp: 1.6 },
 ];
 // 필드 사건: per — 구역마다 놓는 보급 캐시 수 (열면 보급품, 대신 매복), vault: 금고 수
 // vault — 금고 보물함 수 [구역 1~4, 5~9]
@@ -737,6 +737,19 @@ const CAMPAIGN = [
   { name: '코어',        brief: '군체의 뇌 오버마인드를 처치하고, 자폭이 끝나기 전에 코어 입구의 탈출정으로 가라.' },
 ];
 const ESCAPE_TIME = 75; // 오버마인드 처치 후 탈출 제한 시간 (초)
+
+// ===== 3막: 구역 1~3 · 4~6 · 7~9 — 막마다 테마·조명·색조·적·돌발 상황 (배경음악은 MUSIC.zones·combat) =====
+// name·title·col: 막 이름·부제·글자 색 (구역 첫 진입 카드), themes: 구역마다 바닥·벽 테마 (game.js THEMES 번호)
+// lamps: 방 조명 색 (고르는 비율대로), flick: 깜박이는 조명 비율, dark·shade: 시야 안 어둠의 세기 (0.88이 보통)·색, grade: 화면 색조 [r, g, b, 세기] (곱하기)
+// foes: 이 막에 나오는 적 (처음 나오는 구역은 ENEMIES의 from — 막끼리 조금 겹침), events: 돌발 상황 (번갈아)
+const ACTS = [
+  { name: '1막', title: '외곽', col: '#ffb060', themes: [0, 1, 3], lamps: ['255,150,60', '255,150,60', '255,110,40', '255,200,120'], flick: 0.3, dark: 0.86, shade: '14,8,2', grade: [255, 205, 160, 0.3],
+    foes: ['crawler', 'runner', 'xenoid', 'spitter', 'bomber', 'watcher', 'brute'], events: ['breach', 'blackout'] },
+  { name: '2막', title: '연구 구역', col: '#7fe8d8', themes: [2, 1, 3], lamps: ['120,220,255', '150,255,210', '120,200,255', '200,255,170'], flick: 0.2, dark: 0.88, shade: '0,10,12', grade: [165, 235, 225, 0.32],
+    foes: ['crawler', 'sparker', 'shielder', 'lurker', 'charger', 'assassin', 'brooder'], events: ['gas', 'breach'] },
+  { name: '3막', title: '코어', col: '#ff6a7a', themes: [3, 2, 0], lamps: ['255,60,50', '255,90,140', '200,80,255', '255,140,60'], flick: 0.45, dark: 0.9, shade: '16,0,6', grade: [255, 150, 175, 0.32],
+    foes: ['runner', 'gunner', 'juggernaut', 'warden', 'burrower', 'mortar', 'summoner'], events: ['blackout', 'gas'] },
+];
 
 // ===== 데이터 기록 (음성 기록): 구역마다 둘 — 케르베로스-7에 무슨 일이 있었는지. 바닥의 휴대 단말기를 주우면 재생 =====
 // 저장마다 주운 기록은 다시 놓이지 않음 (진행 기록 flags.logs), 들은 기록은 수집 도감 [J]에 모여 다시 볼 수 있음 (모든 저장에서 함께)
@@ -891,7 +904,7 @@ const KEY_ORDER = ['blue', 'yellow', 'red'];
 const LOCKS = [1, 1, 1, 2, 2, 2, 2, 2, 2]; // 구역 1~9의 보안문 색 수 (방 구조상 못 만들면 줄어듦) — 키카드는 그 구역에서만 쓰임
 
 // ===== 분위기 소리 (환경음 음량으로 조절) =====
-// wind: 환기구 바람 크기, hum: 기계음 크기, freq: 기계음 높이(Hz) — zones는 구역 테마(game.js THEMES) 순서
+// wind: 환기구 바람 크기, hum: 기계음 크기, freq: 기계음 높이(Hz) — zones는 구역 테마(game.js THEMES) 순서 (구역마다 ACTS의 themes)
 // 정전이 나면 기계음이 꺼지고 바람이 줄어듦. gap: 멀리서 들리는 소리 간격(초), far: 몬스터 기척이 들리는 거리(칸)
 // noises: 기지 어딘가의 먼 기계 소리 [Freedoom 효과음, 크기, 재생 속도]
 const AMBIENCE = {
