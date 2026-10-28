@@ -725,6 +725,25 @@ function sealKeepsPaths(r, sl) {
   }
   return true;
 }
+// 금고(vr)를 막아도 구역 입구에서 키카드를 순서대로 주울 수 있고, 금고 없이 닿던 방에는 모두 닿는지 (금고 문은 열지 않음, 다른 구역은 막힌 것으로)
+// — 금고가 키카드로 가는 유일한 길이면 금고 열쇠(고유 정예)를 먼저 얻어야 하고, 고유 정예마저 그 보안문 뒤면 막힘
+function keysFlow(R, vr, sl) {
+  const out = new Uint8Array(MW * MH), locks = doors.filter(d => d.kr === R.n && d.key && d.key !== 'vault'), at = (dd, r) => dd[r.cy * MW + r.cx] >= 0;
+  for (let k = 0; k < MW * MH; k++) if (regionMap[k] !== R.n) out[k] = 1;
+  const reach = (held, sealed) => {
+    const b = out.slice();
+    if (sealed) for (const { run } of sl) for (const [i, j] of run) b[j * MW + i] = 1;
+    for (const d of locks) if (!held.has(d.key)) for (const c of d.cells) b[c] = 1;
+    return bfs(R.entry.cx, R.entry.cy, b);
+  };
+  const held = new Set();
+  for (let k = R.keyPlan.length - 1; k >= 0; k--) { // 파랑부터 (keyPlan은 마지막 색부터)
+    if (!at(reach(held, true), R.keyPlan[k].room)) return false;
+    held.add(R.keyPlan[k].color);
+  }
+  const before = reach(held, false), after = reach(held, true);
+  return R.rooms.every(r => r === vr || !at(before, r) || at(after, r));
+}
 // 방의 모든 입구를 문으로 막을 수 있으면 [{ door(기존 문 번호, 없으면 -1), run }], 아니면 null
 function roomSeal(r) {
   const seal = [];
@@ -952,7 +971,7 @@ function placeExtras() {
     // 금고 (고유 정예가 있을 때만 — 열쇠를 그가 지님): 입구가 보안문·격벽이 아니고, 막아도 길이 끊기지 않는 방
     if (sr) for (const r of mix(open())) {
       const sl = roomSeal(r);
-      if (!sl || sl.some(e => e.door >= 0 && (doors[e.door].key || doors[e.door].gate)) || !sealKeepsPaths(r, sl)) continue;
+      if (!sl || sl.some(e => e.door >= 0 && (doors[e.door].key || doors[e.door].gate)) || !sealKeepsPaths(r, sl) || !keysFlow(R, r, sl)) continue;
       for (const e of sl) { const door = doors[e.door >= 0 ? e.door : addDoor(e.run)]; door.key = 'vault'; door.kr = n; door.locked = true; }
       r.vault = true; R.vault = r; hard.add(r);
       for (let k = 0; k < FIELD_EVENTS.vault[n <= 4 ? 0 : 1]; k++) {
@@ -1586,7 +1605,7 @@ const xpNeed = lv => XP_NEXT[0] + XP_NEXT[1] * lv;          // 이 레벨에서 
 const PERK_ORDER = PERK_TREES.map((_, t) => Object.keys(PERKS).filter(k => PERKS[k].tree === t));
 // 난이도 곡선 (CURVE): 그 구역의 값, 적 피해 배율 (구역·곡선, 정예), 앞 구역 일반 적의 보상 배율
 const curveAt = (T, lv) => T[clamp(Math.round(lv || 1), 1, T.length) - 1];
-const lvDmg = lv => (1 + 0.1 * (lv - 1)) * curveAt(CURVE.dmg, lv);
+const lvDmg = lv => (1 + ENEMY_GROW.dmg * (lv - 1)) * curveAt(CURVE.dmg, lv);
 const eliteDmg = e => e.elite ? 1 + (ELITE.dmg - 1) * curveAt(CURVE.elite, e.lv) : 1;
 const fewBoost = e => e.elite || e.d.boss ? 1 : 1 / curveAt(CURVE.room, e.lv);
 function xpFor(e) {
@@ -1661,7 +1680,7 @@ function fillRoom(r, budget, pool, lv = level) {
 function spawnEnemy(type, x, y, lv) { const e = makeEnemy(type, x, y, lv); if (e.d.ceiling) e.ceil = true; enemies.push(e); return e; } // 매복자는 천장에 붙은 채로
 const hiddenE = e => !!(e.ceil || e.under || e.riseT > 0); // 천장의 매복자·땅속의 굴착자: 보이지 않고 맞지 않음 (자동 조준·폭발·근접 모두)
 function makeEnemy(type, x, y, lv = level) { // lv: 강함의 기준 구역
-  const d = ENEMIES[type], m = (1 + 0.18 * (lv - 1)) * DIFFICULTY[difficulty].hp * curveAt(d.boss ? CURVE.boss : CURVE.hp, lv); // 앞 구역: 난이도 곡선
+  const d = ENEMIES[type], m = (1 + ENEMY_GROW.hp * (lv - 1)) * DIFFICULTY[difficulty].hp * curveAt(d.boss ? CURVE.boss : CURVE.hp, lv); // 앞 구역: 난이도 곡선
   return {
     type, d, lv, x, y, r: d.r, hp: d.hp * m, maxhp: d.hp * m, dmg: d.dmg * lvDmg(lv), fly: !!d.fly,
     aggro: false, acd: 0, rcd: rnd(0.5, 2), face: rnd(0, 6.28), anim: rnd(0, 10),
@@ -3978,7 +3997,7 @@ function modSum(it, k) {
 }
 const modSteps = it => Object.values(it.mods || {}).reduce((a, b) => a + b, 0);
 const modCap = it => MOD_CAP[it.rarity] || 0;
-const modCost = n => ({ gold: MOD_COST.gold[n] || 0, parts: MOD_COST.parts[n] || 0 });
+const modCost = (it, n) => ({ gold: Math.round((MOD_COST.gold[n] || 0) * MOD_TIER[clamp(Math.floor((ARMORS[it.id].minLvl - 1) / 3), 0, 2)] / 10) * 10, parts: MOD_COST.parts[n] || 0 }); // 골드는 장비 단계만큼
 const modsFor = it => Object.keys(MODS).filter(m => MODS[m].slot === it.s.slot);
 const gearDef = (p = player) => GEAR_KEYS.reduce((s, g) => s + (p.gear[g] ? p.gear[g].s.def : 0), 0);
 const defCut = def => def / (def + ARMOR_K);
@@ -4614,7 +4633,7 @@ function tradeButtons() {
     });
     const w = trade.sel;
     if (w && w.kind === 'armor') modsFor(w).forEach((m, n) => { // 장비 개조: 한도까지 (이 장비의 단계 합 기준 비용)
-      const full = modSteps(w) >= modCap(w), c = modCost(modSteps(w));
+      const full = modSteps(w) >= modCap(w), c = modCost(w, modSteps(w));
       B.push({ id: 'mod:' + m, x: g.gx + VG_W * CELL - 110, y: g.gy + MOD_Y + n * MOD_ROW + 5, w: 110, h: 22, label: full ? '최대' : `${c.gold}G ${c.parts}부품`, on: !full && p.gold >= c.gold && p.parts >= c.parts });
     });
   }
@@ -4759,7 +4778,7 @@ function buyUpgrade(k) {
 }
 // 장비 개조 한 단계: 그 장비 종류의 개조만, 등급별 한도까지 (장착 중이면 바로 반영)
 function buyMod(it, m) {
-  const p = player, M = MODS[m], n = it ? modSteps(it) : 0, c = modCost(n);
+  const p = player, M = MODS[m], n = it ? modSteps(it) : 0, c = it && modCost(it, n);
   if (!it || !M || it.kind !== 'armor' || M.slot !== it.s.slot || n >= modCap(it) || p.gold < c.gold || p.parts < c.parts) return;
   p.gold -= c.gold; p.parts -= c.parts; it.mods = { ...it.mods, [m]: ((it.mods || {})[m] || 0) + 1 };
   if (isEquipped(it)) gearChanged();
@@ -7167,7 +7186,7 @@ function drawMinimap() {
   const R = regions[level];
   let k = Z, w = Math.max(200, 120 * Z), h = Math.round(w * 0.63), x0 = W - w - 14, y0 = 14, sx = Math.round(mmX(player.x, player.y) - w / 2 / k), sy = Math.round(mmY(player.x, player.y) - h / 2 / k); // 작은 지도도 게임처럼 Z배 픽셀
   if (mapBig) { k = Math.min(2.4, (W - 80) / mapC.width, (VH - 90) / mapC.height); w = mapC.width * k; h = mapC.height * k; x0 = (W - w) / 2; y0 = (VH - h) / 2; sx = sy = 0; }
-  const keyRow = !inBase && R && R.locks.length ? 30 : 0; // 아래에 이 구역의 키카드 칸
+  const keyCols = R ? [...R.locks, ...(R.vault ? ['vault'] : [])] : [], keyRow = !inBase && keyCols.length ? 30 : 0; // 아래에 이 구역의 키카드 칸 (금고가 있으면 금고 열쇠도)
   pxCard(x0 - 8, y0 - 8, w + 16, h + 26 + keyRow);
   ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.clip();
   if (mapBig) ctx.drawImage(mapC, x0, y0, w, h);
@@ -7256,7 +7275,7 @@ function drawMinimap() {
   if (keyRow) { // 이 구역의 키카드 칸 (주운 것은 밝게)
     const ky = y0 + h + 20;
     ctx.fillText('키카드', x0, ky + 15);
-    R.locks.forEach((c, n) => {
+    keyCols.forEach((c, n) => {
       const K = KEYCARDS[c], has = keysHeld.has(`${level}:${c}`), bx = x0 + 40 + n * 30;
       ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(bx, ky, 24, 24);
       ctx.globalAlpha = has ? 1 : 0.45; ctx.strokeStyle = K.color; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, ky + 0.5, 23, 23);
@@ -7578,7 +7597,7 @@ const packWeapon = w => w && (w.kind === 'shell' ? { kind: 'shell', id: w.id, ra
   : w.kind === 'attach' ? { kind: 'attach', id: w.id, rarity: w.rarity, gx: w.gx, gy: w.gy }
   : { id: w.id, rarity: w.rarity, affixes: w.affixes, mag: w.mag, gx: w.gx, gy: w.gy, uq: w.uq, att: w.att });
 // 0.15 이전 저장: 없어진 보석(가방·소켓·보석 주머니)은 판매가, 장비 강화는 들인 골드만큼 돌려줌 (불러오는 동안 oldGold에 모음), 세트 장비는 같은 옵션의 전설 등급으로
-const OLD_GEM_GOLD = [80, 260, 800].map(v => Math.round(v * SELL_RATE));
+const OLD_GEM_GOLD = [32, 104, 320]; // 그때의 판매가 (가치 x 0.4)
 let oldGold = 0;
 const okAff = (list, T) => (list || []).filter(a => T[a.k]); // 0.16 이전: 없어진 옵션 (능력치)은 버림
 const okMods = d => Object.fromEntries(Object.entries(d.mods || {}).filter(([m, n]) => MODS[m] && MODS[m].slot === ARMORS[d.id].slot && n > 0)); // 장비 개조 (없어진 개조는 버림)
