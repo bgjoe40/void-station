@@ -3075,8 +3075,12 @@ function makeShell(id, rarity = 0) {
   return buildShell(id, rarity, affixes);
 }
 // 이 구역에서 나올 수 있는 스킬 중 하나 (from 구역부터)
+// 막마다 새로 나오는 것을 자주: 이번 막(구역 1·4·7부터 세 구역)에 나오기 시작한 무기·방어구·쉘은 3배로 (예전 것도 나옴)
+const actFirst = lv => Math.floor((lv - 1) / 3) * 3 + 1;
+const fresh = lv => lv >= actFirst(level) ? 3 : 1;
+const pickFresh = (keys, lvOf) => weighted(Object.fromEntries(keys.map(k => [k, fresh(lvOf(k))])));
 function randomLootShell(bonus = 0) {
-  return makeShell(pick(Object.keys(SKILLS).filter(k => SKILLS[k].from <= level + 1)), rollRarity(bonus));
+  return makeShell(pickFresh(Object.keys(SKILLS).filter(k => SKILLS[k].from <= level + 1), k => SKILLS[k].from), rollRarity(bonus));
 }
 // 쉘의 지금 수치: 기본 x 등급·옵션(위력·범위·지속·제어) x 강화장신구, 위력은 캐릭터 레벨, 개수는 더하기, 피해는 구역 배율. cd: 대기시간
 // 강화장신구의 스킬 옵션·기본 효과 (모든 스킬에): 쉘 수치 종류 → 장신구 옵션
@@ -3770,7 +3774,7 @@ function rollRarity(bonus = 0) {
 // heavy: 에너지·중화기가 나올 수 있는 구역이면 그중에서 고를 확률 (정예·보스 보상)
 function randomLootWeapon(bonus = 0, heavy = 0) {
   const ids = Object.keys(WEAPONS).filter(k => WEAPONS[k].minLvl <= level + 1), big = ids.filter(k => WEAPONS[k].cat === 5);
-  return makeWeapon(pick(big.length && Math.random() < heavy ? big : ids), rollRarity(bonus));
+  return makeWeapon(pickFresh(big.length && Math.random() < heavy ? big : ids, k => WEAPONS[k].minLvl), rollRarity(bonus));
 }
 // 지속 DPS: 총기는 재장전 시간 포함, 산탄은 전부 맞았다고 가정, 점사 무기는 점사 한 번(burst발)마다 발사 간격
 const weaponDps = s => s.dmg * (s.pellets || 1) * (1 + (s.crit || 0)) *
@@ -3944,7 +3948,7 @@ function refreshArmor(inst) {
 function pickArmorBase() {
   const by = {};
   for (const k of Object.keys(ARMORS)) if (ARMORS[k].minLvl <= level + 1) (by[ARMORS[k].slot] ||= []).push(k);
-  return pick(by[weighted(Object.fromEntries(Object.keys(by).map(t => [t, ARMOR_SLOT_DROP[t]])))]);
+  return pickFresh(by[weighted(Object.fromEntries(Object.keys(by).map(t => [t, ARMOR_SLOT_DROP[t]])))], k => ARMORS[k].minLvl);
 }
 const randomLootArmor = (bonus = 0) => makeArmor(pickArmorBase(), rollRarity(bonus));
 // 떨어지는 장비: ARMOR_DROP 확률로 방어구, 아니면 무기 (heavy: 에너지·중화기가 나올 확률)
@@ -4544,7 +4548,7 @@ const healCost = () => 60 + level * 20;
 
 function rollStock() {
   const ids = Object.keys(WEAPONS).filter(k => WEAPONS[k].minLvl <= level + 1);
-  const ws = Array.from({ length: 14 }, () => makeWeapon(pick(ids), Math.random() < 0.12 ? 2 : Math.random() < 0.4 ? 1 : 0))
+  const ws = Array.from({ length: 14 }, () => makeWeapon(pickFresh(ids, k => WEAPONS[k].minLvl), Math.random() < 0.12 ? 2 : Math.random() < 0.4 ? 1 : 0))
     .sort((a, b) => b.s.size[0] * b.s.size[1] - a.s.size[0] * a.s.size[1]);
   stock = []; buyback = [];
   for (const w of ws) {
@@ -4556,7 +4560,7 @@ function rollStock() {
     const spot = gridFindSpot(armorStock, a, VG_W, VG_H);
     if (spot) { a.gx = spot.gx; a.gy = spot.gy; armorStock.push(a); }
   }
-  const sids = Object.keys(SKILLS).filter(k => SKILLS[k].from <= level + 1).sort(() => Math.random() - 0.5); // 스킬 쉘: 서로 다른 스킬로, 진열대에 2칸 간격
+  const sids = Object.keys(SKILLS).filter(k => SKILLS[k].from <= level + 1).map(k => [k, Math.random() * fresh(SKILLS[k].from)]).sort((a, b) => b[1] - a[1]).map(a => a[0]); // 스킬 쉘: 서로 다른 스킬로 (이번 막 것이 앞에), 진열대에 2칸 간격
   shellStock = Array.from({ length: SHELL_STOCK }, (_, n) => {
     const sh = makeShell(sids[n % sids.length], Math.random() < 0.1 ? 2 : Math.random() < 0.4 ? 1 : 0);
     sh.gx = (n % 5) * 2; sh.gy = Math.floor(n / 5) * 2;
