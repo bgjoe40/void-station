@@ -1,7 +1,7 @@
 // ===== 게임 데이터 정의 (무기 / 탄약 / 수류탄 / 아이템 / 적) =====
 
 // 버전: GitHub에 커밋·푸시할 때마다 올림 (새 기능은 가운데 자리, 고침·작은 추가는 끝자리) — 타이틀·일시정지 화면에 표시, git 태그 v<버전>
-const VERSION = '0.34.1';
+const VERSION = '0.35.0';
 
 const CAT_NAMES = ['근접', '권총', '샷건', '라이플', '기관총', '에너지'];
 const MAX_LOAD = 30;   // 장착 + 가방 무기 무게 합이 넘으면 이동속도 감소
@@ -328,7 +328,7 @@ const ATT_FX = {
   rangeN: v => `사거리 +${v}칸`, speed: v => `탄속 +${pct(v)}`, mag: v => `장탄수 +${pct(v)}`,
   reload: v => v >= 0 ? `재장전 시간 -${pct(v)}` : `재장전 시간 +${pct(-v)}`, rate: v => v >= 0 ? `공격속도 +${pct(v)}` : `공격속도 -${pct(-v)}`,
   weight: v => `무게 +${v}`, lighter: v => `무게 -${pct(v)}`, shake: v => `반동 -${pct(v)}`, elite: v => `정예·보스에게 피해 +${pct(v)}`,
-  ap: v => `장갑 ${pct(v)} 무시`, fire: v => `명중 시 ${pct(v)} 확률로 화상`, cryo: v => `명중 시 ${pct(v)} 확률로 둔화`, shock: v => `명중 시 ${pct(v)} 확률로 기절`,
+  ap: v => `장갑을 뚫을 확률 ${pct(ARMOR_PIERCE + (1 - ARMOR_PIERCE) * v)}`, fire: v => `명중 시 ${pct(v)} 확률로 화상`, cryo: v => `명중 시 ${pct(v)} 확률로 둔화`, shock: v => `명중 시 ${pct(v)} 확률로 기절`,
   knock: v => `넉백 +${pct(v)}`, stun: v => `기절 +${v}초`, stamina: v => `스태미너 소모 -${pct(v)}`,
   quiet: () => '총소리가 작아짐 (멀리 있는 적이 덜 몰려옴)', thermal: () => '숨은 그림자 추적자도 자동 조준',
 };
@@ -377,9 +377,11 @@ const SELL_RATE = 0.25;          // 판매가 = 가치 x 0.25 (구매가는 가�
 //  hop: 깡충 이동 — v칸/초로 dur초씩 뛰고(높이 h) rest초 쉬기를 되풀이, pounce칸 안이면 pv칸/초·pdur초·높이 ph로 크게 덮침 (pcd초마다)
 //  dodge: 조준당해 총에 맞을 것 같으면 chance 확률로 옆으로 뜀 (min칸보다 멀 때, cd초마다) — 날아오던 자동 조준 탄이 빗나감
 //  lob: 다가오면서 가끔 던지는 원거리 공격 (min~range칸, wind초 예고 동작 뒤 발사, rate초마다)
-//  armor: 장갑 — 직접 맞은 한 발마다 피해를 그만큼 덜 받음 (최소 20%는 들어감, 화상·중독은 그대로), heavy: 거의 밀리지 않고 기절·빙결도 짧음
+//  armor: 장갑 — 직접 맞은 한 발마다 피해를 그만큼 덜 받음 (최소 20%는 들어감, 화상·중독은 그대로, ARMOR_PIERCE 확률로 뚫리면 그대로), heavy: 거의 밀리지 않고 기절·빙결도 짧음
 //  fixed: 제자리에서 움직이지 않고 밀리지도 않음 (corpse: 그래도 시체를 남김), roomMax: 방 하나에 놓는 최대 수
 //  pillar: 보이는 플레이어의 발밑에 붉은 원을 띄우고 wind초 뒤 불기둥 (반경 r칸, 피해 dmg, 화상 burn초) — range칸 안에서 rate초마다
+// 장갑을 뚫을 확률: 몇 발에 한 발은 장갑을 뚫고 무기 피해가 그대로 들어감. 철갑탄(ap)이면 더 자주 — 확률 = ARMOR_PIERCE + (1 - ARMOR_PIERCE) x ap
+const ARMOR_PIERCE = 0.3;
 const ENEMIES = {
   crawler: { name: '크롤러',     hp: 22,  spd: 4.0, r: 0.25, dmg: 6,  atkRate: 0.6, gold: 5,   blood: '#7b4', loot: 0.03, from: 1, w: 5, cost: 1,
              hop: { v: 5.5, dur: 0.22, h: 12, rest: [0.08, 0.2], pounce: 3.2, pv: 8.5, pdur: 0.36, ph: 28, pcd: 2.4 } },
@@ -395,7 +397,7 @@ const ENEMIES = {
              ranged: { type: 'shock', dmg: 7, rate: 2.2, range: 7, speed: 12 } },
   brute:   { name: '브루트',     hp: 320, spd: 1.7, r: 0.55, dmg: 34, atkRate: 1.5, gold: 120, blood: '#8b3', loot: 0.4, lootBonus: 1, knock: 9, from: 3, w: 1.5, cost: 5,
              lob: { type: 'ball', dmg: 16, rate: 3.6, min: 3, range: 10, speed: 7.5, wind: 0.35 } }, // 녹색 에너지 구체를 던짐 (Doom의 바론처럼)
-  // 철갑 거수: 아주 느리지만 맷집이 세다 — 장갑 때문에 기관총·산탄 같은 약한 탄은 거의 안 통하고, 강한 한 방(저격·리볼버·강타·폭발)이 잘 통함
+  // 철갑 거수: 아주 느리지만 맷집이 세다 — 장갑 때문에 기관총·산탄 같은 약한 탄은 잘 안 통하고 (몇 발에 한 발만 뚫림), 강한 한 방(저격·리볼버·강타·폭발)이 잘 통함
   juggernaut: { name: '철갑 거수', hp: 600, spd: 0.9, r: 0.62, dmg: 32, atkRate: 1.8, gold: 150, blood: '#a43', loot: 0.45, lootBonus: 1, knock: 11, armor: 8, heavy: true, from: 7, w: 1.2, cost: 6 },
   // 후반 적 (4~7구역부터)
   // 차저: 보이면 웅크렸다가(붉게 번쩍) 일직선으로 돌진, 맞으면 크게 밀려남. 벽에 박으면 잠시 기절
@@ -709,7 +711,7 @@ const MONSTER_DESC = {
   crawler: '떼로 몰려와 깡충깡충 뛰어들고, 가까우면 크게 덮친다.', runner: '크롤러의 붉은 변종. 약하지만 더 빠르게 뛰어든다.',
   xenoid: '조준당하면 옆으로 뛰어 자동 조준 탄을 피한다.', spitter: '거리를 두고 산성액을 뱉는다. 맞으면 중독.',
   sparker: '떠다니며 전기 탄을 쏜다. 맞으면 감전되어 느려진다.', brute: '느리지만 강하다. 다가오면서 녹색 에너지 구체를 던진다.',
-  juggernaut: '장갑 때문에 약한 탄은 거의 안 통한다. 강한 한 방으로.', charger: '웅크렸다가 일직선으로 돌진한다. 벽에 박으면 잠시 기절.',
+  juggernaut: '장갑 때문에 약한 탄은 잘 안 통하지만, 몇 발에 한 발은 뚫린다. 강한 한 방이나 철갑탄으로.', charger: '웅크렸다가 일직선으로 돌진한다. 벽에 박으면 잠시 기절.',
   gunner: '거리를 두고 5발씩 연사한다.', brooder: '떠다니며 크롤러를 낳고, 죽으면 품고 있던 크롤러가 쏟아진다.',
   mortar: '느리고 단단하다. 화염탄 3발을 부채꼴로 쏜다.', watcher: '움직이지 않고 멀리서 발밑에 불기둥을 일으킨다.',
   shielder: '정면을 에너지 방패로 막는다. 막을 때마다 닳아 결국 부서진다.', bomber: '날아와 곁에서 터진다. 먼저 쏘아 떨어뜨려라.',
@@ -959,7 +961,7 @@ const TIPS = {
   key:       { title: '보안문과 키카드', icon: 'bkeya0', lines: ['같은 색 키카드가 있어야 열린다'] },
   loot:      { title: '무기 줍기', icon: 'icon_pump', lines: ['[F]로 줍는다. 이름 색이 등급이다'] },
   elite:     { title: '정예 몬스터', icon: 'trooa1', lines: ['강하지만 좋은 장비를 떨어뜨린다'] },
-  armor:     { title: '장갑 몬스터', icon: 'bos2a1', lines: ['약한 탄은 잘 안 통한다. 강한 한 방을 써라'] },
+  armor:     { title: '장갑 몬스터', icon: 'bos2a1', lines: ['약한 탄은 잘 안 통하지만 몇 발에 한 발은 뚫린다', '강한 한 방이나 철갑탄 탄창이 잘 통한다'] },
   dodge:     { title: '총알을 피하는 적', icon: 'trooa1', lines: ['넓게 쏘거나 피한 직후를 노려라'] },
   boss:      { title: '보스', icon: 'cybra1', lines: ['체력이 절반 밑이면 격노한다'] },
   levelup:   { title: '레벨 업', icon: 'icon_syringe_blue', lines: ['특성은 스킬 창 [K]에서 올린다'] },

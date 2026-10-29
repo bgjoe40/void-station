@@ -1887,7 +1887,7 @@ function hitEnemy(e, dmg, kx = 0, ky = 0, silent = false, crit = false, guard = 
   if (e.wardT > gtime && !silent && e.wardBy && !e.wardBy.dead) { dmg *= 1 - e.wardBy.d.ward.cut; if (Math.random() < 0.5) spark(e.x, e.y, 3, '#7df', 2.5); } // 수호 드론의 보호막 (지속 피해는 그대로)
   if (e.d.vuln && e.stun > 0) dmg *= e.d.vuln; // 파쇄 짐승: 벽에 박혀 기절한 동안 더 아픔
   const raw = dmg;
-  if (e.d.armor && !silent && !meleeNow) dmg = Math.max(raw * 0.2, raw - e.d.armor * (1 - apNow)); // 장갑: 직접 맞은 한 발마다 덜 받음 (화상·중독 같은 지속 피해는 그대로, 근접은 무시, 철갑탄은 일부 무시)
+  if (e.d.armor && !silent && !meleeNow && Math.random() >= ARMOR_PIERCE + (1 - ARMOR_PIERCE) * apNow) dmg = Math.max(raw * 0.2, raw - e.d.armor); // 장갑: 직접 맞은 한 발마다 덜 받음 — 몇 발에 한 발(철갑탄이면 더 자주)은 뚫려 피해 그대로 (화상·중독 같은 지속 피해는 그대로, 근접은 무시)
   const blocked = guard || dmg < raw * 0.5; // 장갑·방패에 거의 막힘 → 회색 숫자 + 불꽃
   const kb = (e.d.fixed ? 0 : e.d.boss ? 0.15 : e.d.heavy ? 0.25 : 1) * (crit ? 1.5 : 1); // 치명타는 더 밀려남
   e.hp -= dmg; e.flash = 0.08; e.kx += kx * kb; e.ky += ky * kb;
@@ -1935,7 +1935,7 @@ function weaponHit(e, s, dmg, kx, ky, force = false) {
   if (s.uq === 'venom') e.venom = true; // 맹독 살포기: 이 적이 죽으면 독가스 (이번 공격으로 죽어도)
   const ED = (s.eliteDmg || 0) + perkV('prey');
   if (ED && (e.elite || e.d.boss)) dmg *= 1 + ED; // 파츠·거물 사냥: 정예·보스에게 더
-  apNow = s.ap || 0; hitEnemy(e, crit ? dmg * 2 : dmg, kx, ky, false, crit); apNow = 0; // 철갑탄 파츠: 장갑 일부 무시
+  apNow = s.ap || 0; hitEnemy(e, crit ? dmg * 2 : dmg, kx, ky, false, crit); apNow = 0; // 철갑탄 파츠: 장갑을 더 자주 뚫음
   if (!e.dead) {
     if (s.uq === 'frost' && !shatter) { e.freeze = Math.max(e.freeze, 1.4 * ccScale(e)); e.slow = Math.max(e.slow, 3); }
     else if (s.uq === 'dragon') e.burn = Math.max(e.burn, 3);
@@ -3781,7 +3781,7 @@ function skillLeft(id) {
 }
 // 화면 아래 가운데 스킬 칸 (Z X V B): 끼운 쉘 그림·등급 테두리, 대기시간(시계 방향으로 걷힘), 지속 중인 효과 막대. 커서를 올리면 쉘 설명
 
-let apNow = 0; // 철갑탄 파츠로 맞히는 중: 장갑을 무시하는 비율 (weaponHit → hitEnemy)
+let apNow = 0; // 철갑탄 파츠로 맞히는 중: 장갑을 뚫을 확률을 높이는 정도 (weaponHit → hitEnemy)
 let meleeNow = false; // 근접 공격이 맞히는 중인 무기 스탯 (장갑 무시·방패 강타·처치 보급 — 체인톱은 탄약 더)
 function doMelee(w) {
   meleeNow = w;
