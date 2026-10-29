@@ -1,7 +1,7 @@
 // ===== 게임 데이터 정의 (무기 / 탄약 / 수류탄 / 아이템 / 적) =====
 
 // 버전: GitHub에 커밋·푸시할 때마다 올림 (새 기능은 가운데 자리, 고침·작은 추가는 끝자리) — 타이틀·일시정지 화면에 표시, git 태그 v<버전>
-const VERSION = '0.33.0';
+const VERSION = '0.34.0';
 
 const CAT_NAMES = ['근접', '권총', '샷건', '라이플', '기관총', '에너지'];
 const MAX_LOAD = 30;   // 장착 + 가방 무기 무게 합이 넘으면 이동속도 감소
@@ -443,29 +443,48 @@ const ENEMIES = {
   warden:   { name: '수호 드론',   hp: 60,  spd: 2.6, r: 0.3,  dmg: 0,  atkRate: 99,  gold: 40,  blood: '#9cf', loot: 0.12, keep: 6, fly: true, roomMax: 1, nocorpse: true, from: 7, w: 1.5, cost: 3,
               ward: { range: 5.5, n: 4, cut: 0.6 } },
   // 보스: 다음 구역으로 가는 길목 방(코어는 가장 안쪽 방)을 지키고, 쓰러뜨리면 봉쇄 격벽이 열림 (boss 값이 공격 방식)
-  titan:      { name: '타이탄',     hp: 1600, spd: 1.5, r: 0.75, dmg: 40, atkRate: 1.6, gold: 800, blood: '#9c3', lootBonus: 3, knock: 10, boss: 'titan' },
-  hivemother: { name: '하이브 마더', hp: 1900, spd: 1.2, r: 0.85, dmg: 30, atkRate: 1.4, gold: 900, blood: '#bd2', lootBonus: 3, boss: 'hive' },
-  // 최종 보스: 움직이지 않는 군체의 뇌. 몬스터가 깨어나는 포자를 쏘고 화염탄을 뿌림 (fixed: 밀려나지 않음)
-  overmind:   { name: '오버마인드', hp: 2600, spd: 0, r: 1.0, dmg: 0, atkRate: 99, gold: 0, blood: '#c46', lootBonus: 3, boss: 'brain', fixed: true },
+  // 타이탄: 로켓 연사 (격노하면 5발, 살짝 따라옴), 가까우면 발을 들었다가 내려찍어 충격파 (stomp — wind초 예고, 격노하면 두 번),
+  // 로켓 포격 (barrage — 플레이어 자리와 둘레 spread칸 안 n곳을 붉은 원으로 예고, gap초 간격으로 떨어져 반경 r칸 폭발)
+  titan:      { name: '타이탄',     hp: 1600, spd: 1.5, r: 0.75, dmg: 40, atkRate: 1.6, gold: 800, blood: '#9c3', lootBonus: 3, knock: 10, boss: 'titan',
+                stomp: { wind: 0.4, r: 5.5, speed: 8.5, dmg: 30 }, barrage: { n: 5, rate: 7, flight: 1.2, gap: 0.15, spread: 3.2, r: 1.8, dmg: 30 } },
+  // 하이브 마더: 산성액 부채꼴, 크롤러 소환, 산성 고리 (nova — n발), 산성 비 (rain — 떨어질 곳 예고 → 반경 r칸 독 웅덩이 t초)
+  hivemother: { name: '하이브 마더', hp: 1900, spd: 1.2, r: 0.85, dmg: 30, atkRate: 1.4, gold: 900, blood: '#bd2', lootBonus: 3, boss: 'hive',
+                nova: { n: 16, rate: 5.5, speed: 6, dmg: 9 }, rain: { n: 5, rate: 7.5, flight: 1.1, r: 1.4, t: 4, dmg: 12 } },
+  // 최종 보스: 움직이지 않는 군체의 뇌. 몬스터가 깨어나는 포자를 쏘고 화염탄을 뿌림 (fixed: 밀려나지 않음), 발밑을 쫓는 불기둥 (pyre — 단계마다 n개)
+  // 체력 65% 밑: 화염탄 고리 (nova), 30% 밑: 쌍둥이 광선이 방을 휩씀 (laser — 반대쪽에도 한 줄기, z: 광선이 나오는 높이 px)
+  overmind:   { name: '오버마인드', hp: 2600, spd: 0, r: 1.0, dmg: 0, atkRate: 99, gold: 0, blood: '#c46', lootBonus: 3, boss: 'brain', fixed: true,
+                pyre: { rate: 6, n: [3, 4, 5], wind: 0.9, r: 1.1, dmg: 22, burn: 2 }, nova: { n: 18, rate: 5, speed: 5.5, dmg: 11 },
+                laser: { rate: 9, wind: 1.2, dur: 3.2, sweep: 1.2, len: 16, dmg: 8, tick: 0.12, z: 40 } },
   // 구역 보스 (REGION_BOSSES): boss 값이 공격 방식, xp: 처치 경험치. 체력이 절반 밑이면 격노 (빨라지고 공격이 잦아짐)
-  // 파쇄 짐승: 붉은 띠로 예고한 뒤 일직선 돌진 (charge — 벽에 박히면 stun초 기절, 그동안 받는 피해 vuln배), 가까우면 뛰어올라 내려찍어 충격파 (slam)
+  // 파쇄 짐승: 붉은 띠로 예고한 뒤 일직선 돌진 (charge — 벽에 박히면 stun초 기절, 그동안 받는 피해 vuln배, chain: 이어 돌진 횟수 [보통, 격노] — 이어지는 웅크림은 chainWind배),
+  // 가까우면 뛰어올라 내려찍어 충격파 (slam), 떨어져 있으면 플레이어가 있던 곳으로 크게 도약 (leap — min~max칸, 내려앉을 곳은 붉은 원, 반경 r칸 피해 + 충격파)
   crusher:     { name: '파쇄 짐승', hp: 900, spd: 2.4, r: 0.75, dmg: 18, atkRate: 1.3, gold: 400, blood: '#b62', lootBonus: 2, knock: 9, boss: 'crusher', xp: 160, vuln: 1.5,
-                 charge: { range: 13, wind: 0.8, speed: 13, dur: 0.95, stun: 2.2, cd: 4.5, mul: 2.2 }, slam: { near: 3.2, cd: 5, wind: 0.45, r: 4.5, speed: 9, dmg: 20 } },
-  // 번식 모체: 떠다니며 거리를 두고, rate초마다 n마리씩 낳고 (동시에 max마리까지, pool에서 뽑음) 산성액을 부채꼴로 (spray)
+                 charge: { range: 13, wind: 0.8, speed: 13, dur: 0.95, stun: 2.2, cd: 4.5, mul: 2.2, chain: [0, 2], chainWind: 0.45 }, slam: { near: 3.2, cd: 5, wind: 0.45, r: 4.5, speed: 9, dmg: 20 },
+                 leap: { min: 5, max: 11, cd: 7.5, wind: 0.55, dur: 0.75, h: 70, r: 2, dmg: 26 } },
+  // 번식 모체: 떠다니며 거리를 두고, rate초마다 n마리씩 낳고 (동시에 max마리까지, pool에서 뽑음) 산성액을 부채꼴로 (spray — 격노하면 두 번),
+  // 알을 던짐 (egg — 떨어진 곳에 산성 웅덩이 + 새끼 하나), 격노하면 빙글 돌며 산성액을 사방으로 (whirl — arms갈래로 gap초마다 turn라디안씩 돌며 dur초)
   broodmother: { name: '번식 모체', hp: 1100, spd: 1.3, r: 0.85, dmg: 14, atkRate: 1.2, gold: 450, blood: '#9c4', lootBonus: 2, keep: 5, fly: true, boss: 'brood', xp: 200,
-                 brood: { rate: 4.5, n: 2, max: 9, pool: { crawler: 3, runner: 2, bomber: 1.5 } }, spray: { n: 5, spread: 0.16, rate: 2.8, speed: 8, dmg: 9 } },
-  // 감시 포대 아르고스: 떠다니며 사방으로 퍼지는 탄 고리 (ring)와 소용돌이 탄 (spiral — arms갈래로 gap초마다 turn라디안씩 돌며 dur초)
+                 brood: { rate: 4.5, n: 2, max: 9, pool: { crawler: 3, runner: 2, bomber: 1.5 } }, spray: { n: 5, spread: 0.16, rate: 2.8, speed: 8, dmg: 9 },
+                 egg: { n: 3, rate: 6.5, flight: 1.1, r: 1.2, t: 3, dmg: 12 }, whirl: { arms: 2, gap: 0.1, turn: 0.3, dur: 2.2, rate: 7, speed: 6.5, dmg: 9 } },
+  // 감시 포대 아르고스: 떠다니며 사방으로 퍼지는 탄 고리 (ring)와 소용돌이 탄 (spiral — arms갈래로 gap초마다 turn라디안씩 돌며 dur초, 격노하면 거꾸로 도는 소용돌이가 겹침),
+  // 조준 연사 (aimed — n발을 gap초마다, 날아가는 동안 플레이어가 갈 곳을 앞질러)
   argus:       { name: '감시 포대 아르고스', hp: 1500, spd: 1.1, r: 0.85, dmg: 12, atkRate: 1.4, gold: 600, blood: '#c4a', lootBonus: 3, keep: 6, fly: true, boss: 'argus', xp: 300,
-                 orb: { speed: 5.2, dmg: 11 }, ring: { n: 14, rate: 3.4 }, spiral: { arms: 3, gap: 0.09, turn: 0.26, dur: 2.4, rate: 7.5 } },
-  // 역병 거인: 독액 덩어리 n개를 던져 독 웅덩이 (glob — 반경 r칸, t초), 주위에 독구름 (cloud — wind초 예고 뒤 반경 r칸, t초)
+                 orb: { speed: 5.2, dmg: 11 }, ring: { n: 14, rate: 3.4 }, spiral: { arms: 3, gap: 0.09, turn: 0.26, dur: 2.4, rate: 7.5 },
+                 aimed: { n: 6, gap: 0.12, rate: 4.5, speed: 7.5 } },
+  // 역병 거인: 독액 덩어리 n개를 던져 독 웅덩이 (glob — 반경 r칸, t초, 격노하면 두 번에 한 번은 플레이어를 빙 둘러쌈), 주위에 독구름 (cloud — wind초 예고 뒤 반경 r칸, t초),
+  // 독액 토하기 (vomit — near칸 안이면 wind초 동안 부채꼴 예고 → dur초 동안 ±sweep을 쓸며 gap초마다 한 발)
   plaguegiant: { name: '역병 거인', hp: 1800, spd: 0.95, r: 0.9, dmg: 26, atkRate: 1.8, gold: 700, blood: '#9b3', lootBonus: 3, knock: 10, boss: 'plague', xp: 350,
-                 glob: { n: 3, rate: 3.2, flight: 1, r: 1.5, t: 6, dmg: 14 }, cloud: { rate: 8, wind: 0.8, r: 3.6, t: 3.5 } },
-  // 공허 사제: warp초마다 순간이동, rate초마다 불기둥 무늬 (pyre — 십자·줄·고리), 시체를 일으킴 (raise)
+                 glob: { n: 3, rate: 3.2, flight: 1, r: 1.5, t: 6, dmg: 14 }, cloud: { rate: 8, wind: 0.8, r: 3.6, t: 3.5 },
+                 vomit: { rate: 7, near: 8, wind: 0.6, dur: 1.4, gap: 0.05, sweep: 0.75, speed: 7, dmg: 10 } },
+  // 공허 사제: warp초마다 순간이동 (나타나며 공허 구체 고리 — orbs), rate초마다 불기둥 무늬 (pyre — 십자·줄·고리·추적), 시체를 일으킴 (raise)
   voidpriest:  { name: '공허 사제', hp: 2000, spd: 2.0, r: 0.55, dmg: 20, atkRate: 1.2, gold: 800, blood: '#a5c', lootBonus: 3, keep: 4, boss: 'void', xp: 450,
-                 warp: { rate: 4.5, min: 4, max: 7 }, pyre: { rate: 3.6, wind: 0.95, r: 1.2, dmg: 24, burn: 2 }, raise: { rate: 8, range: 9, wind: 0.8, max: 4, hp: 0.6 } },
-  // 처형자: 유도 미사일 n발 (missile — 초당 turn라디안 꺾임), 레이저 (laser — wind초 조준선 뒤 dur초 동안 ±sweep라디안을 쓸고 지나감, 닿는 동안 tick초마다 dmg)
+                 warp: { rate: 4.5, min: 4, max: 7 }, pyre: { rate: 3.6, wind: 0.95, r: 1.2, dmg: 24, burn: 2 }, raise: { rate: 8, range: 9, wind: 0.8, max: 4, hp: 0.6 },
+                 orbs: { n: 8, speed: 4.5, dmg: 14 } },
+  // 처형자: 유도 미사일 n발 (missile — 초당 turn라디안 꺾임), 레이저 (laser — wind초 조준선 뒤 dur초 동안 ±sweep라디안을 쓸고 지나감, 닿는 동안 tick초마다 dmg, 격노하면 반대쪽에도 한 줄기),
+  // 연속 돌진 베기 (charge — 붉은 띠 예고, chain번 더 이어짐 [보통, 격노])
   executioner: { name: '처형자', hp: 2200, spd: 2.3, r: 0.65, dmg: 30, atkRate: 1.2, gold: 900, blood: '#a33', lootBonus: 3, knock: 8, boss: 'exec', xp: 500,
-                 missile: { n: 2, rate: 3.2, speed: 6.5, turn: 1.7, dmg: 18, life: 4 }, laser: { rate: 7, wind: 0.9, dur: 1.4, sweep: 0.7, len: 14, dmg: 9, tick: 0.12 } },
+                 missile: { n: 2, rate: 3.2, speed: 6.5, turn: 1.7, dmg: 18, life: 4 }, laser: { rate: 7, wind: 0.9, dur: 1.4, sweep: 0.7, len: 14, dmg: 9, tick: 0.12 },
+                 charge: { range: 11, wind: 0.5, speed: 17, dur: 0.4, stun: 0.8, cd: 6.5, mul: 1, chain: [2, 3], chainWind: 0.65 } },
   // 둥지 (둥지 파괴 임무 전용): 움직이지 않고 옆에 몬스터를 낳음. 구역에 오래 있을수록 자주·많이
   // brood: rate초마다 → 4분에 걸쳐 min초까지 빨라짐, 둥지 하나당 max마리 → 4분 뒤 max+2마리, 모든 둥지 합쳐 cap마리까지, pool에서 뽑음
   nest: { name: '번식 둥지', hp: 360, spd: 0, r: 0.6, dmg: 0, atkRate: 99, gold: 80, blood: '#c46', cost: 5, fixed: true, nest: true,
@@ -484,7 +503,7 @@ const START_EASE = [0.5, 0.75]; // 막 첫 구역(1·4·7)에서 들어오는 �
 // 적이 적은 만큼 일반 적 한 마리의 경험치·골드·장비 확률은 1 / room 배 (구역마다 얻는 양은 비슷하게)
 // 구역마다 적이 세지는 정도 (구역 1 기준): 체력·피해 (앞 구역은 아래 CURVE로 더 약하게)
 const ENEMY_GROW = { hp: 0.13, dmg: 0.12 };
-const BOSS_BOOST = { hp: 1.3, dmg: 1.2 }; // 보스(구역 보스·막 보스)의 체력·피해 배율 (CURVE.boss·ENEMY_GROW 위에)
+const BOSS_BOOST = { hp: 3.9, dmg: 3.6 }; // 보스(구역 보스·막 보스)의 체력·피해 배율 (CURVE.boss·ENEMY_GROW 위에)
 const CURVE = {
   room:  [0.65, 0.75, 0.85, 0.95, 1, 1, 1, 1, 1],
   hp:    [0.8, 0.88, 0.94, 0.98, 1, 1, 1, 1, 1],
@@ -698,11 +717,11 @@ const MONSTER_DESC = {
   lurker: '천장에 숨어 있다가 떨어진다. 바닥의 그림자가 짙어지면 비켜라.', burrower: '땅속을 파고 다가와 발밑에서 솟아오른다. 땅 위에 있을 때 쳐라.',
   warden: '주변 적에게 보호막을 씌운다. 드론부터 쓰러뜨려라.',
   nest: '옆에 몬스터를 계속 낳는 번식 둥지.', thief: '보급품을 훔쳐 달아나는 약탈자. 놓치면 사라지고, 잡으면 보물이 쏟아진다.',
-  titan: '로켓 3연발과 땅 내려찍기. 구역 3의 봉쇄 격벽을 지킨다.', hivemother: '산성액 부채꼴과 크롤러 소환. 구역 6의 봉쇄 격벽을 지킨다.',
-  overmind: '정거장 코어의 군체의 뇌. 쓰러뜨리면 자폭이 시작된다.',
-  crusher: '붉은 띠를 따라 돌진하고, 벽에 박히면 잠시 무방비. 가까우면 내려찍어 충격파.', broodmother: '떠다니며 크롤러·폭주 해골을 낳고 산성액을 뿌린다.',
-  argus: '사방으로 퍼지는 탄 고리와 소용돌이 탄. 틈으로 빠져나가라.', plaguegiant: '독액 덩어리를 던져 독 웅덩이를 만들고, 주위에 독구름을 뿜는다.',
-  voidpriest: '순간이동하며 불기둥 무늬를 펼치고 시체를 일으킨다.', executioner: '유도 미사일과 레이저. 붉은 조준선을 보면 비켜라.',
+  titan: '로켓 연사와 하늘에서 떨어지는 로켓 포격, 가까우면 내려찍어 충격파. 구역 3의 봉쇄 격벽을 지킨다.', hivemother: '산성액 부채꼴·산성 고리·산성 비와 크롤러 소환. 구역 6의 봉쇄 격벽을 지킨다.',
+  overmind: '정거장 코어의 군체의 뇌. 화염탄·포자·쫓아오는 불기둥, 약해질수록 화염탄 고리와 쌍둥이 광선. 쓰러뜨리면 자폭이 시작된다.',
+  crusher: '붉은 띠를 따라 돌진하고 (격노하면 연달아), 벽에 박히면 잠시 무방비. 멀면 크게 도약해 내려찍는다.', broodmother: '떠다니며 크롤러·폭주 해골을 낳고, 산성액과 새끼가 든 알을 뿌린다. 격노하면 돌며 뿜는다.',
+  argus: '사방으로 퍼지는 탄 고리와 소용돌이 탄, 갈 곳을 앞질러 쏘는 연사. 틈으로 빠져나가라.', plaguegiant: '독액 덩어리와 독구름, 부채꼴로 쓸며 토하는 독액. 격노하면 빙 둘러 던진다.',
+  voidpriest: '순간이동하며 공허 구체를 뿌리고, 불기둥 무늬를 펼치고 시체를 일으킨다.', executioner: '유도 미사일, 레이저, 연속 돌진. 격노하면 레이저가 양쪽으로. 붉은 조준선을 보면 비켜라.',
 };
 
 // ===== 필드: 구역 9개가 이어진 하나의 큰 정거장 =====

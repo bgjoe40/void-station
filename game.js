@@ -2330,34 +2330,44 @@ function explode(type, x, y, scale = 1, dm = 1) {
 // ===== 보스 =====
 let boss = null; // 지금 싸우는 보스 (체력 막대)
 const bossKindFor = lv => lv >= CAMPAIGN.length ? 'overmind' : lv % BOSS_EVERY ? null : (lv / BOSS_EVERY) % 2 === 1 ? 'titan' : 'hivemother';
-function bossThink(e, dt, d, dx, dy, see, spawned) { // 이번 프레임의 움직임을 직접 처리했으면 true (구역 보스의 돌진·주문·레이저 중)
+function bossThink(e, dt, d, dx, dy, see, spawned) { // 이번 프레임의 움직임을 직접 처리했으면 true (구역 보스의 돌진·주문·레이저 중, 타이탄의 내려찍기)
   if (BOSS_AI[e.d.boss]) return BOSS_AI[e.d.boss](e, dt, d, dx, dy, see, spawned);
-  const p = player, m = foeDmg(e), a0 = Math.atan2(dy, dx); // 타이탄·하이브 마더·오버마인드 공격 피해 배율 (구역·난이도 곡선)
+  const m = foeDmg(e), a0 = Math.atan2(dy, dx); // 타이탄·하이브 마더·오버마인드 공격 피해 배율 (구역·난이도 곡선)
   if (e.d.boss === 'titan') {
-    // 로켓 3연발
+    const St = e.d.stomp, Bg = e.d.barrage, rage = bossRage(e);
+    // 가까이 붙으면 발을 들었다가 (그동안 멈춤) 내려찍어 충격파 (벽·닫힌 문 너머로는 안 함, 격노하면 두 번)
+    if (e.stompW > 0) {
+      e.atkT = 0.1;
+      if ((e.stompW -= dt) <= 0) { slamWave(e, St); if (rage) later(0.35, () => { if (!e.dead) slamWave(e, St); }); }
+      return true;
+    }
+    e.stompT = (e.stompT ?? 2) - dt;
+    if (see && d < 2.8 && e.stompT <= 0) { e.stompT = 3.2 * (rage ? 0.75 : 1); e.stompW = St.wind; Snd.mon(e, 'attack'); return true; }
+    // 로켓 연사 (격노하면 5발, 살짝 따라옴)
     e.volleyT = (e.volleyT ?? 1.5) - dt;
-    if (see && d < 13 && e.volleyT <= 0 && !e.burst) { e.volleyT = 3; e.burst = 3; e.burstT = 0; }
+    if (see && d < 13 && e.volleyT <= 0 && !e.burst) { e.volleyT = rage ? 2.4 : 3; e.burst = rage ? 5 : 3; e.burstT = 0; }
     if (e.burst) {
       e.burstT -= dt;
       if (e.burstT <= 0) {
-        e.burst--; e.burstT = 0.3; e.atkT = ATK_ANIM; e.face = a0;
+        e.burst--; e.burstT = rage ? 0.22 : 0.3; e.atkT = ATK_ANIM; e.face = a0;
         const a = a0 + rnd(-0.12, 0.12);
-        eshots.push({ x: e.x + Math.cos(a) * 0.8, y: e.y + Math.sin(a) * 0.8, vx: Math.cos(a) * 7, vy: Math.sin(a) * 7, type: 'rocket', dmg: 28 * m, life: 3 });
+        eshots.push({ x: e.x + Math.cos(a) * 0.8, y: e.y + Math.sin(a) * 0.8, vx: Math.cos(a) * 7, vy: Math.sin(a) * 7, type: 'rocket', dmg: 28 * m, life: 3, home: rage ? 0.6 : 0 });
         Snd.play('rocket', e.x, e.y);
       }
     }
-    // 가까이 붙으면 땅 내려찍기 (벽·닫힌 문 너머로는 안 함)
-    e.stompT = (e.stompT ?? 2) - dt;
-    if (see && d < 2.8 && e.stompT <= 0) {
-      e.stompT = 3.2; e.atkT = ATK_ANIM;
-      hurtPlayer(32 * m * (1 - d / 3.5), e.x, e.y); p.kx += dx / d * 9; p.ky += dy / d * 9;
-      shake = Math.max(shake, 14); smoke(e.x, e.y, 24, '90,80,70', 3); addFx('misl', 'bcd', e.x, e.y, 0, 0.4, 2.2);
-      Snd.play('stomp', e.x, e.y);
+    // 로켓 포격: 플레이어 자리와 그 둘레를 붉은 원으로 예고 → 로켓이 하나씩 떨어져 터짐
+    e.barrageT = (e.barrageT ?? 4) - dt;
+    if (see && d < 14 && e.barrageT <= 0 && !e.burst) {
+      e.barrageT = Bg.rate * (rage ? 0.7 : 1); e.atkT = ATK_ANIM; e.face = a0;
+      bossLob(e, 'blast', aroundPlayer(Bg.n + (rage ? 3 : 0), 1.2, Bg.spread), Bg);
+      Snd.play('rocket', e.x, e.y); Snd.mon(e, 'attack');
     }
   } else if (e.d.boss === 'brain') {
-    // 오버마인드: 움직이지 않음. 화염탄 부채꼴 + 포자 발사(떨어진 곳에서 몬스터가 깨어남). 체력이 줄수록 빨라짐
-    const ph = e.hp < e.maxhp * 0.3 ? 2 : e.hp < e.maxhp * 0.65 ? 1 : 0;
+    // 오버마인드: 움직이지 않음. 화염탄 부채꼴 + 포자 발사(떨어진 곳에서 몬스터가 깨어남) + 발밑을 쫓는 불기둥. 체력이 줄수록 빨라지고
+    // 둘째 단계부터 화염탄 고리, 마지막 단계에는 쌍둥이 광선이 방을 휩씀 (광선을 쏘는 동안에도 다른 공격은 이어짐)
+    const ph = e.hp < e.maxhp * 0.3 ? 2 : e.hp < e.maxhp * 0.65 ? 1 : 0, N = e.d.nova, P = e.d.pyre;
     e.rage = ph === 2;
+    if (e.laser) laserTick(e, dt);
     e.fireT = (e.fireT ?? 2) - dt;
     if (see && d < 14 && e.fireT <= 0) {
       e.fireT = [2.6, 2, 1.4][ph]; e.atkT = ATK_ANIM;
@@ -2378,26 +2388,51 @@ function bossThink(e, dt, d, dx, dy, see, spawned) { // 이번 프레임의 움�
       }
       Snd.mon(e, 'attack');
     }
+    e.pyreT = (e.pyreT ?? 3.5) - dt;
+    if (see && d < 14 && e.pyreT <= 0) { e.pyreT = P.rate * [1, 0.85, 0.7][ph]; pyrePattern(e, 'chase', P.wind, P.n[ph]); }
+    e.novaT = (e.novaT ?? 2) - dt;
+    if (ph && see && d < 15 && e.novaT <= 0) {
+      e.novaT = N.rate * (ph === 2 ? 0.75 : 1); e.atkT = ATK_ANIM;
+      const off = rnd(0, 1), dmg = bossDmg(e, N.dmg);
+      bossRing(e, 'fireball', N.n, N.speed, dmg, off);
+      if (ph === 2) later(0.45, () => { if (!e.dead) bossRing(e, 'fireball', N.n, N.speed, dmg, off + Math.PI / N.n); });
+      Snd.play('fireball', e.x, e.y);
+    }
+    e.laserT = (e.laserT ?? 2) - dt;
+    if (ph === 2 && see && !e.laser && e.laserT <= 0) { e.laserT = e.d.laser.rate; startLaser(e, true); }
   } else {
-    // 하이브 마더: 산성액 부채꼴 + 크롤러 소환, 체력 절반 이하면 격노(빨라짐)
-    e.rage = e.hp < e.maxhp * 0.5;
-    e.sprayT = (e.sprayT ?? 1.5) - dt * (e.rage ? 1.5 : 1);
+    // 하이브 마더: 산성액 부채꼴 (격노하면 두 번) + 크롤러 소환 + 산성 고리 + 산성 비 (떨어질 곳 예고 → 독 웅덩이)
+    // 체력 절반 이하면 격노 (빨라지고, 질주 크롤러·폭주 해골도 소환)
+    const rage = bossRage(e), N = e.d.nova, Rn = e.d.rain;
+    e.sprayT = (e.sprayT ?? 1.5) - dt * (rage ? 1.5 : 1);
     if (see && d < 11 && e.sprayT <= 0) {
       e.sprayT = 2.4; e.atkT = ATK_ANIM; e.face = a0;
-      for (let k = -3; k <= 3; k++) {
-        const a = a0 + k * 0.14;
-        eshots.push({ x: e.x, y: e.y, vx: Math.cos(a) * 8, vy: Math.sin(a) * 8, type: 'acid', dmg: 9 * m, life: 1.6 });
-      }
+      const fan = da => { for (let k = -3; k <= 3; k++) { const a = a0 + da + k * 0.14; eshots.push({ x: e.x, y: e.y, vx: Math.cos(a) * 8, vy: Math.sin(a) * 8, type: 'acid', dmg: 9 * m, life: 1.6 }); } };
+      fan(0); if (rage) later(0.35, () => { if (!e.dead) fan(0.07); });
       Snd.play('spit', e.x, e.y);
+    }
+    e.novaT = (e.novaT ?? 3) - dt;
+    if (see && d < 12 && e.novaT <= 0) {
+      e.novaT = N.rate * (rage ? 0.7 : 1); e.atkT = ATK_ANIM;
+      const off = rnd(0, 1), dmg = bossDmg(e, N.dmg);
+      bossRing(e, 'acid', N.n, N.speed, dmg, off);
+      if (rage) later(0.4, () => { if (!e.dead) bossRing(e, 'acid', N.n, N.speed, dmg, off + Math.PI / N.n); });
+      Snd.play('spit', e.x, e.y); Snd.mon(e, 'attack');
+    }
+    e.rainT = (e.rainT ?? 5) - dt;
+    if (see && d < 13 && e.rainT <= 0) {
+      e.rainT = Rn.rate * (rage ? 0.7 : 1); e.atkT = ATK_ANIM;
+      bossLob(e, 'acid', aroundPlayer(Rn.n + (rage ? 3 : 0), 1.5, 3.5), Rn);
+      Snd.play('ballThrow', e.x, e.y);
     }
     e.summonT = (e.summonT ?? 4) - dt;
     if (e.summonT <= 0) {
-      e.summonT = e.rage ? 6 : 9;
+      e.summonT = rage ? 6 : 9;
       let alive = enemies.filter(o => o.minion && !o.dead).length + spawned.length;
       for (let k = 0; k < 5 && alive < 20; k++) {
-        const a = rnd(0, 6.28), x = e.x + Math.cos(a) * 1.4, y = e.y + Math.sin(a) * 1.4;
-        if (collides(x, y, 0.25, false)) continue;
-        const c = makeEnemy('crawler', x, y);
+        const a = rnd(0, 6.28), x = e.x + Math.cos(a) * 1.4, y = e.y + Math.sin(a) * 1.4, type = rage ? weighted({ crawler: 3, runner: 2, bomber: 1 }) : 'crawler';
+        if (collides(x, y, ENEMIES[type].r, false)) continue;
+        const c = makeEnemy(type, x, y);
         c.minion = true; c.aggro = true; spawned.push(c); alive++;
         addFx('tfog', 'abcdefghij', x, y, 0, 0.6, 0.8);
       }
@@ -2413,33 +2448,84 @@ function bossRage(e) {
   if (e.rage && !e.raged) { e.raged = true; msg(`${e.d.name} 격노!`, '#ff6a4a'); Snd.mon(e, 'sight'); flashes.push({ x: e.x, y: e.y, r: 420, t: 0.4, max: 0.4, col: '255,80,50' }); shake = Math.max(shake, 6); }
   return e.rage;
 }
-// 파쇄 짐승: 돌진은 chargeThink(e.d.charge)가 맡음 — 여기서는 격노(돌진·공격 간격↓)와 내려찍기 (뛰어올랐다가 충격파, 격노하면 두 번)
+// 사방으로 퍼지는 탄 고리 (off: 첫 탄의 각도)
+function bossRing(e, type, n, speed, dmg, off = 0) {
+  for (let k = 0; k < n; k++) { const a = off + k * Math.PI * 2 / n; eshots.push({ x: e.x + Math.cos(a) * 0.9, y: e.y + Math.sin(a) * 0.9, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, type, dmg, life: 13 / speed }); }
+}
+// 플레이어 자리와 그 둘레 r0~r1칸의 빈 바닥 n곳 (보스가 던지는 것이 떨어질 곳)
+function aroundPlayer(n, r0, r1) {
+  const p = player, L = [];
+  for (let k = 0; k < n; k++) {
+    let x = p.x, y = p.y;
+    if (k) for (let t = 0; t < 8; t++) { const a = rnd(0, 6.28), r = rnd(r0, r1); x = p.x + Math.cos(a) * r; y = p.y + Math.sin(a) * r; if (!collides(x, y, 0.3, false) && !safeAt(x, y)) break; }
+    L.push({ x, y });
+  }
+  return L;
+}
+// 플레이어 자리와 그 둘레 r칸을 n곳으로 빙 둘러 (안에 있으면 밖으로 빠져나가야 함)
+function ringAround(n, r) {
+  const p = player, a0 = rnd(0, 6.28), L = [{ x: p.x, y: p.y }];
+  for (let k = 0; k < n; k++) { const a = a0 + k * Math.PI * 2 / n, x = p.x + Math.cos(a) * r, y = p.y + Math.sin(a) * r; if (!collides(x, y, 0.3, false) && !safeAt(x, y)) L.push({ x, y }); }
+  return L;
+}
+// 보스가 던지는 것: 떨어질 곳 L을 깜박이는 원으로 예고하고 하나씩 조금씩 늦게 떨어짐 — acid: 독액 (독 웅덩이, hatch면 번식 모체의 새끼도), blast: 타이탄의 포격 로켓 (폭발)
+function bossLob(e, type, L, o) {
+  L.forEach((t, k) => grenades.push({ type, sx: e.x, sy: e.y, tx: t.x, ty: t.y, x: e.x, y: e.y, z: 40, z0: 40, arc: type === 'blast' ? 160 : 70, t: 0, dur: o.flight + k * (o.gap || 0.12),
+    warn: true, warnR: o.r, dmg: bossDmg(e, o.dmg), poolR: o.r, poolT: o.t, hatch: o.hatch ? e : null }));
+}
+// 회전 탄막 (e.spin): t초 동안 gap초마다 arms갈래로 쏘며 한 번에 turn라디안씩 돎 — 번식 모체의 회전 분사
+function spinTick(e, dt) {
+  const S = e.spin;
+  S.t -= dt; S.gapT -= dt; e.atkT = 0.1;
+  while (S.gapT <= 0 && S.t > 0) { S.gapT += S.gap; bossRing(e, S.type, S.arms, S.speed, S.dmg, S.a); S.a += S.turn * S.dir; }
+  if (Math.random() < dt * 6) Snd.play('spit', e.x, e.y);
+  if (S.t <= 0) e.spin = null;
+}
+// 파쇄 짐승: 돌진은 chargeThink(e.d.charge)가 맡음 (격노하면 이어 돌진) — 여기서는 격노(돌진·공격 간격↓), 내려찍기 (뛰어올랐다가 충격파, 격노하면 두 번),
+// 도약 (떨어져 있으면 웅크렸다가 플레이어가 있던 곳으로 크게 뜀 — 내려앉을 곳은 붉은 원, 착지는 quakeLand)
 function crusherThink(e, dt, d, dx, dy, see) {
-  const S = e.d.slam, rage = bossRage(e);
+  const S = e.d.slam, Lp = e.d.leap, rage = bossRage(e);
   e.atkMul = rage ? 0.7 : 1;
-  e.slamCd = (e.slamCd ?? 2) - dt;
+  e.slamCd = (e.slamCd ?? 2) - dt; e.leapCd = (e.leapCd ?? 4) - dt;
   if (e.slamT > 0) {
     e.slamT -= dt; e.atkT = 0.1; e.z = Math.sin(Math.PI * clamp(1 - e.slamT / S.wind, 0, 1)) * 30;
     if (e.slamT <= 0) { e.z = 0; slamWave(e, S); if (rage) later(0.35, () => { if (!e.dead) slamWave(e, S); }); }
     return true;
   }
+  if (e.leapW > 0) { // 도약 준비: 웅크림
+    e.leapW -= dt; e.atkT = 0.1; e.face = Math.atan2(e.leapTo.y - e.y, e.leapTo.x - e.x);
+    if (e.leapW <= 0) { const lx = e.leapTo.x - e.x, ly = e.leapTo.y - e.y; startLeap(e, lx, ly, Math.hypot(lx, ly) / Lp.dur, Lp.dur, Lp.h, 'quake'); Snd.mon(e, 'attack'); }
+    return true;
+  }
   if (e.dashT > 0 || e.windT > 0) return false;
   if (see && d < S.near && e.slamCd <= 0) { e.slamCd = S.cd * (rage ? 0.6 : 1); e.slamT = S.wind; Snd.mon(e, 'attack'); return true; }
+  if (see && d > Lp.min && d < Lp.max && e.leapCd <= 0) { e.leapCd = Lp.cd * (rage ? 0.7 : 1); e.leapW = Lp.wind; e.leapTo = { x: player.x, y: player.y }; Snd.mon(e, 'sight'); return true; }
   return false;
 }
 function slamWave(e, S) {
-  waves.push({ x: e.x, y: e.y, r: e.r, max: S.r, speed: S.speed, dmg: bossDmg(e, S.dmg), hit: false, col: '255,170,90' });
+  const w = { x: e.x, y: e.y, r: e.r, max: S.r, speed: S.speed, dmg: bossDmg(e, S.dmg), hit: false, col: '255,170,90' };
+  waves.push(w);
   shake = Math.max(shake, 12); smoke(e.x, e.y, 20, '90,80,70', 3); addFx('misl', 'bcd', e.x, e.y, 0, 0.4, 2); Snd.play('stomp', e.x, e.y);
   decal(e.x, e.y, 1.4, 'rgba(10,8,6,0.6)');
+  return w;
 }
-// 번식 모체: 산성액 부채꼴 + 새끼 (크롤러·질주 크롤러·폭주 해골 — 새끼는 경험치·전리품이 거의 없음)
+// 파쇄 짐승이 도약해 내려앉음: 반경 r칸 피해·밀어냄 + 충격파 (격노하면 한 번 더) — 착지에 맞았으면 첫 충격파에는 다시 맞지 않음
+function quakeLand(e) {
+  const Lp = e.d.leap, p = player, d = Math.hypot(p.x - e.x, p.y - e.y), hit = d < Lp.r + p.r && hurtPlayer(bossDmg(e, Lp.dmg), e.x, e.y);
+  e.leapTo = null;
+  if (hit) { p.kx += (p.x - e.x) / (d || 1) * 10; p.ky += (p.y - e.y) / (d || 1) * 10; }
+  slamWave(e, e.d.slam).hit = hit;
+  if (e.rage) later(0.35, () => { if (!e.dead) slamWave(e, e.d.slam); });
+}
+// 번식 모체: 산성액 부채꼴 (격노하면 두 번) + 새끼 (크롤러·질주 크롤러·폭주 해골 — 새끼는 경험치·전리품이 거의 없음) + 알 (떨어진 곳에 산성 웅덩이 + 새끼),
+// 격노하면 빙글 돌며 산성액을 사방으로 (회전 분사)
 function broodBossThink(e, dt, d, dx, dy, see, spawned) {
-  const B = e.d.brood, S = e.d.spray, rage = bossRage(e), a0 = Math.atan2(dy, dx);
+  const B = e.d.brood, S = e.d.spray, Eg = e.d.egg, Wh = e.d.whirl, rage = bossRage(e), a0 = Math.atan2(dy, dx);
   e.sprayT = (e.sprayT ?? 1.5) - dt;
   if (see && d < 11 && e.sprayT <= 0) {
     e.sprayT = S.rate * (rage ? 0.7 : 1); e.atkT = ATK_ANIM; e.face = a0;
-    const n = S.n + (rage ? 2 : 0);
-    for (let k = 0; k < n; k++) { const a = a0 + (k - (n - 1) / 2) * S.spread; eshots.push({ x: e.x, y: e.y, vx: Math.cos(a) * S.speed, vy: Math.sin(a) * S.speed, type: 'acid', dmg: bossDmg(e, S.dmg), life: 1.6 }); }
+    const n = S.n + (rage ? 2 : 0), fan = da => { for (let k = 0; k < n; k++) { const a = a0 + da + (k - (n - 1) / 2) * S.spread; eshots.push({ x: e.x, y: e.y, vx: Math.cos(a) * S.speed, vy: Math.sin(a) * S.speed, type: 'acid', dmg: bossDmg(e, S.dmg), life: 1.6 }); } };
+    fan(0); if (rage) later(0.35, () => { if (!e.dead) fan(S.spread / 2); });
     Snd.play('spit', e.x, e.y);
   }
   e.broodT = (e.broodT ?? 2) - dt;
@@ -2454,22 +2540,47 @@ function broodBossThink(e, dt, d, dx, dy, see, spawned) {
     }
     e.atkT = ATK_ANIM; Snd.mon(e, 'attack');
   }
+  e.eggT = (e.eggT ?? 3.5) - dt;
+  if (see && d < 12 && e.eggT <= 0) {
+    e.eggT = Eg.rate * (rage ? 0.7 : 1); e.atkT = ATK_ANIM;
+    bossLob(e, 'acid', aroundPlayer(Eg.n + (rage ? 2 : 0), 1.2, 3), { ...Eg, hatch: true });
+    Snd.play('ballThrow', e.x, e.y);
+  }
+  e.whirlT = (e.whirlT ?? 3) - dt;
+  if (e.spin) spinTick(e, dt);
+  else if (rage && see && d < 12 && e.whirlT <= 0) {
+    e.whirlT = Wh.rate;
+    e.spin = { t: Wh.dur, gap: Wh.gap, gapT: 0, arms: Wh.arms, a: a0, dir: Math.random() < 0.5 ? 1 : -1, turn: Wh.turn, type: 'acid', speed: Wh.speed, dmg: bossDmg(e, Wh.dmg) };
+    Snd.mon(e, 'attack');
+  }
   return false;
 }
-// 감시 포대 아르고스: 사방으로 퍼지는 탄 고리 (격노하면 엇갈린 두 겹)와 소용돌이 탄 (움직이면서)
+// 감시 포대 아르고스: 사방으로 퍼지는 탄 고리 (격노하면 엇갈린 두 겹), 소용돌이 탄 (움직이면서, 격노하면 거꾸로 도는 소용돌이가 겹치고 그동안에도 고리·연사),
+// 조준 연사 (날아가는 동안 플레이어가 갈 곳을 앞질러 쏨 — 걷는 빠르기 4.3칸/초 기준)
 function argusThink(e, dt, d, dx, dy, see) {
-  const O = e.d.orb, RG = e.d.ring, SP = e.d.spiral, rage = bossRage(e), a0 = Math.atan2(dy, dx);
-  const orb = a => eshots.push({ x: e.x + Math.cos(a) * 0.9, y: e.y + Math.sin(a) * 0.9, vx: Math.cos(a) * O.speed, vy: Math.sin(a) * O.speed, type: 'orb', dmg: bossDmg(e, O.dmg), life: 14 / O.speed });
+  const O = e.d.orb, RG = e.d.ring, SP = e.d.spiral, AM = e.d.aimed, rage = bossRage(e), a0 = Math.atan2(dy, dx), p = player;
+  const orb = (a, sp = O.speed) => eshots.push({ x: e.x + Math.cos(a) * 0.9, y: e.y + Math.sin(a) * 0.9, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, type: 'orb', dmg: bossDmg(e, O.dmg), life: 14 / sp });
   if (e.spiral > 0) {
     e.spiral -= dt; e.spT -= dt; e.atkT = 0.1;
     const arms = SP.arms + (rage ? 1 : 0);
-    while (e.spT <= 0 && e.spiral > 0) { e.spT += SP.gap; for (let k = 0; k < arms; k++) orb(e.spA + k * Math.PI * 2 / arms); e.spA += SP.turn * e.spDir; }
+    while (e.spT <= 0 && e.spiral > 0) {
+      e.spT += SP.gap;
+      for (let k = 0; k < arms; k++) { orb(e.spA + k * Math.PI * 2 / arms); if (rage) orb(e.spB + (k + 0.5) * Math.PI * 2 / arms); }
+      e.spA += SP.turn * e.spDir; e.spB -= SP.turn * e.spDir;
+    }
     if (Math.random() < dt * 6) Snd.play('spit', e.x, e.y);
-    return false;
+    if (!rage) return false;
   }
-  e.ringT = (e.ringT ?? 1.5) - dt; e.spiralT = (e.spiralT ?? 5) - dt;
+  if (e.aimN > 0 && (e.aimT -= dt) <= 0) {
+    e.aimN--; e.aimT = AM.gap; e.atkT = ATK_ANIM;
+    const t = Math.hypot(p.x - e.x, p.y - e.y) / AM.speed;
+    e.face = Math.atan2(p.y + p.mvy * 4.3 * t - e.y, p.x + p.mvx * 4.3 * t - e.x); orb(e.face, AM.speed);
+    Snd.play('spit', e.x, e.y);
+  }
+  e.ringT = (e.ringT ?? 1.5) - dt; e.spiralT = (e.spiralT ?? 5) - dt; e.aimCd = (e.aimCd ?? 3) - dt;
   if (!see || d > 15) return false;
-  if (e.spiralT <= 0) { e.spiralT = SP.rate * (rage ? 0.7 : 1); e.spiral = SP.dur; e.spT = 0; e.spA = a0; e.spDir = Math.random() < 0.5 ? 1 : -1; Snd.mon(e, 'attack'); return false; }
+  if (e.spiralT <= 0 && !(e.spiral > 0)) { e.spiralT = SP.rate * (rage ? 0.7 : 1); e.spiral = SP.dur; e.spT = 0; e.spA = e.spB = a0; e.spDir = Math.random() < 0.5 ? 1 : -1; Snd.mon(e, 'attack'); return false; }
+  if (e.aimCd <= 0 && !(e.aimN > 0)) { e.aimCd = AM.rate * (rage ? 0.7 : 1); e.aimN = AM.n + (rage ? 3 : 0); e.aimT = 0; Snd.mon(e, 'attack'); }
   if (e.ringT <= 0) {
     e.ringT = RG.rate * (rage ? 0.75 : 1); e.atkT = ATK_ANIM; e.face = a0;
     const n = RG.n + (rage ? 6 : 0), off = rnd(0, Math.PI * 2 / n);
@@ -2479,39 +2590,57 @@ function argusThink(e, dt, d, dx, dy, see) {
   }
   return false;
 }
-// 역병 거인: 독액 덩어리 (떨어질 곳에 초록 테두리 예고 → 독 웅덩이), 가까우면 주위에 독구름 (예고 동안 멈춤)
+// 역병 거인: 독액 덩어리 (떨어질 곳에 초록 예고 → 독 웅덩이, 격노하면 두 번에 한 번은 플레이어를 빙 둘러쌈), 가까우면 주위에 독구름 (예고 동안 멈춤),
+// 독액 토하기 (부채꼴 예고 → 쓸며 토함, 격노하면 더 넓게 갔다가 되돌아옴 — 그동안 멈춤)
 function plagueThink(e, dt, d, dx, dy, see) {
-  const G = e.d.glob, C = e.d.cloud, rage = bossRage(e);
+  const G = e.d.glob, C = e.d.cloud, V = e.d.vomit, rage = bossRage(e), Vm = e.vomit;
   if (e.cloudT > 0) {
     e.cloudT -= dt; e.atkT = 0.1;
     if (Math.random() < dt * 30) smoke(e.x + rnd(-1, 1), e.y + rnd(-1, 1), 1, '120,200,60', 1.2);
     if (e.cloudT <= 0) { const t = C.t * (rage ? 1.4 : 1); areas.push({ type: 'gas', x: e.x, y: e.y, r: C.r, t, max: t, foe: true }); smoke(e.x, e.y, 24, '120,200,60', 3); Snd.play('gas', e.x, e.y); }
     return true;
   }
-  e.globT = (e.globT ?? 1.5) - dt; e.cloudCd = (e.cloudCd ?? 5) - dt;
+  if (Vm) {
+    Vm.t -= dt; e.atkT = 0.1;
+    if (Vm.phase === 'wind') { e.face = Vm.a; if (Vm.t <= 0) { Vm.phase = 'spray'; Vm.t = Vm.max = V.dur * (rage ? 1.4 : 1); Vm.gapT = 0; Snd.play('gas', e.x, e.y); } return true; }
+    const k = 1 - Math.max(0, Vm.t) / Vm.max, sw = V.sweep * (rage ? 1.3 : 1);
+    const a = Vm.a + Vm.dir * sw * (rage ? Math.sin(k * Math.PI * 2) : 2 * k - 1); // 한쪽 끝에서 다른 끝으로 (격노하면 한쪽으로 갔다가 반대쪽 끝까지 되돌아옴)
+    e.face = a; Vm.gapT -= dt;
+    while (Vm.gapT <= 0) { Vm.gapT += V.gap; const b = a + rnd(-0.06, 0.06); eshots.push({ x: e.x + Math.cos(b) * 0.9, y: e.y + Math.sin(b) * 0.9, vx: Math.cos(b) * V.speed, vy: Math.sin(b) * V.speed, type: 'acid', dmg: bossDmg(e, V.dmg), life: 1.5 }); }
+    if (Math.random() < dt * 8) Snd.play('spit', e.x, e.y);
+    if (Vm.t <= 0) e.vomit = null;
+    return true;
+  }
+  e.globT = (e.globT ?? 1.5) - dt; e.cloudCd = (e.cloudCd ?? 5) - dt; e.vomitT = (e.vomitT ?? 4) - dt;
   if (e.cloudCd <= 0 && d < C.r + 1.5) { e.cloudCd = C.rate * (rage ? 0.75 : 1); e.cloudT = C.wind; Snd.mon(e, 'attack'); return true; }
+  if (see && d < V.near && e.vomitT <= 0) { e.vomitT = V.rate * (rage ? 0.75 : 1); e.vomit = { phase: 'wind', t: V.wind, a: Math.atan2(dy, dx), dir: Math.random() < 0.5 ? 1 : -1 }; Snd.mon(e, 'attack'); return true; }
   if (see && d < 12 && e.globT <= 0) {
     e.globT = G.rate * (rage ? 0.75 : 1); e.atkT = ATK_ANIM; e.face = Math.atan2(dy, dx);
-    for (let k = 0; k < G.n + (rage ? 2 : 0); k++) {
-      let tx = player.x, ty = player.y;
-      if (k) for (let t = 0; t < 8; t++) { const a = rnd(0, 6.28), r = rnd(1.5, 3.2); tx = player.x + Math.cos(a) * r; ty = player.y + Math.sin(a) * r; if (!collides(tx, ty, 0.3, false) && !safeAt(tx, ty)) break; }
-      grenades.push({ type: 'acid', sx: e.x, sy: e.y, tx, ty, x: e.x, y: e.y, z: 40, z0: 40, arc: 70, t: 0, dur: G.flight + k * 0.12, warn: true, warnR: G.r, dmg: bossDmg(e, G.dmg), poolR: G.r, poolT: G.t * (rage ? 1.3 : 1) });
-    }
+    const ring = rage && (e.globN = (e.globN || 0) + 1) % 2 === 0;
+    bossLob(e, 'acid', ring ? ringAround(6, 2.4) : aroundPlayer(G.n + (rage ? 2 : 0), 1.5, 3.2), { ...G, t: G.t * (rage ? 1.3 : 1) });
     Snd.play('ballThrow', e.x, e.y);
   }
   return false;
 }
-// 독액 덩어리가 떨어짐: 닿으면 피해·중독 + 독 웅덩이 (보스가 만든 독이라 몬스터는 다치지 않음)
+// 독액 덩어리가 떨어짐: 닿으면 피해·중독 + 독 웅덩이 (보스가 만든 독이라 몬스터는 다치지 않음), 번식 모체의 알이면 새끼 하나
 function acidSplash(g) {
   const p = player, d = Math.hypot(p.x - g.x, p.y - g.y);
   if (d < g.poolR && hurtPlayer(g.dmg, g.x, g.y)) afflict('poison', 3);
   areas.push({ type: 'gas', x: g.x, y: g.y, r: g.poolR, t: g.poolT, max: g.poolT, foe: true });
+  if (g.hatch && !g.hatch.dead) hatchling(g.hatch, g.x, g.y);
   addFx('bal7', 'cde', g.x, g.y, 6, 0.4, 1.6); smoke(g.x, g.y, 10, '120,200,60', 1.5); bloodSplat(g.x, g.y, g.poolR * 0.7, 'rgba(90,140,30,0.6)', false);
   Snd.play('fireHit', g.x, g.y);
 }
-// 공허 사제: 순간이동, 불기둥 무늬 (십자·줄·고리, 격노하면 십자+고리), 시체 되살리기는 raiseThink(e.d.raise)
+// 번식 모체의 알에서 새끼 하나 (새끼는 brood.max마리까지)
+function hatchling(o, x, y) {
+  const B = o.d.brood, type = weighted(B.pool);
+  if (enemies.filter(c => c.parent === o && !c.dead).length >= B.max || collides(x, y, ENEMIES[type].r, !!ENEMIES[type].fly) || safeAt(x, y)) return;
+  const c = spawnEnemy(type, x, y, o.lv); c.parent = o; c.aggro = true;
+  addFx('tfog', 'abcdefghij', x, y, 0, 0.5, 0.7);
+}
+// 공허 사제: 순간이동 (나타나며 공허 구체 고리, 격노하면 나타나자마자 불기둥), 불기둥 무늬 (십자·줄·고리·추적, 격노하면 십자+고리도), 시체 되살리기는 raiseThink(e.d.raise)
 function voidThink(e, dt, d, dx, dy, see) {
-  const Wp = e.d.warp, P = e.d.pyre, rage = bossRage(e);
+  const Wp = e.d.warp, P = e.d.pyre, Ob = e.d.orbs, rage = bossRage(e);
   if (e.raiseC) return false; // 되살리는 주문 중 (raiseThink가 멈춰 세움)
   e.warpT = (e.warpT ?? 3) - dt; e.pyreT = (e.pyreT ?? 1.5) - dt;
   if (e.castT > 0) { e.castT -= dt; return true; } // 불기둥 부르는 동작
@@ -2519,57 +2648,81 @@ function voidThink(e, dt, d, dx, dy, see) {
   if (e.warpT <= 0 && d < 13) {
     e.warpT = Wp.rate * (rage ? 0.7 : 1) * rnd(0.85, 1.15);
     const s = blinkSpot(e, Wp.min, Wp.max, rnd(0, 6.28), true);
-    if (s) { blinkTo(e, s); e.face = Math.atan2(player.y - e.y, player.x - e.x); }
+    if (s) {
+      blinkTo(e, s); e.face = Math.atan2(player.y - e.y, player.x - e.x);
+      bossRing(e, 'orb', Ob.n + (rage ? 4 : 0), Ob.speed, bossDmg(e, Ob.dmg), rnd(0, 1));
+      if (rage) e.pyreT = Math.min(e.pyreT, 0.3);
+    }
   }
   if (e.pyreT <= 0 && d < 13) {
     e.pyreT = P.rate * (rage ? 0.7 : 1); e.castT = e.castMax = 0.6; e.face = Math.atan2(dy, dx);
-    pyrePattern(e, pick(rage ? ['cross', 'line', 'ring', 'crossring'] : ['cross', 'line', 'ring']), P.wind * (rage ? 0.8 : 1));
+    pyrePattern(e, pick(rage ? ['cross', 'line', 'ring', 'crossring', 'chase'] : ['cross', 'line', 'ring', 'chase']), P.wind * (rage ? 0.8 : 1));
     Snd.mon(e, 'attack');
     return true;
   }
   return false;
 }
-function pyrePattern(e, pat, w) {
+// 불기둥 무늬 (공허 사제·오버마인드의 pyre): cross 십자, ring 고리 (가운데는 조금 늦게), crossring 둘 다, line 보스에서 플레이어 쪽으로 한 줄,
+// chase 0.35초마다 그때 플레이어가 선 자리에 하나씩 n개 (멈추면 맞음)
+function pyrePattern(e, pat, w, n = 5) {
   const P = e.d.pyre, p = player, dmg = bossDmg(e, P.dmg);
   const add = (x, y, delay = 0) => { if (!blocksShot(x, y) && !safeAt(x, y)) pillars.push({ x, y, t: w + delay, max: w + delay, r: P.r, dmg, burn: P.burn }); };
   if (pat === 'cross' || pat === 'crossring') { add(p.x, p.y); for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2; add(p.x + Math.cos(a) * 2, p.y + Math.sin(a) * 2, 0.15); } }
   if (pat === 'ring' || pat === 'crossring') for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; add(p.x + Math.cos(a) * 2.6, p.y + Math.sin(a) * 2.6, pat === 'crossring' ? 0.5 : 0); }
   if (pat === 'ring') add(p.x, p.y, 0.45);
   if (pat === 'line') { const a = Math.atan2(p.y - e.y, p.x - e.x); for (let k = 0; k < 7; k++) add(e.x + Math.cos(a) * (1.4 + k * 1.3), e.y + Math.sin(a) * (1.4 + k * 1.3), k * 0.1); }
+  if (pat === 'chase') for (let k = 0; k < n; k++) later(k * 0.35, () => { if (!e.dead) add(player.x, player.y); });
 }
-// 처형자: 유도 미사일, 레이저 (조준선 → 쓸기 — 그동안 멈춤)
+// 레이저 (처형자·오버마인드): 조준선 wind초 (끝 무렵에는 방향이 고정됨) → dur초 동안 ±sw를 쓸고 지나감, 닿는 동안 tick초마다 피해. twin: 반대쪽에도 한 줄기
+function startLaser(e, twin) {
+  e.laser = { phase: 'aim', t: e.d.laser.wind, a: Math.atan2(player.y - e.y, player.x - e.x), sw: e.d.laser.sweep * (e.rage ? 1.35 : 1), dir: Math.random() < 0.5 ? 1 : -1, twin };
+  Snd.mon(e, 'attack');
+}
+const laserAngs = (B, a) => B.twin ? [a, a + Math.PI] : [a];
+function laserTick(e, dt) {
+  const L = e.d.laser, B = e.laser, p = player;
+  B.t -= dt; e.atkT = 0.1;
+  if (B.phase === 'aim') {
+    if (B.t > L.wind * 0.35) B.a = Math.atan2(p.y - e.y, p.x - e.x);
+    e.face = B.a;
+    if (B.t <= 0) {
+      B.phase = 'fire'; B.t = B.max = L.dur * (e.rage ? 0.8 : 1); B.cur = B.from = B.a - B.sw * B.dir; B.tick = 0;
+      B.lens = laserAngs(B, B.cur).map(a => laserLen(e, a, L.len)); Snd.play('laser', e.x, e.y);
+    }
+    return;
+  }
+  B.cur = B.from + B.sw * 2 * B.dir * (1 - Math.max(0, B.t) / B.max); e.face = B.cur;
+  const as = laserAngs(B, B.cur);
+  B.lens = as.map(a => laserLen(e, a, L.len));
+  if ((B.tick -= dt) <= 0) {
+    B.tick = L.tick;
+    const rx = p.x - e.x, ry = p.y - e.y, on = as.some((a, i) => { const ca = Math.cos(a), sa = Math.sin(a), along = rx * ca + ry * sa; return along > 0 && along < B.lens[i] && Math.abs(rx * sa - ry * ca) < 0.45 + p.r; });
+    if (on && p.dash <= 0 && hurtPlayer(bossDmg(e, L.dmg), e.x, e.y)) afflict('burn', 1);
+    Snd.play('laser', e.x, e.y);
+  }
+  if (Math.random() < dt * 30) as.forEach((a, i) => spark(e.x + Math.cos(a) * B.lens[i], e.y + Math.sin(a) * B.lens[i], 2, '#ff9070', 2));
+  if (B.t <= 0) e.laser = null;
+}
+// 처형자의 유도 미사일 n발 (플레이어 쪽 부채꼴)
+function fireMissiles(e, n) {
+  const M = e.d.missile, a0 = Math.atan2(player.y - e.y, player.x - e.x);
+  for (let k = 0; k < n; k++) { const a = a0 + (k - (n - 1) / 2) * 0.6; eshots.push({ x: e.x + Math.cos(a) * 0.8, y: e.y + Math.sin(a) * 0.8, vx: Math.cos(a) * M.speed, vy: Math.sin(a) * M.speed, type: 'rocket', dmg: bossDmg(e, M.dmg), life: M.life, home: M.turn }); }
+  Snd.play('rocket', e.x, e.y);
+}
+// 처형자: 유도 미사일, 레이저 (조준선 → 쓸기 — 그동안 멈춤, 격노하면 쌍둥이 레이저를 쏘는 순간 미사일도), 연속 돌진 베기는 chargeThink(e.d.charge)가 맡음
 function execThink(e, dt, d, dx, dy, see) {
-  const M = e.d.missile, L = e.d.laser, rage = bossRage(e), p = player;
-  const B = e.laser;
-  if (B) {
-    B.t -= dt; e.atkT = 0.1;
-    if (B.phase === 'aim') {
-      if (B.t > L.wind * 0.35) B.a = Math.atan2(p.y - e.y, p.x - e.x); // 끝 무렵에는 방향이 고정됨
-      e.face = B.a;
-      if (B.t <= 0) { B.phase = 'fire'; B.t = B.max = L.dur * (rage ? 0.8 : 1); B.from = B.a - B.sw * B.dir; B.tick = 0; Snd.play('laser', e.x, e.y); }
-      return true;
-    }
-    B.cur = B.from + B.sw * 2 * B.dir * (1 - Math.max(0, B.t) / B.max); e.face = B.cur;
-    const len = B.len = laserLen(e, B.cur, L.len), ca = Math.cos(B.cur), sa = Math.sin(B.cur);
-    if ((B.tick -= dt) <= 0) {
-      B.tick = L.tick;
-      const rx = p.x - e.x, ry = p.y - e.y, along = rx * ca + ry * sa;
-      if (along > 0 && along < len && Math.abs(rx * sa - ry * ca) < 0.45 + p.r && p.dash <= 0 && hurtPlayer(bossDmg(e, L.dmg), e.x, e.y)) afflict('burn', 1);
-      Snd.play('laser', e.x, e.y);
-    }
-    if (Math.random() < dt * 30) spark(e.x + ca * len, e.y + sa * len, 2, '#ff9070', 2);
-    if (B.t <= 0) e.laser = null;
+  const M = e.d.missile, L = e.d.laser, rage = bossRage(e);
+  if (e.laser) {
+    const aim = e.laser.phase === 'aim';
+    laserTick(e, dt);
+    if (aim && rage && e.laser && e.laser.phase === 'fire') fireMissiles(e, M.n);
     return true;
   }
+  if (e.dashT > 0 || e.windT > 0) return false; // 돌진 베기 중
   e.missT = (e.missT ?? 1.5) - dt; e.laserT = (e.laserT ?? 4) - dt;
   if (!see || d > 14) return false;
-  if (e.laserT <= 0) { e.laserT = L.rate * (rage ? 0.7 : 1); e.laser = { phase: 'aim', t: L.wind, a: Math.atan2(dy, dx), sw: L.sweep * (rage ? 1.35 : 1), dir: Math.random() < 0.5 ? 1 : -1 }; Snd.mon(e, 'attack'); return true; }
-  if (e.missT <= 0) {
-    e.missT = M.rate * (rage ? 0.75 : 1); e.atkT = ATK_ANIM; e.face = Math.atan2(dy, dx);
-    const n = M.n + (rage ? 1 : 0), a0 = Math.atan2(dy, dx);
-    for (let k = 0; k < n; k++) { const a = a0 + (k - (n - 1) / 2) * 0.6; eshots.push({ x: e.x + Math.cos(a) * 0.8, y: e.y + Math.sin(a) * 0.8, vx: Math.cos(a) * M.speed, vy: Math.sin(a) * M.speed, type: 'rocket', dmg: bossDmg(e, M.dmg), life: M.life, home: M.turn }); }
-    Snd.play('rocket', e.x, e.y);
-  }
+  if (e.laserT <= 0) { e.laserT = L.rate * (rage ? 0.7 : 1); startLaser(e, rage); return true; }
+  if (e.missT <= 0) { e.missT = M.rate * (rage ? 0.75 : 1); e.atkT = ATK_ANIM; e.face = Math.atan2(dy, dx); fireMissiles(e, M.n + (rage ? 1 : 0)); }
   return false;
 }
 // 레이저가 닿는 길이 (벽까지, 최대 max칸)
@@ -2590,31 +2743,45 @@ function updateWaves(dt) {
   }
   waves = waves.filter(w => w.r < w.max);
 }
-// 보스 예고·효과 (조명 위에 그려 어둠 속에서도 보임): 파쇄 짐승의 돌진 경로, 처형자의 조준선·레이저, 충격파
+// 보스 예고·효과 (조명 위에 그려 어둠 속에서도 보임): 돌진 경로 (파쇄 짐승·처형자), 도약해 내려앉을 곳, 독액을 토할 부채꼴, 조준선·레이저 (처형자·오버마인드), 충격파
 function drawBossFx() {
   for (const e of enemies) {
-    if (e.dead || !e.d.boss || !canSee(e.x, e.y)) continue;
+    if (e.dead || !e.d.boss || !(e.aggro || canSee(e.x, e.y))) continue; // 싸우는 보스의 예고는 보스가 어둠 속에 있어도 보임
     const C = e.d.charge;
     if (C && e.windT > 0) { // 돌진 경로: 붉은 띠 (웅크리는 동안 차오름)
-      const a = Math.atan2(player.y - e.y, player.x - e.x), ca = Math.cos(a), sa = Math.sin(a), k = 1 - e.windT / C.wind;
+      const a = Math.atan2(player.y - e.y, player.x - e.x), ca = Math.cos(a), sa = Math.sin(a), k = 1 - e.windT / (e.windMax || C.wind);
       let L = e.r; while (L < C.speed * C.dur && !blocksShot(e.x + ca * L, e.y + sa * L)) L += 0.25;
       const w = e.r * 0.9, px = -sa * w, py = ca * w, P = (x, y) => [PX(x, y), PY(x, y)];
       const q = [P(e.x + px, e.y + py), P(e.x + ca * L + px, e.y + sa * L + py), P(e.x + ca * L - px, e.y + sa * L - py), P(e.x - px, e.y - py)];
       ctx.beginPath(); q.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath();
       ctx.fillStyle = `rgba(255,40,30,${0.12 + 0.22 * k})`; ctx.fill();
     }
+    if (e.leapTo) { // 파쇄 짐승의 도약: 내려앉을 곳 (안쪽이 차오르는 붉은 원)
+      const Lp = e.d.leap, k = clamp(1 - (e.leapW > 0 ? e.leapW + Lp.dur : e.leapT) / (Lp.wind + Lp.dur), 0, 1);
+      ctx.fillStyle = 'rgba(255,40,30,0.12)'; isoEllipse(e.leapTo.x, e.leapTo.y, Lp.r); ctx.fill();
+      ctx.fillStyle = `rgba(255,70,30,${0.15 + 0.3 * k})`; isoEllipse(e.leapTo.x, e.leapTo.y, Lp.r * (0.3 + 0.7 * k)); ctx.fill();
+    }
+    const Vm = e.vomit;
+    if (Vm && Vm.phase === 'wind') { // 역병 거인: 독액을 토할 부채꼴 (옅은 초록, 차오름)
+      const V = e.d.vomit, sw = V.sweep * (e.rage ? 1.3 : 1), k = 1 - Vm.t / V.wind;
+      ctx.beginPath(); ctx.moveTo(PX(e.x, e.y), PY(e.x, e.y));
+      for (let s = 0; s <= 12; s++) { const a = Vm.a - sw + sw * 2 * s / 12, x = e.x + Math.cos(a) * 6, y = e.y + Math.sin(a) * 6; ctx.lineTo(PX(x, y), PY(x, y)); }
+      ctx.closePath(); ctx.fillStyle = `rgba(150,230,60,${0.08 + 0.2 * k})`; ctx.fill();
+    }
     const B = e.laser;
-    if (B) { // 처형자: 조준선 → 레이저
-      const a = B.phase === 'aim' ? B.a : B.cur, len = B.phase === 'aim' ? laserLen(e, a, e.d.laser.len) : B.len || 1, ex = e.x + Math.cos(a) * len, ey = e.y + Math.sin(a) * len;
-      const x0 = PX(e.x, e.y), y0 = PY(e.x, e.y) - 62, x1 = PX(ex, ey), y1 = PY(ex, ey) - 24;
-      ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1);
-      if (B.phase === 'aim') { ctx.strokeStyle = `rgba(255,40,30,${0.35 + 0.35 * Math.sin(gtime * 40)})`; ctx.lineWidth = 1.5; ctx.stroke(); }
-      else {
-        ctx.strokeStyle = 'rgba(255,60,40,0.35)'; ctx.lineWidth = 12; ctx.stroke();
-        ctx.strokeStyle = 'rgba(255,120,90,0.8)'; ctx.lineWidth = 5; ctx.stroke();
-        ctx.strokeStyle = 'rgba(255,240,220,0.95)'; ctx.lineWidth = 2; ctx.stroke();
-      }
-      ctx.lineCap = 'butt'; ctx.lineWidth = 1;
+    if (B) { // 처형자·오버마인드: 조준선 → 레이저 (twin: 반대쪽에도)
+      const L = e.d.laser, x0 = PX(e.x, e.y), y0 = PY(e.x, e.y) - (L.z || 62);
+      laserAngs(B, B.phase === 'aim' ? B.a : B.cur).forEach((a, i) => {
+        const len = B.phase === 'aim' ? laserLen(e, a, L.len) : B.lens[i], ex = e.x + Math.cos(a) * len, ey = e.y + Math.sin(a) * len, x1 = PX(ex, ey), y1 = PY(ex, ey) - 24;
+        ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1);
+        if (B.phase === 'aim') { ctx.strokeStyle = `rgba(255,40,30,${0.35 + 0.35 * Math.sin(gtime * 40)})`; ctx.lineWidth = 1.5; ctx.stroke(); }
+        else {
+          ctx.strokeStyle = 'rgba(255,60,40,0.35)'; ctx.lineWidth = 12; ctx.stroke();
+          ctx.strokeStyle = 'rgba(255,120,90,0.8)'; ctx.lineWidth = 5; ctx.stroke();
+          ctx.strokeStyle = 'rgba(255,240,220,0.95)'; ctx.lineWidth = 2; ctx.stroke();
+        }
+        ctx.lineCap = 'butt'; ctx.lineWidth = 1;
+      });
     }
   }
   for (const w of waves) { // 충격파: 퍼지는 고리 (퍼질수록 엷어짐)
@@ -5178,7 +5345,10 @@ function chargeThink(e, dt, d, dx, dy, see) {
     } else if (Math.hypot(e.x - ox, e.y - oy) < C.speed * dt * 0.3) { // 벽에 박음
       e.dashT = 0; e.stun = C.stun; shake = Math.max(shake, 4); spark(e.x, e.y, 8, '#ffd27a', 3); Snd.play('meleeHit', e.x, e.y);
     }
-    if (e.dashT <= 0) e.chargeCd = C.cd * (e.atkMul || 1);
+    if (e.dashT <= 0) {
+      if (e.chainN > 0 && !(e.stun > 0)) { e.chainN--; e.windT = e.windMax = C.wind * C.chainWind; Snd.mon(e, 'attack'); } // 보스의 이어 돌진: 벽에 박히지 않았으면 곧바로 다시 웅크림
+      else e.chargeCd = C.cd * (e.atkMul || 1);
+    }
     return true;
   }
   if (e.windT > 0) {
@@ -5186,11 +5356,11 @@ function chargeThink(e, dt, d, dx, dy, see) {
     if (e.windT <= 0) { e.cdx = dx / d; e.cdy = dy / d; e.dashT = C.dur; e.hitDone = false; }
     return true;
   }
-  if (see && e.chargeCd <= 0 && d > 1.5 && d < C.range) { e.windT = C.wind; Snd.mon(e, 'sight'); return true; }
+  if (see && e.chargeCd <= 0 && d > 1.5 && d < C.range) { e.windT = e.windMax = C.wind; e.chainN = C.chain ? C.chain[e.rage ? 1 : 0] : 0; Snd.mon(e, 'sight'); return true; } // chain: 보스가 이어 돌진하는 횟수 [보통, 격노]
   return false;
 }
 // 도약: (dx, dy) 쪽으로 dur초 동안 v칸/초로 뛰어오름 (높이 h px, 그림자는 바닥에 남음)
-// kind: hop(크롤러의 깡충 이동) · pounce(덮치기) · dodge(제노이드가 옆으로 피하기)
+// kind: hop(크롤러의 깡충 이동) · pounce(덮치기) · dodge(제노이드가 옆으로 피하기) · quake(파쇄 짐승의 도약 — 내려앉으며 충격파)
 function startLeap(e, dx, dy, v, dur, h, kind) {
   const l = Math.hypot(dx, dy) || 1;
   e.ldx = dx / l; e.ldy = dy / l; e.leapV = v; e.leapT = e.leapDur = dur; e.leapH = h; e.leapKind = kind;
@@ -5204,6 +5374,7 @@ function leapStep(e, dt) {
   if (e.leapT > 0) return;
   e.leapT = 0; e.z = 0;
   if (e.leapKind !== 'hop') smoke(e.x, e.y, 3, '110,100,90', 0.6); // 크게 뛴 뒤 착지 먼지
+  if (e.leapKind === 'quake') quakeLand(e);
 }
 // 옆으로 피하기: 플레이어 쪽에서 볼 때 왼쪽·오른쪽 중 막히지 않은 쪽으로, 조금 다가가며 (지그재그로 접근). 날아오던 자동 조준 탄은 목표를 잃고 직진
 function dodge(e) {
@@ -5603,7 +5774,7 @@ function updateProjectiles(dt) {
   for (const g of grenades) {
     g.t += dt; const k = Math.min(1, g.t / g.dur);
     g.x = g.sx + (g.tx - g.sx) * k; g.y = g.sy + (g.ty - g.sy) * k; g.z = Math.sin(k * Math.PI) * (g.arc || 50) + (g.z0 ?? 14) * (1 - k);
-    if (k >= 1) { g.dead = true; if (g.type === 'acid') acidSplash(g); else explode(g.type, g.x, g.y, g.scale || 1, g.own ? 1 + perkV('blast') : 1); } // scale: 벌집의 작은 폭탄, acid: 역병 거인의 독액
+    if (k >= 1) { g.dead = true; if (g.type === 'acid') acidSplash(g); else if (g.type === 'blast') shotImpact({ type: 'rocket', x: g.x, y: g.y, dmg: g.dmg }); else explode(g.type, g.x, g.y, g.scale || 1, g.own ? 1 + perkV('blast') : 1); } // scale: 벌집의 작은 폭탄, acid: 보스의 독액, blast: 타이탄의 포격 로켓 (로켓 폭발과 같음)
   }
   grenades = grenades.filter(g => !g.dead);
 
@@ -6832,12 +7003,13 @@ function render() {
   for (const g of grenades) {
     const sx = PX(g.x, g.y), sy = PY(g.x, g.y);
     ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(sx, sy, 5, 2.5, 0, 0, Math.PI * 2); ctx.fill();
-    if (g.warn) { // 폭발하는 정예가 남긴 폭탄·역병 거인의 독액: 떨어질(터질) 곳을 깜박이는 옅은 원으로 예고 (테두리 없음)
+    if (g.warn) { // 폭발하는 정예가 남긴 폭탄·보스가 던지는 것: 떨어질(터질) 곳을 깜박이는 옅은 원으로 예고 (테두리 없음)
       const a = 0.1 + 0.08 * Math.sin(gtime * 16);
       ctx.fillStyle = g.type === 'acid' ? `rgba(150,230,60,${a})` : `rgba(255,60,40,${a})`; isoEllipse(g.tx, g.ty, g.warnR || 2.7); ctx.fill();
     }
     if (g.type === 'pod') drawSprite('bosf', 'abcd'[Math.floor(gtime * 8) % 4], sx, sy - g.z, 0, 0.8); // 오버마인드의 포자
-    else if (g.type === 'acid') drawSprite('bal7', Math.floor(gtime * 10) % 2 ? 'b' : 'a', sx, sy - g.z, 0, 1.4); // 역병 거인의 독액 덩어리
+    else if (g.type === 'acid') drawSprite('bal7', Math.floor(gtime * 10) % 2 ? 'b' : 'a', sx, sy - g.z, 0, 1.4); // 보스의 독액 덩어리
+    else if (g.type === 'blast') drawSprite('misl', 'a', sx, sy - g.z, Math.atan2(g.ty - g.sy, g.tx - g.sx), 0.9); // 타이탄의 포격 로켓
     else drawFrame('icon_gren_' + g.type, sx, sy - g.z, 0.6 * Math.min(1, (g.scale || 1) * 1.4));
   }
   for (const q of parts) drawParticle(q);
