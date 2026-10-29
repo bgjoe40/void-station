@@ -5934,13 +5934,13 @@ function drawCrate(i, j) {
   if (dmg > 0) { ctx.fillStyle = `rgba(0,0,0,${dmg * 0.4})`; ctx.fillRect(0, 0, top.width, top.height); }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
-// 자동문: 열릴수록 아랫부분부터 천장으로 올라감 (Doom식). 보안문은 양 끝에 색 표시등, 윗면도 그 색
+// 자동문: 열릴수록 아랫부분부터 천장으로 올라감 (Doom식). 보안문은 양 끝에 키카드 색 표시등, 윗면도 그 색 — 봉쇄 격벽·금고 문은 색 없는 문틀 (키카드 문과 헷갈리지 않게)
 function drawDoor(i, j) {
   const k = j * MW + i, d = doors[doorOf[k]], tex = (d.key === 'vault' && ART.tex.wall_bronze1) || ART.tex.wall_bigdoor2; // 금고 문은 청동
   if (!tex || d.open >= 0.99) return;
   const b = WALLH * d.open, h = WALLH - b, v0 = tex.height * d.open, vh = tex.height - v0;
   const same = (ii, jj) => tileAt(ii, jj) === T.DOOR && doorOf[jj * MW + ii] === doorOf[k];
-  const strip = (d.key && ART.tex[KEYCARDS[d.key].tex]) || (d.gate && ART.tex.wall_doorred), SW = 0.22; // 보안문 색 표시등, 봉쇄 격벽은 붉게
+  const strip = d.key && d.key !== 'vault' ? ART.tex[KEYCARDS[d.key].tex] : (d.gate || d.key === 'vault') && ART.tex.wall_doortrak, SW = 0.22; // 보안문은 키카드 색 표시등, 봉쇄 격벽·금고 문은 문틀
   if (!same(i, j + 1) && !isWallT(tileAt(i, j + 1))) {
     texFace(tex, PX(i, j + 1), PY(i, j + 1) - b, TW / 2, TH / 2, (i * 64) % tex.width, v0, vh, h, 0.1);
     if (strip && !same(i - 1, j)) stripFace(strip, i, j + 1, i + SW, j + 1, b, d.open, 0.1);
@@ -5954,7 +5954,7 @@ function drawDoor(i, j) {
   diamond(PX(i, j), PY(i, j) - WALLH);
   ctx.fillStyle = '#262a30'; ctx.fill();
   if (d.key) { ctx.fillStyle = `rgba(${KEYCARDS[d.key].rgb},${d.locked ? 0.55 : 0.25})`; ctx.fill(); }
-  else if (d.gate) { ctx.fillStyle = `rgba(255,110,40,${0.45 + 0.2 * Math.sin(gtime * 4)})`; ctx.fill(); }
+  else if (d.gate) { ctx.fillStyle = `rgba(255,130,20,${0.45 + 0.2 * Math.sin(gtime * 4)})`; ctx.fill(); } // 봉쇄 격벽: 깜박이는 주황
   ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.stroke();
 }
 // 좁은 텍스처를 월드 (x0, y0)→(x1, y1) 구간의 문 면에 세워 붙임 (b: 올라간 높이, open: 열린 비율)
@@ -7215,9 +7215,9 @@ const mapSeen = new Uint8Array(MW * MH), mapC = document.createElement('canvas')
 mapC.width = (MW + MH) * MM + 4; mapC.height = (MW + MH) * MM / 2 + 4;
 let mapBig = false;
 const mmX = (x, y) => (x - y) * MM + MH * MM + 2, mmY = (x, y) => (x + y) * MM / 2 + 2;
-const MAP_COL = { [T.FLOOR]: '#3b4350', [T.EXIT]: '#3b4350', [T.WALL]: '#8c929c', [T.CRATE]: '#5a5f66', [T.PIPEX]: '#7a4a2a', [T.PIPEY]: '#7a4a2a', [T.TERM]: '#5a8fd0', [T.DOOR]: '#e0a040' };
+const MAP_COL = { [T.FLOOR]: '#3b4350', [T.EXIT]: '#3b4350', [T.WALL]: '#8c929c', [T.CRATE]: '#5a5f66', [T.PIPEX]: '#7a4a2a', [T.PIPEY]: '#7a4a2a', [T.TERM]: '#5a8fd0', [T.DOOR]: '#c4cad4' }; // 문은 밝은 회색 (노란 보안문과 헷갈리지 않게)
 function revealTile(k) {
-  const d = tiles[k] === T.DOOR && doors[doorOf[k]], col = d && d.key ? KEYCARDS[d.key].color : d && d.gate ? '#ff6a3a' : MAP_COL[tiles[k]]; // 보안문은 그 색, 봉쇄 격벽은 주황
+  const d = tiles[k] === T.DOOR && doors[doorOf[k]], col = d && d.key === 'vault' ? '#b07a3c' : d && d.key ? KEYCARDS[d.key].color : d && d.gate ? '#ff8a1a' : MAP_COL[tiles[k]]; // 보안문은 그 키카드 색, 금고 문은 청동, 봉쇄 격벽은 주황
   mapSeen[k] = 1;
   if (!col) return;
   const i = k % MW, j = (k / MW) | 0, x = mmX(i, j), y = mmY(i, j);

@@ -110,7 +110,7 @@ DERIVED = {'bspr': ('bspi', 0.9),   # 질주 크롤러 (붉은 크롤러)
 # 벽 텍스처(패치 합성)와 바닥 텍스처(flat)
 WALL_TEX = ['STARTAN2', 'STARBR2', 'STARG3', 'STARGR1', 'TEKWALL1', 'METAL2', 'SUPPORT3', 'BROWN96', 'BRONZE1',
             'COMPTALL', 'COMPWERD', 'COMPSTA1', 'SPACEW3', 'SILVER2', 'PIPE4', 'BROWNPIP', 'CRATE2', 'BIGDOOR2',
-            'DOORBLU', 'DOORYEL', 'DOORRED']  # 보안문 양 끝 색 표시등
+            'DOORBLU', 'DOORYEL', 'DOORRED', 'DOORTRAK']  # 보안문 양 끝 색 표시등, 색 없는 문틀 (봉쇄 격벽·금고 문)
 FLATS = ['aqf001', 'aqf029', 'aqf031', 'floor7_1', 'aqf004', 'floor0_6', 'aqf051', 'floor0_5', 'flat5_4', 'flat4',
          'aqf027', 'aqf026', 'ceil3_5', 'mflr8_1', 'aqf072', 'aqf045', 'floor5_1', 'aqf007', 'floor4_8', 'aqf005',
          'ceil5_1', 'gate4', 'cratop2', 'flat14', 'flat19']
