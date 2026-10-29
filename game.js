@@ -1700,9 +1700,9 @@ function fillRoom(r, budget, pool, lv = level) {
 function spawnEnemy(type, x, y, lv) { const e = makeEnemy(type, x, y, lv); if (e.d.ceiling) e.ceil = true; enemies.push(e); return e; } // 매복자는 천장에 붙은 채로
 const hiddenE = e => !!(e.ceil || e.under || e.riseT > 0); // 천장의 매복자·땅속의 굴착자: 보이지 않고 맞지 않음 (자동 조준·폭발·근접 모두)
 function makeEnemy(type, x, y, lv = level) { // lv: 강함의 기준 구역
-  const d = ENEMIES[type], m = (1 + ENEMY_GROW.hp * (lv - 1)) * DIFFICULTY[difficulty].hp * curveAt(d.boss ? CURVE.boss : CURVE.hp, lv); // 앞 구역: 난이도 곡선
+  const d = ENEMIES[type], m = (1 + ENEMY_GROW.hp * (lv - 1)) * DIFFICULTY[difficulty].hp * curveAt(d.boss ? CURVE.boss : CURVE.hp, lv) * (d.boss ? BOSS_BOOST.hp : 1); // 앞 구역: 난이도 곡선, 보스는 더
   return {
-    type, d, lv, x, y, r: d.r, hp: d.hp * m, maxhp: d.hp * m, dmg: d.dmg * lvDmg(lv), fly: !!d.fly,
+    type, d, lv, x, y, r: d.r, hp: d.hp * m, maxhp: d.hp * m, dmg: d.dmg * lvDmg(lv) * (d.boss ? BOSS_BOOST.dmg : 1), fly: !!d.fly,
     aggro: false, acd: 0, rcd: rnd(0.5, 2), face: rnd(0, 6.28), anim: rnd(0, 10),
     stun: 0, freeze: 0, slow: 0, burn: 0, poison: 0, flash: 0, kx: 0, ky: 0, strafe: Math.random() < 0.5 ? 1 : -1, wander: 0, wx: 0, wy: 0,
     atkT: 0, painT: 0, moving: false, // 스프라이트 동작: 공격, 피격, 걷기
@@ -1906,7 +1906,7 @@ function hitEnemy(e, dmg, kx = 0, ky = 0, silent = false, crit = false, guard = 
 // 전기를 품은 정예: 맞을 때마다 (대기시간마다) 전기 불꽃 n개가 사방으로 — 맞으면 감전
 function eliteSpark(e) {
   const S = ELITE_FX.spark; e.sparkCd = S.cd;
-  for (let k = 0; k < S.n; k++) { const a = rnd(0, 6.28); eshots.push({ x: e.x, y: e.y, vx: Math.cos(a) * S.speed, vy: Math.sin(a) * S.speed, type: 'shock', dmg: S.dmg * lvDmg(e.lv), life: S.life }); }
+  for (let k = 0; k < S.n; k++) { const a = rnd(0, 6.28); eshots.push({ x: e.x, y: e.y, vx: Math.cos(a) * S.speed, vy: Math.sin(a) * S.speed, type: 'shock', dmg: S.dmg * foeDmg(e), life: S.life }); }
   spark(e.x, e.y, 6, '#9ee8ff', 3); Snd.play('zap', e.x, e.y);
 }
 // 무기 명중: 치명타·속성 옵션·고유 효과·파츠 적용 (force: 반드시 치명타). 방패에 막혔으면 'block'
@@ -2332,7 +2332,7 @@ let boss = null; // 지금 싸우는 보스 (체력 막대)
 const bossKindFor = lv => lv >= CAMPAIGN.length ? 'overmind' : lv % BOSS_EVERY ? null : (lv / BOSS_EVERY) % 2 === 1 ? 'titan' : 'hivemother';
 function bossThink(e, dt, d, dx, dy, see, spawned) { // 이번 프레임의 움직임을 직접 처리했으면 true (구역 보스의 돌진·주문·레이저 중)
   if (BOSS_AI[e.d.boss]) return BOSS_AI[e.d.boss](e, dt, d, dx, dy, see, spawned);
-  const p = player, m = lvDmg(e.lv), a0 = Math.atan2(dy, dx); // 타이탄·하이브 마더·오버마인드 공격 피해 배율 (구역·난이도 곡선)
+  const p = player, m = foeDmg(e), a0 = Math.atan2(dy, dx); // 타이탄·하이브 마더·오버마인드 공격 피해 배율 (구역·난이도 곡선)
   if (e.d.boss === 'titan') {
     // 로켓 3연발
     e.volleyT = (e.volleyT ?? 1.5) - dt;
@@ -2406,7 +2406,8 @@ function bossThink(e, dt, d, dx, dy, see, spawned) { // 이번 프레임의 움�
   }
 }
 // ===== 구역 보스 (REGION_BOSSES): 체력이 절반 밑이면 격노 — 빨라지고 공격이 잦아짐 =====
-const bossDmg = (e, v) => v * lvDmg(e.lv);
+const foeDmg = e => lvDmg(e.lv) * (e.d.boss ? BOSS_BOOST.dmg : 1); // 적 공격의 피해 배율 (구역·난이도 곡선, 보스는 더)
+const bossDmg = (e, v) => v * foeDmg(e);
 function bossRage(e) {
   e.rage = e.hp < e.maxhp * 0.5;
   if (e.rage && !e.raged) { e.raged = true; msg(`${e.d.name} 격노!`, '#ff6a4a'); Snd.mon(e, 'sight'); flashes.push({ x: e.x, y: e.y, r: 420, t: 0.4, max: 0.4, col: '255,80,50' }); shake = Math.max(shake, 6); }
@@ -3135,7 +3136,7 @@ const makeUniqueShell = id => buildShell(id, 4, SHELL_UNIQUES[id].affixes.map(a 
 // chance 확률로 이 구역에서 나올 수 있는 스킬의 고유 전설 쉘, 아니면 null
 function uniqueShellDrop(chance) {
   const ids = Object.keys(SHELL_UNIQUES).filter(k => SKILLS[k].from <= level + 1);
-  return ids.length && Math.random() < chance ? makeUniqueShell(pick(ids)) : null;
+  return ids.length && Math.random() < chance * UNIQUE_RATE ? makeUniqueShell(pick(ids)) : null;
 }
 // 옵션 하나 (높은 등급일수록 좋은 수치)
 function rollShellAffix(rarity, k) {
@@ -3820,7 +3821,7 @@ const makeUnique = key => buildWeapon(UNIQUES[key].base, 4, UNIQUES[key].affixes
 // chance 확률로 이 구역에서 나올 수 있는 고유 전설 하나 (바탕 무기가 나오는 구역부터), 아니면 null
 function uniqueDrop(chance) {
   const keys = Object.keys(UNIQUES).filter(k => WEAPONS[UNIQUES[k].base].minLvl <= level + 1);
-  return keys.length && Math.random() < chance ? makeUnique(pick(keys)) : null;
+  return keys.length && Math.random() < chance * UNIQUE_RATE ? makeUnique(pick(keys)) : null;
 }
 // 판매 기준 가치
 const basePrice = inst => (inst.kind === 'armor' ? ARMORS[inst.id].price : WEAPONS[inst.id].price) || 120;
@@ -4146,7 +4147,7 @@ function watcherThink(e, dt, d, dx, dy, see) {
   e.castCd = (e.castCd ?? rnd(0.8, 1.8)) - dt;
   if (!see || d > P.range || e.castCd > 0) return;
   e.castCd = P.rate * rnd(0.85, 1.15) * (e.atkMul || 1); e.castT = e.castMax = P.wind + 0.15;
-  pillars.push({ x: player.x, y: player.y, t: P.wind, max: P.wind, r: P.r, dmg: P.dmg * lvDmg(e.lv) * eliteDmg(e), burn: P.burn, owner: e });
+  pillars.push({ x: player.x, y: player.y, t: P.wind, max: P.wind, r: P.r, dmg: P.dmg * foeDmg(e) * eliteDmg(e), burn: P.burn, owner: e });
   Snd.mon(e, 'attack'); tip('watcher');
 }
 function updatePillars(dt) {
@@ -5088,7 +5089,7 @@ function updatePlayer(dt) {
   if (buff('iron')) p.kx = p.ky = 0; // 강철 피부: 밀려나지 않음
   moveEntity(p, p.kx * dt, p.ky * dt); p.kx *= Math.max(0, 1 - dt * 8); p.ky *= Math.max(0, 1 - dt * 8);
   p.moving = !!(sx || sy); if (p.moving) p.walk += dt * spd * 2.4;
-  if (p.moving && p.dash <= 0) { const st = Math.floor(p.walk * 0.3); if (st !== p.stepN) { p.stepN = st; Snd.play('step'); } } // 발소리 (걷기 초당 약 3번, 달리면 더 빨리)
+  if (p.moving && p.dash <= 0) { const st = Math.floor(p.walk * 0.3); if (st !== p.stepN) { p.stepN = st; Snd.play('step'); if (p.sprinting) runDust(p); } } // 발소리 (걷기 초당 약 3번, 달리면 더 빨리 + 발자국 먼지)
 
   const m = screenToWorld(mouse.x, mouse.y + 14);
   p.aim = Math.atan2(m.y - p.y, m.x - p.x);
@@ -5156,7 +5157,7 @@ function updatePlayer(dt) {
 
 // 몬스터 원거리 공격 한 발 (구역이 깊을수록 피해 증가)
 function enemyShot(e, R, a) {
-  eshots.push({ x: e.x, y: e.y, vx: Math.cos(a) * R.speed, vy: Math.sin(a) * R.speed, type: R.type, dmg: R.dmg * lvDmg(e.lv), life: R.range / R.speed + 0.3 });
+  eshots.push({ x: e.x, y: e.y, vx: Math.cos(a) * R.speed, vy: Math.sin(a) * R.speed, type: R.type, dmg: R.dmg * foeDmg(e), life: R.range / R.speed + 0.3 });
 }
 // 난사하는 정예면 양옆으로 한 발씩 더
 function enemyShots(e, R, a) { enemyShot(e, R, a); if (e.multi) { const s = ELITE_FX.multi.spread; enemyShot(e, R, a - s); enemyShot(e, R, a + s); } }
@@ -5247,7 +5248,7 @@ function bombThink(e, dt, d, see) {
 }
 // 폭주 해골이 터짐 (k: 피해 배율 — 쏘아 떨어뜨렸으면 약하고 좁게): 플레이어·생존자·설치물·다른 적 모두, 가까울수록 크게
 function bombBlast(e, k) {
-  const B = e.d.bomb, R = B.r * (k < 1 ? 0.8 : 1), dmg = B.dmg * lvDmg(e.lv) * k * eliteDmg(e), x = e.x, y = e.y, f = d => 1 - Math.min(1, d / R) * 0.5;
+  const B = e.d.bomb, R = B.r * (k < 1 ? 0.8 : 1), dmg = B.dmg * foeDmg(e) * k * eliteDmg(e), x = e.x, y = e.y, f = d => 1 - Math.min(1, d / R) * 0.5;
   const pd = Math.hypot(player.x - x, player.y - y);
   if (pd < R) hurtPlayer(dmg * f(pd), x, y);
   for (const v of survivors) { const dv = Math.hypot(v.x - x, v.y - y); if (dv < R) hurtSurvivor(v, dmg * f(dv), x, y); }
@@ -6053,21 +6054,31 @@ const ENEMY_ART = {
   burrower: { spr: 'tbur', scale: 1, walk: 'abcd', attack: 'efg', pain: 'h', death: 'ijklm' },        // 흙빛 제노이드 (색 변종) — 땅속을 파고 다님
   warden:   { spr: 'fskw', scale: 0.75, walk: 'abc', attack: 'abc', pain: 'a', death: 'a', z: 34, idle: 8 }, // 푸른 기계 해골 (색 변종) — 보호막을 씌움
 };
+// 달리기 발자국 먼지: 발밑에서 뒤쪽으로 흩어지는 작은 흙먼지
+function runDust(p) {
+  for (let k = 0; k < 5; k++) parts.push({ x: p.x - p.mvx * 0.2 + rnd(-0.12, 0.12), y: p.y - p.mvy * 0.2 + rnd(-0.12, 0.12), z: 1, vx: -p.mvx * rnd(0.4, 1.2) + rnd(-0.5, 0.5), vy: -p.mvy * rnd(0.4, 1.2) + rnd(-0.5, 0.5), vz: rnd(15, 40), g: 90, life: rnd(0.3, 0.5), max: 0.5, col: pick(['#8a8272', '#a49a88', '#6e675a']), size: 2 });
+}
 function drawPlayer() {
   const p = player, sx = PX(p.x, p.y), sy = PY(p.x, p.y), w = curW().s;
   drawShadow(p.x, p.y, 0.3);
   if (p.fx.curse > 0) { ctx.strokeStyle = `rgba(150,90,255,${0.5 + 0.3 * Math.sin(gtime * 8)})`; ctx.lineWidth = 2; isoEllipse(p.x, p.y, 0.5); ctx.stroke(); ctx.lineWidth = 1; } // 저주: 발밑에 보라 고리
   const face = w.type === 'gun' && p.target && !p.target.dead ? Math.atan2(p.target.y - p.y, p.target.x - p.x) : p.aim;
   let fr = 'a';
+  const run = p.moving && p.sprinting && state !== 'dead';
   if (state === 'dead') fr = 'hijklmn'[Math.min(6, Math.floor(p.deathT / 0.12))];
   else if (p.painT > 0) fr = 'g';
   else if (p.fireT > 0) fr = p.fireT > 0.07 ? 'f' : 'e';
-  else if (p.moving) fr = 'abcd'[Math.floor(p.walk * 0.7) % 4];
+  else if (p.moving) fr = run ? 'bd'[Math.floor(p.walk * 0.7) % 2] : 'abcd'[Math.floor(p.walk * 0.7) % 4]; // 달리기: 보폭이 큰 두 그림만 번갈아
   ctx.globalAlpha = p.dash > 0 ? 0.55 : buff('cloak') ? 0.25 + 0.08 * Math.sin(gtime * 6) : 1; // 은신: 거의 투명
   if (p.hitT > 0) ctx.filter = 'sepia(1) saturate(7) hue-rotate(-50deg) brightness(1.15)'; // 맞은 순간 붉게
   else if (buff('berserk')) ctx.filter = 'sepia(0.8) saturate(3) hue-rotate(-30deg) brightness(1.1)'; // 광폭화: 붉은 기운
   else if (buff('iron')) ctx.filter = 'grayscale(1) brightness(1.3) contrast(1.25)'; // 강철 피부: 금속빛
-  drawSprite('play', fr, sx, sy, face);
+  if (run) { // 달리기: 가는 쪽으로 몸을 기울이고 보폭마다 살짝 튀어 오름
+    const dx = p.mvx - p.mvy, dy = (p.mvx + p.mvy) / 2, lean = -0.12 * dx / (Math.hypot(dx, dy) || 1), hop = Math.round(Math.abs(Math.sin(p.walk * 0.7 * Math.PI)) * 2);
+    ctx.save(); ctx.translate(sx, sy); ctx.transform(1, 0, lean, 1, 0, 0); ctx.translate(-sx, -sy - hop);
+    drawSprite('play', fr, sx, sy, face);
+    ctx.restore();
+  } else drawSprite('play', fr, sx, sy, face);
   ctx.filter = 'none'; ctx.globalAlpha = 1;
   // 근접 휘두르기 궤적 (진압봉은 푸른빛, 플라즈마 블레이드는 굵은 청록, 체인톱은 앞쪽에 떨리는 톱니)
   if (w.type === 'melee' && p.swing > 0) {
@@ -6907,6 +6918,13 @@ function render() {
     g.addColorStop(0, 'rgba(235,245,255,0.95)'); g.addColorStop(0.45, `rgba(130,165,255,${0.55 + 0.35 * k})`); g.addColorStop(1, 'rgba(80,120,255,0)');
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(mx, my, r, 0, Math.PI * 2); ctx.fill();
   }
+  if (hudFx.stamA > 0 && !scene && !cine && state !== 'dead') { // 스태미너 막대: 화면 가운데 캐릭터 발밑 (바닥나면 붉게 깜박)
+    const bw = 32, bh = 3, bx = Math.round(psx - bw / 2), by = Math.round(psy + 9);
+    ctx.globalAlpha = hudFx.stamA;
+    ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(bx - 1, by - 1, bw + 2, bh + 2);
+    ctx.fillStyle = p.exhausted ? (Math.sin(gtime * 10) > 0 ? '#e64' : '#833') : '#cd4'; ctx.fillRect(bx, by, Math.round(bw * clamp(p.stamina / staminaMax(), 0, 1)), bh);
+    ctx.globalAlpha = 1;
+  }
   ctx.restore(); ctx = mainCtx; W = W0; VH = VH0;
   ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, VH); ctx.clip();
   ctx.imageSmoothingEnabled = false; ctx.drawImage(worldC, 0, 0, VW * Z, VVH * Z); ctx.imageSmoothingEnabled = true;
@@ -7481,7 +7499,7 @@ function pxRate(v, x, y, col) {
   }
 }
 function pxSegBar(x, y, n, sw, sh, frac, col) { for (let k = 0; k < n; k++) { ctx.fillStyle = (k + 0.5) / n <= frac ? col : 'rgba(255,255,255,0.08)'; ctx.fillRect(x + k * (sw + 1) * Z, y, sw * Z, sh * Z); } }
-const hudFx = { slot: -1, name: 0, xp: -1, xpT: 0, dashCd: 0, dashReady: 0, dashDeny: 0 }; // 무기를 바꾼 직후 이름이 보일 시간, 경험치를 얻은 직후 밝게 보일 시간, 회피가 다 차오른 순간·대기 중에 누른 순간의 번쩍임 (초)
+const hudFx = { slot: -1, name: 0, xp: -1, xpT: 0, dashCd: 0, dashReady: 0, dashDeny: 0, stamA: 0 }; // 무기를 바꾼 직후 이름이 보일 시간, 경험치를 얻은 직후 밝게 보일 시간, 회피가 다 차오른 순간·대기 중에 누른 순간의 번쩍임 (초)
 function hudTick(dt) {
   const p = player; if (!p) return;
   if (hudFx.slot !== p.slot) { if (hudFx.slot >= 0) hudFx.name = 2.5; hudFx.slot = p.slot; }
@@ -7489,6 +7507,7 @@ function hudTick(dt) {
   hudFx.name = Math.max(0, hudFx.name - dt); hudFx.xpT = Math.max(0, hudFx.xpT - dt);
   if (hudFx.dashCd > 0 && p.dashCd <= 0) hudFx.dashReady = 0.4; // 회피가 다시 찼음
   hudFx.dashCd = p.dashCd; hudFx.dashReady = Math.max(0, hudFx.dashReady - dt); hudFx.dashDeny = Math.max(0, hudFx.dashDeny - dt);
+  hudFx.stamA = p.stamina < staminaMax() - 0.01 ? 1 : Math.max(0, hudFx.stamA - dt * 2.5); // 스태미너 막대: 쓰거나 차오르는 동안 보이고, 다 차면 서서히 사라짐
 }
 // 화면 가장자리 빛: 가운데(화면 반지름의 r0배)는 맑고 모서리로 갈수록 col (화면 비율의 타원)
 function edgeGlow(col, a, r0) {
@@ -7512,7 +7531,7 @@ function drawZoneCard() {
 }
 function drawHUD() {
   const p = player, U = Z, m = HUD_M * U, ch = HUD_CARD_H * U, top = hudBottom();
-  // 왼쪽 아래: 체력 (큰 숫자, 칸 막대), 방어 (방패, 작은 숫자), 기력 (가는 막대)
+  // 왼쪽 아래: 체력 (큰 숫자, 칸 막대), 방어 (방패, 작은 숫자) — 스태미너는 화면 가운데 캐릭터 발밑 (render)
   const cw = 132 * U, cx = m;
   pxCard(cx, top, cw, ch);
   pxShapeEdge(SH_CROSS, cx + 6 * U, top + 6 * U, p.hp < p.maxhp * 0.3 && Math.sin(gtime * 8) > 0 ? '#ffffff' : '#d8222c', '#3a0608');
@@ -7520,8 +7539,6 @@ function drawHUD() {
   if (rg > 0) pxRate(rg, cx + 26 * U + hw, top + 15 * U, '#7cf0a2'); // 체력 재생 (+3.2/S)
   pxSegBar(cx + 7 * U, top + 24 * U, 12, 8, 4, p.hp / p.maxhp, '#c8202a');
   if (p.armor > 0) { pxShape(SH_SHIELD, cx + cw - 30 * U, top + 6 * U, '#5a8fe0'); pxNum(Math.round(p.armor), cx + cw - 20 * U, top + 7 * U); }
-  ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(cx + 7 * U, top + 32 * U, 107 * U, 2 * U);
-  ctx.fillStyle = p.exhausted ? HC.dim : '#4f8fe8'; ctx.fillRect(cx + 7 * U, top + 32 * U, Math.round(107 * clamp(p.stamina / staminaMax(), 0, 1)) * U, 2 * U);
   // 오른쪽 아래: 무기 (슬롯 표시, 끼운 파츠까지 그린 무기, 장탄 큰 숫자, 남은 탄). 무기 이름은 바꾼 직후에만
   const ci = curW(), ws = ci.s, ww = 156 * U, wx = W - m - ww;
   pxCard(wx, top, ww, ch);
