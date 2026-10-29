@@ -4190,12 +4190,12 @@ function useItem(id) {
 // 스킬 칸은 왼쪽 클릭으로 집고 (가방이 열림) 우클릭으로 가방에 뺌
 let perkOpen = false, perkTab = 0; // 보고 있는 특성 탭
 function perkGeom() {
-  const pw = 584, y = 8;
+  const pw = clamp(W - BAG_W * CELL - 60, 494, 584), y = 8; // 오른쪽 인벤토리 창과 겹치지 않게 (넓으면 584 — 스킬 이름·대기시간이 다 들어감)
   return { x: trade ? Math.round(W / 2 - pw / 2) : 12, y, pw, ph: 474, ay: y + 52, aw: (pw - 24 - 3 * 8) / 4, ah: 62, tabY: y + 144, tw: (pw - 24 - 2 * 6) / 3, ty: y + 182, rowH: 88 };
 }
 const shellRect = (g, k) => [g.x + 12 + k * (g.aw + 8), g.ay, g.aw, g.ah];
 const perkTabRect = (g, t) => [g.x + 12 + t * (g.tw + 6), g.tabY, g.tw, 24];
-const perkNode = (g, k) => { const P = PERKS[k]; return [g.x + 137 + P.col * 216, g.ty + P.tier * g.rowH, 44, 44]; }; // 그림 칸 (이름·단계는 오른쪽)
+const perkNode = (g, k) => { const P = PERKS[k]; return [g.x + 92 + Math.round((g.pw - 494) / 2) + P.col * 216, g.ty + P.tier * g.rowH, 44, 44]; }; // 그림 칸 (이름·단계는 오른쪽), 창이 넓으면 가운데로
 const respecBtn = g => [g.x + g.pw - 136, g.y + g.ph - 30, 124, 20];
 // 아직 못 배우는 까닭 (없으면 '')
 function perkLock(k) {

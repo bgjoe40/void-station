@@ -1,7 +1,7 @@
 // ===== 게임 데이터 정의 (무기 / 탄약 / 수류탄 / 아이템 / 적) =====
 
 // 버전: GitHub에 커밋·푸시할 때마다 올림 (새 기능은 가운데 자리, 고침·작은 추가는 끝자리) — 타이틀·일시정지 화면에 표시, git 태그 v<버전>
-const VERSION = '0.32.0';
+const VERSION = '0.32.1';
 
 const CAT_NAMES = ['근접', '권총', '샷건', '라이플', '기관총', '에너지'];
 const MAX_LOAD = 30;   // 장착 + 가방 무기 무게 합이 넘으면 이동속도 감소
@@ -564,13 +564,13 @@ const SKILLS = {
               v: { dmg: 80, n: 5, r: 2.2 }, mods: ['n', 'r'], life: 45, cap: 16,
               desc: v => `바라보는 쪽에 지뢰 ${v.n}개. 적이 밟으면 폭발 (반경 ${v.r}칸, 피해 ${v.dmg})` },
   turret:   { name: '포탑 배치', color: '#9f9', icon: 'mguna0', from: 5, price: 910, cd: 30,
-              v: { dmg: 14, dur: 18, hp: 180 }, mods: ['dur'], rate: 0.16, range: 9,
+              v: { dmg: 7, dur: 14, hp: 144 }, mods: ['dur'], rate: 0.16, range: 9, // 설치 스킬 기준: 켜져 있는 동안 그 시점 총과 비슷한 DPS, 대기시간의 절반쯤 켜짐 (탄은 반드시 맞음)
               desc: v => `${v.dur}초 동안 ${SKILLS.turret.range}칸 안의 적을 쏘는 포탑 (한 발 ${v.dmg}, 초당 6발, 내구도 ${v.hp})` },
   drone:    { name: '전투 드론', color: '#7ef', icon: 'fskua0', from: 6, price: 1070, cd: 26,
-              v: { dmg: 22, dur: 15 }, mods: ['dur'], rate: 0.4, range: 8,
+              v: { dmg: 18, dur: 12 }, mods: ['dur'], rate: 0.4, range: 8, // 포탑과 같은 기준
               desc: v => `${v.dur}초 동안 곁을 따라다니며 플라즈마를 쏘는 드론 (한 발 ${v.dmg}, 초당 2.5발)` },
   tesla:    { name: '테슬라 코일', color: '#6af', icon: 'celpa0', from: 8, price: 1400, cd: 24,
-              v: { dmg: 24, dur: 12, r: 4.5, n: 3, hp: 220 }, mods: ['dur', 'r', 'n'], rate: 0.6,
+              v: { dmg: 12, dur: 10, r: 4.5, n: 3, hp: 176 }, mods: ['dur', 'r', 'n'], rate: 0.6, // 포탑과 같은 기준 (여럿을 함께 맞히고 기절시키니 한 마리에겐 더 약하게)
               desc: v => `${v.dur}초 동안 서 있는 코일. 0.6초마다 ${v.r}칸 안의 적 ${v.n}마리에게 번개 (피해 ${v.dmg}, 내구도 ${v.hp})` },
   missiles: { name: '유도 미사일', color: '#fa6', icon: 'rocka0', from: 7, price: 1240, cd: 10,
               v: { dmg: 45, n: 6 }, mods: ['n'],
