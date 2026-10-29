@@ -79,7 +79,6 @@ npm run dist
 
 - [Freedoom](https://github.com/freedoom/freedoom) (BSD-3-Clause) — 스프라이트, 벽·바닥 텍스처, 효과음, 배경음악 · 라이선스 전문: [`assets/LICENSE-freedoom.txt`](assets/LICENSE-freedoom.txt)
 - knekko, [Futuristic Guns, Weapons and Items](https://opengameart.org/content/futuristic-guns-weapons-and-items) (CC0) — 무기 · 장비 아이콘
-- MELLE, [CC0 Gem Icons](https://opengameart.org/content/cc0-gem-icons) (CC0) — 보석 아이콘
 - knekko, [Cybericons](https://opengameart.org/content/cybericons) · [Microchips](https://opengameart.org/content/microchips-cpus-ics) (CC0) — 팔 장비 · 강화칩 · 강화장신구 아이콘
 - [Project Cordon Sprites](https://github.com/doficia/project-cordon-sprites) (CC0) — 헬멧 · 조끼 · 전투화 · 소모품 아이콘
 - AlejandroHaibi, [Liquid Splatter Pixel Texture](https://opengameart.org/content/liquid-splatter-pixel-texture) (CC0) — 핏자국

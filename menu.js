@@ -92,8 +92,8 @@ function iconURL(key, max = 120) {
   const id = key + ':' + max;
   if (iconCache.has(id)) return iconCache.get(id);
   const [sx, sy, fw, fh] = f, k = Math.max(1, Math.floor(max / Math.max(fw, fh)));
-  const c = document.createElement('canvas'); c.width = fw * k; c.height = fh * k;
-  const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(ART.atlas, sx, sy, fw, fh, 0, 0, fw * k, fh * k);
+  const c = document.createElement('canvas'); c.width = (fw + 2) * k; c.height = (fh + 2) * k;
+  const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(edged(ART.atlas, sx, sy, fw, fh), 0, 0, (fw + 2) * k, (fh + 2) * k); // 게임 UI와 같은 회색 외곽선
   const u = c.toDataURL(); iconCache.set(id, u); return u;
 }
 const monIcon = t => frontKey(ENEMY_ART[t].spr, ENEMY_ART[t].walk[0]);
@@ -400,7 +400,7 @@ const KEY_GROUPS = [
   ['이동과 전투', [
     [['W', 'A', 'S', 'D'], '이동', '방향키도 됨'], [['마우스'], '조준', '조준한 쪽의 가장 가까운 적을 자동 조준 (설정에서 끌 수 있음)'],
     [['좌클릭'], '공격', '자동화기는 누르고 있기'], [['우클릭'], '수류탄 던지기', '커서 위치로'], [['G'], '수류탄 종류 바꾸기'],
-    [['R'], '재장전'], [['Shift'], '달리기', '스태미너를 계속 씀'], [['Space'], '회피 대시', '잠깐 무적'], [['1', '~', '4'], '무기 슬롯', '휠로도 바꿈']]],
+    [['R'], '재장전'], [['Shift'], '달리기', '스태미너를 계속 씀'], [['Space'], '회피 대시', `잠깐 무적, 대기 ${DASH_CD}초`], [['1', '~', '4'], '무기 슬롯', '휠로도 바꿈']]],
   ['아이템과 스킬', [
     [['Q'], '메디킷', '최대 체력의 40% 회복'], [['E'], '치료제', '중독, 화상, 감전 해제'], [['T'], '아드레날린', '잠시 빨라짐'],
     [['Z', 'X', 'V', 'B'], '스킬', '스킬 창에 끼운 쉘'], [['F'], '줍기, 사용', '무기, 자판기, 단말기, 보물함']]],

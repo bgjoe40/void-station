@@ -5028,12 +5028,13 @@ function onKey(code) {
   else if (code === 'KeyH') { if (tipNow) closeTip(); else if (logNow) { logNow = null; Snd.play('menu'); } } // 안내 카드 · 데이터 기록 닫기
   else if (code in SKILL_KEYS) useSkillSlot(SKILL_KEYS[code]); // 스킬 칸 (Z X V B)
   else if (code === 'KeyG') { const ks = Object.keys(GRENADES); p.gsel = ks[(ks.indexOf(p.gsel) + 1) % ks.length]; }
-  else if (code === 'Space' && p.dashCd <= 0) {
+  else if (code === 'Space') {
+    if (p.dashCd > 0) { hudFx.dashDeny = 0.3; Snd.play('empty'); return; } // 아직 차오르는 중: HUD의 회피 칸이 붉게 번쩍
     if (p.stamina < STAMINA_DASH) { msg('스태미너 부족', '#fc6'); return; }
     useStamina(STAMINA_DASH);
     let dx = p.mvx || 0, dy = p.mvy || 0;
     if (!dx && !dy) { dx = Math.cos(p.aim); dy = Math.sin(p.aim); }
-    p.ddx = dx; p.ddy = dy; p.dash = 0.22; p.dashCd = 0.9 * (1 - perkV('dash')) * (1 - gearV('dash')); Snd.play('dash');
+    p.ddx = dx; p.ddy = dy; p.dash = 0.22; p.dashCd = p.dashMax = DASH_CD * (1 - perkV('dash')) * (1 - gearV('dash')); Snd.play('dash');
   }
 }
 
@@ -5796,12 +5797,25 @@ function drawBottom(key, x, y, scale) {
 // 회전한 아이콘 (가운데 기준): 날아가는 칼날, 도는 톱날
 function drawSpin(key, x, y, ang, w, h) { ctx.save(); ctx.translate(x, y); ctx.rotate(ang); drawIcon(key, -w / 2, -h / 2, w, h); ctx.restore(); }
 // 상자 안에 비율을 유지해 가운데 맞추기 (HUD·인벤토리 아이콘)
+// UI 아이콘: 둘레 1칸에 회색 외곽선을 두른 그림 (아이콘 화풍 맞추기 — 처음 그릴 때 한 번 만들어 둠)
+const ICON_EDGE = '#343740';
+function edged(src, sx, sy, w, h) {
+  const c = document.createElement('canvas'); c.width = w + 2; c.height = h + 2;
+  const g = c.getContext('2d');
+  for (const [dx, dy] of [[0, 1], [2, 1], [1, 0], [1, 2]]) g.drawImage(src, sx, sy, w, h, dx, dy, w, h);
+  g.globalCompositeOperation = 'source-in'; g.fillStyle = ICON_EDGE; g.fillRect(0, 0, w + 2, h + 2);
+  g.globalCompositeOperation = 'source-over'; g.drawImage(src, sx, sy, w, h, 1, 1, w, h);
+  return c;
+}
+const iconEdged = new Map();
 function drawIcon(key, x, y, w, h) {
   const f = META.frames[key];
   if (!f || !ART.ready) return;
-  const [sx, sy, fw, fh] = f, k = Math.min(w / fw, h / fh);
+  let c = iconEdged.get(key);
+  if (!c) { c = edged(ART.atlas, f[0], f[1], f[2], f[3]); iconEdged.set(key, c); }
+  const k = Math.min(w / c.width, h / c.height);
   ctx.imageSmoothingEnabled = k < 1;
-  ctx.drawImage(ART.atlas, sx, sy, fw, fh, x + (w - fw * k) / 2, y + (h - fh * k) / 2, fw * k, fh * k);
+  ctx.drawImage(c, x + (w - c.width * k) / 2, y + (h - c.height * k) / 2, c.width * k, c.height * k);
   ctx.imageSmoothingEnabled = true;
 }
 
@@ -7220,7 +7234,7 @@ function drawMinimap() {
   const R = regions[level];
   let k = Z, w = Math.max(200, 120 * Z), h = Math.round(w * 0.63), x0 = W - w - 14, y0 = 14, sx = Math.round(mmX(player.x, player.y) - w / 2 / k), sy = Math.round(mmY(player.x, player.y) - h / 2 / k); // 작은 지도도 게임처럼 Z배 픽셀
   if (mapBig) { k = Math.min(2.4, (W - 80) / mapC.width, (VH - 90) / mapC.height); w = mapC.width * k; h = mapC.height * k; x0 = (W - w) / 2; y0 = (VH - h) / 2; sx = sy = 0; }
-  const keyCols = R ? [...R.locks, ...(R.vault ? ['vault'] : [])] : [], keyRow = !inBase && keyCols.length ? 30 : 0; // 아래에 이 구역의 키카드 칸 (금고가 있으면 금고 열쇠도)
+  const keyCols = R ? [...R.locks, ...(R.vault ? ['vault'] : [])] : [], keyRow = !inBase && keyCols.length ? 30 : 0; // 아래에 이 구역의 키카드 줄 (금고가 있으면 금고 열쇠도 — 주운 것만 그림)
   pxCard(x0 - 8, y0 - 8, w + 16, h + 26 + keyRow);
   ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.clip();
   if (mapBig) ctx.drawImage(mapC, x0, y0, w, h);
@@ -7315,14 +7329,14 @@ function drawMinimap() {
   ctx.restore();
   ctx.font = font(FS); ctx.textAlign = 'left'; ctx.fillStyle = '#9a9484';
   ctx.fillText(fitText(`${inBase || !R ? '우주 기지' : `구역 ${level} ${CAMPAIGN[level - 1].name}`}   [M] ${mapBig ? '작게' : '전체 지도'}`, w), x0, y0 + h + 12);
-  if (keyRow) { // 이 구역의 키카드 칸 (주운 것은 밝게)
+  if (keyRow) { // 이 구역에서 주운 키카드만 (없으면 아무것도 없음)
     const ky = y0 + h + 20;
     ctx.fillText('키카드', x0, ky + 15);
-    keyCols.forEach((c, n) => {
-      const K = KEYCARDS[c], has = keysHeld.has(`${level}:${c}`), bx = x0 + 40 + n * 30;
+    keyCols.filter(c => keysHeld.has(`${level}:${c}`)).forEach((c, n) => {
+      const K = KEYCARDS[c], bx = x0 + 40 + n * 30;
       ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(bx, ky, 24, 24);
-      ctx.globalAlpha = has ? 1 : 0.45; ctx.strokeStyle = K.color; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, ky + 0.5, 23, 23);
-      ctx.globalAlpha = has ? 1 : 0.2; drawIcon(K.spr + 'a0', bx + 3, ky + 2, 18, 20); ctx.globalAlpha = 1;
+      ctx.strokeStyle = K.color; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, ky + 0.5, 23, 23);
+      drawIcon(K.spr + 'a0', bx + 3, ky + 2, 18, 20);
     });
   }
 }
@@ -7441,6 +7455,7 @@ function pxShapeEdge(rows, x, y, col, edge) { for (const [dx, dy] of [[-1, 0], [
 function pxShape(rows, x, y, col) { ctx.fillStyle = col; rows.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (r[i] === '#') ctx.fillRect(x + i * Z, y + j * Z, Z, Z); }); }
 const SH_CROSS = ['....#####....', '....#####....', '....#####....', '....#####....', '#############', '#############', '#############', '#############', '#############', '....#####....', '....#####....', '....#####....', '....#####....']; // 체력 (13x13)
 const SH_SHIELD = ['#######', '#######', '#######', '#######', '.#####.', '..###..', '...#...'];
+const SH_SPACE = ['#.....#', '#######']; // Space 키 표시 (HUD의 회피 칸)
 // 카드: 모서리를 깎은 반투명 판, 1픽셀 테두리, (accent면) 왼쪽 위에 호박색 꺾쇠, (line이면) 윗변을 그 색으로. 크기는 화면 픽셀
 function pxCard(x, y, w, h, accent = true, line) {
   const U = Z, c = 2 * U; x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
@@ -7460,12 +7475,14 @@ function pxRate(v, x, y, col) {
   }
 }
 function pxSegBar(x, y, n, sw, sh, frac, col) { for (let k = 0; k < n; k++) { ctx.fillStyle = (k + 0.5) / n <= frac ? col : 'rgba(255,255,255,0.08)'; ctx.fillRect(x + k * (sw + 1) * Z, y, sw * Z, sh * Z); } }
-const hudFx = { slot: -1, name: 0, xp: -1, xpT: 0 }; // 무기를 바꾼 직후 이름이 보일 시간, 경험치를 얻은 직후 밝게 보일 시간 (초)
+const hudFx = { slot: -1, name: 0, xp: -1, xpT: 0, dashCd: 0, dashReady: 0, dashDeny: 0 }; // 무기를 바꾼 직후 이름이 보일 시간, 경험치를 얻은 직후 밝게 보일 시간, 회피가 다 차오른 순간·대기 중에 누른 순간의 번쩍임 (초)
 function hudTick(dt) {
   const p = player; if (!p) return;
   if (hudFx.slot !== p.slot) { if (hudFx.slot >= 0) hudFx.name = 2.5; hudFx.slot = p.slot; }
   if (hudFx.xp !== p.xp) { if (hudFx.xp >= 0) hudFx.xpT = 2; hudFx.xp = p.xp; }
   hudFx.name = Math.max(0, hudFx.name - dt); hudFx.xpT = Math.max(0, hudFx.xpT - dt);
+  if (hudFx.dashCd > 0 && p.dashCd <= 0) hudFx.dashReady = 0.4; // 회피가 다시 찼음
+  hudFx.dashCd = p.dashCd; hudFx.dashReady = Math.max(0, hudFx.dashReady - dt); hudFx.dashDeny = Math.max(0, hudFx.dashDeny - dt);
 }
 // 화면 가장자리 빛: 가운데(화면 반지름의 r0배)는 맑고 모서리로 갈수록 col (화면 비율의 타원)
 function edgeGlow(col, a, r0) {
@@ -7515,11 +7532,21 @@ function drawHUD() {
     ctx.fillStyle = '#000'; ctx.fillText(ci.name, wx + ww - 3 * U + 1, top - 4 * U + 1); ctx.fillStyle = itemColor(ci); ctx.fillText(ci.name, wx + ww - 3 * U, top - 4 * U);
     ctx.globalAlpha = 1;
   }
-  // 아래 가운데: 끼운 스킬 (Z X V B), 소모품 (Q E T), 수류탄 (G) — 작은 칸, 스킬 칸에 마우스를 올리면 설명
+  // 아래 가운데: 회피 (Space), 끼운 스킬 (Z X V B), 소모품 (Q E T), 수류탄 (G) — 작은 칸, 회피·스킬 칸에 마우스를 올리면 설명
   const S = HUD_SLOT * U, gap = 3 * U, sk = p.shells.map((sh, n) => sh && [sh, n]).filter(Boolean), items = Object.keys(ITEMS);
-  const n = sk.length + items.length + 1, total = n * S + (n - 1) * gap + (sk.length ? 6 * U : 0), y = VH - m - S;
-  let x = Math.round(W / 2 - total / 2), hover = null;
+  const n = sk.length + items.length + 2, total = n * S + (n - 1) * gap + 6 * U + (sk.length ? 6 * U : 0), y = VH - m - S;
+  let x = Math.round(W / 2 - total / 2), hover = null, dashHover = null;
   const box = (x2, on) => { ctx.fillStyle = on ? HC.acc : HC.edge; ctx.fillRect(x2, y, S, S); ctx.fillStyle = HC.slot; ctx.fillRect(x2 + U, y + U, S - 2 * U, S - 2 * U); };
+  { // 회피 칸: 쓰면 어둡게 덮였다가 아래부터 차오름 (차오르는 선), 다 차면 테두리가 잠깐 밝게, 대기 중에 누르면 붉게. 스태미너가 모자라면 흐리게
+    const full = DASH_CD * (1 - perkV('dash')) * (1 - gearV('dash')), f = p.dashCd > 0 ? clamp(p.dashCd / (p.dashMax || full), 0, 1) : 0, fh = Math.round((S - 2 * U) * f);
+    box(x, hudFx.dashReady > 0);
+    ctx.globalAlpha = p.stamina >= STAMINA_DASH ? 1 : 0.35; ctx.filter = 'brightness(1.7)'; drawIcon('icon_boots', x + 3 * U, y + 2 * U, S - 6 * U, S - 8 * U); ctx.filter = 'none'; ctx.globalAlpha = 1; // 전투화 (작은 칸에서도 보이게 밝혀서)
+    if (f > 0) { ctx.fillStyle = 'rgba(0,0,0,0.66)'; ctx.fillRect(x + U, y + U, S - 2 * U, fh); ctx.fillStyle = '#7fd8ff'; ctx.fillRect(x + U, y + U + Math.max(0, fh - U), S - 2 * U, U); }
+    if (hudFx.dashDeny > 0) { ctx.globalAlpha = hudFx.dashDeny / 0.3; ctx.strokeStyle = '#ff5a3a'; ctx.lineWidth = U; ctx.strokeRect(x + U / 2, y + U / 2, S - U, S - U); ctx.globalAlpha = 1; }
+    pxShape(SH_SPACE, x + 2 * U, y + S - 4 * U, HC.acc);
+    if (mouse.x >= x && mouse.x < x + S && mouse.y >= y && mouse.y < y + S) dashHover = { x, L: [{ t: '회피 대시 [Space]', c: '#e8e2d6', b: true }, { t: `잠깐 무적, 대기 ${full.toFixed(1)}초, 스태미너 ${STAMINA_DASH}`, c: '#ccc' }] };
+    x += S + gap + 6 * U;
+  }
   for (const [sh, k] of sk) {
     const Sk = SKILLS[sh.id], cd = p.scd[sh.id] || 0, left = skillLeft(sh.id);
     box(x, !!left); drawIcon(Sk.icon, x + 2 * U, y + 2 * U, S - 4 * U, S - 4 * U);
@@ -7557,6 +7584,7 @@ function drawHUD() {
   pxGlyph('L', xx, VH - 10 * U, HC.dim); pxNum(p.clv, xx + 5 * U, VH - 10 * U, 'grey');
   if (hover && !held) { const L = shellTooltip(hover.sh); drawTooltip(L, hover.x - 60, y - L.length * 17 - 18, VH); }
   if (menuHover && !held) drawTooltip(menuHover.L, menuHover.x - 20, y - menuHover.L.length * 17 - 18, VH);
+  if (dashHover && !held) drawTooltip(dashHover.L, dashHover.x - 20, y - dashHover.L.length * 17 - 18, VH);
 }
 function drawCursor() {
   if (state !== 'play' && state !== 'trade') return;

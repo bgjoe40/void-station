@@ -6,8 +6,6 @@
       https://github.com/freedoom/freedoom
   - knekko "Futuristic Guns, Weapons and Items" (CC0): 무기·수류탄·주사기·방어구·케이스 아이콘
       https://opengameart.org/content/futuristic-guns-weapons-and-items
-  - MELLE 보석 아이콘 (CC0, AntumDeluge의 "CC0 Gem Icons" 모음): 보석 6종
-      https://opengameart.org/content/cc0-gem-icons
   - knekko "Cybericons"·"Microchips" (CC0): 팔 장비·강화칩·강화장신구·스킬 메뉴·최종 특성 아이콘
       https://opengameart.org/content/cybericons, https://opengameart.org/content/microchips-cpus-ics
   - Project Cordon Sprites (CC0, doficia와 기여자들): 헬멧·조끼·전투화·소모품 아이콘 (128px 픽셀아트)
@@ -23,6 +21,9 @@
   music/*.mid 배경음악 (Freedoom MIDI 그대로, 게임이 신시사이저로 연주)
   fonts/*.woff2 글꼴 (갈무리), fonts/LICENSE-galmuri.txt
   LICENSE-freedoom.txt, CREDITS-freedoom.txt, CREDITS-freedoom-music.txt, README.md
+
+아이콘 화풍 맞추기: 출처가 다른 아이콘(icon_*, att_*)을 한 묶음처럼 — Cordon 128px 그림은 1/2로 줄여 픽셀 굵기를 맞추고,
+어두운 아이콘은 조금 밝히고 (unify_icon), 가장자리에 같은 빛 방향 (위·왼쪽 밝게, 아래·오른쪽 어둡게). 회색 외곽선은 게임이 UI에 그릴 때 두름
 
 사용: python tools/build_assets.py   (내려받은 원본은 tools/.cache 에 캐시)
 """
@@ -232,16 +233,6 @@ ATTACH_PIVOT = {'muzzle': (0, 0.5), 'sight': (0.5, 1), 'mag': (0.5, 0), 'under':
 ANCHOR_FIX = {'assault': {'mag': (46, 19)}, 'arccarbine': {'mag': (46, 19)}, 'mp5': {'mag': (46, 16), 'under': (53, 10)},
               'mg': {'mag': (17, 10)}, 'camolmg': {'mag': (17, 10)}, 'hellhmg': {'mag': (17, 10)}, 'railgun': {'mag': (17, 10)},
               'marksman': {'sight': (45, 8)}, 'arcsniper': {'sight': (45, 8)}, 'rpg': {'mag': (62, 15)}, 'homingrl': {'mag': (62, 15)}}
-# 보석 아이콘: MELLE의 보석 5색 (zip 안의 32x32) — 이름 -> (파일, 후처리). 사파이어는 루비의 사각 컷을 파랗게, 다이아몬드는 하늘색 컷을 무채색으로
-GEM_ZIP = 'gem-melle_0.zip'
-GEM_ICONS = {
-    'gem_ruby':     ('32x32/gem_03_red.png', None),
-    'gem_sapphire': ('32x32/gem_03_red.png', ('hue', 0.62)),
-    'gem_emerald':  ('32x32/gem_02_green.png', ('hue', 0.12)),
-    'gem_topaz':    ('32x32/gem_05_yellow.png', None),
-    'gem_amethyst': ('32x32/gem_04_violet.png', None),
-    'gem_diamond':  ('32x32/gem_01_blue.png', ('gray', (1.1, 1.15, 1.25))),
-}
 # 팔 장비·강화칩·강화장신구·스킬 메뉴 그림: knekko "Cybericons"·"Microchips" (CC0, zip 안의 32x32) — 이름 -> (묶음, 파일, 후처리)
 # 강화칩은 능력치마다 보조·증폭·코어 3단계 (작은 칩 → 큰 칩 → CPU), 강화장신구는 계열마다 3단계
 CYBER_ZIPS = {'cyber': ('cybericons.zip', 'knekko_cybericons.zip'), 'chips': ('microchips.zip', 'knekko_microchips.zip')}
@@ -310,7 +301,7 @@ README = """# assets/ — 그래픽 출처와 라이선스
 
 ## Project Cordon Sprites — CC0 (퍼블릭 도메인)
 - 출처: https://github.com/doficia/project-cordon-sprites (doficia와 커뮤니티 기여자들, CC0-1.0)
-- 128px 픽셀아트 낱장을 그대로 씀: 전투 헬멧(army-helmet), 정찰 헬멧(kevlar-helmet), 조끼 4종(tactical-vest의 색만 바꿈),
+- 128px 픽셀아트 낱장을 1/2로 줄여 씀 (다른 아이콘과 픽셀 굵기를 맞춤): 전투 헬멧(army-helmet), 정찰 헬멧(kevlar-helmet), 조끼 4종(tactical-vest의 색만 바꿈),
   전투화(military-boots를 어두운 회색으로), HUD·상점의 소모품(medkit, painkillers, injection)
 
 ## knekko "Cybericons"·"Microchips" — CC0 (퍼블릭 도메인)
@@ -319,13 +310,13 @@ README = """# assets/ — 그래픽 출처와 라이선스
   최종 특성(붉은 조준경·회로 심장·전술 헤드셋, 헤드셋은 밝힘).
   네온 건틀릿은 은색 손을 청록으로 칠함
 
-## MELLE 보석 아이콘 — CC0 (퍼블릭 도메인)
-- 출처: https://opengameart.org/content/cc0-gem-icons (AntumDeluge가 모은 CC0 보석 아이콘, MELLE 묶음 — 원작 https://opengameart.org/node/89286)
-- 32x32 보석 5색을 그대로 씀. 사파이어는 루비를 파란 색조로, 다이아몬드는 하늘색 보석을 무채색으로 바꿈
-
 ## 갈무리 (Galmuri) — SIL Open Font License 1.1
 - 출처: https://github.com/quiple/galmuri (이민서), 웹 글꼴은 npm galmuri 2.40.3 (jsDelivr)
 - `fonts/Galmuri11.woff2`, `fonts/Galmuri11-Bold.woff2`, `fonts/Galmuri14.woff2`를 그대로 씀. 라이선스 전문: `fonts/LICENSE-galmuri.txt`
+
+## 아이콘 공통 가공 (화풍 맞추기)
+- 모든 아이콘(무기·방어구·소모품·파츠)은 평균 밝기가 낮으면 감마로 조금 밝히고 (평균 80까지, 감마 0.6 이상),
+  가장자리에 같은 빛 방향을 입힘 (위·왼쪽 가장자리는 밝게, 아래·오른쪽 가장자리는 어둡게). 회색 외곽선은 게임이 UI에 그릴 때 두름
 
 ## AlejandroHaibi "Liquid Splatter Pixel Texture" — CC0 (퍼블릭 도메인)
 - 출처: https://opengameart.org/content/liquid-splatter-pixel-texture
@@ -467,16 +458,6 @@ def splat_icons():
     return out
 
 
-def gem_icon(path, post):
-    z = zipfile.ZipFile(fetch(OGA + GEM_ZIP, 'gem-melle.zip'))
-    im = Image.open(io.BytesIO(z.read(path))).convert('RGBA')
-    if post and post[0] == 'hue':
-        im = hue_shift(im, post[1])
-    elif post and post[0] == 'gray':
-        im = gray(im, post[1])
-    return trim(im)
-
-
 def cordon_icon(spec):
     path, post = spec
     im = Image.open(fetch(CORDON_RAW + path, 'cordon_' + path.replace('/', '_'))).convert('RGBA')
@@ -484,7 +465,48 @@ def cordon_icon(spec):
         im = tint(im, post[1])
     elif post and post[0] == 'gray':
         im = gray(im, post[1])
-    return trim(im)
+    return trim(half(im))
+
+
+def half(im):
+    """1/2로 줄이고 반투명은 0 또는 불투명으로 (픽셀아트 가장자리)"""
+    im = im.resize((max(1, round(im.width / 2)), max(1, round(im.height / 2))), Image.LANCZOS)
+    r, g, b, a = im.split()
+    return Image.merge('RGBA', (r, g, b, a.point(lambda v: 255 if v >= 110 else 0)))
+
+
+ICON_LIFT = (80, 0.6)  # 아이콘 평균 밝기가 이보다 낮으면 감마로 이 밝기 근처까지 (감마는 이 값 이상 — 일부러 어두운 장비는 어두운 채로)
+
+
+def unify_icon(im):
+    """아이콘 화풍 맞추기: 어두우면 조금 밝히고, 가장자리에 같은 빛 방향 (위·왼쪽 밝게, 아래·오른쪽 어둡게). 크기는 그대로 (파츠가 붙는 자리)"""
+    lum = lambda c: 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
+    px = [c for c in im.getdata() if c[3]]
+    target, gmin = ICON_LIFT
+    if px and sum(lum(c) for c in px) / len(px) < target:
+        lo, hi = gmin, 1.0
+        for _ in range(18):  # 평균이 target이 되는 감마를 이분 탐색
+            g = (lo + hi) / 2
+            if sum(lum([255 * (v / 255) ** g for v in c[:3]]) for c in px[::3]) / len(px[::3]) < target:
+                hi = g
+            else:
+                lo = g
+        lut = [round(255 * (v / 255) ** max(gmin, g)) for v in range(256)]
+        r, gg, b, a = im.split()
+        im = Image.merge('RGBA', (r.point(lut), gg.point(lut), b.point(lut), a))
+    out, src, (w, h) = im.copy(), im.load(), im.size
+    px = out.load()
+    solid = lambda x, y: 0 <= x < w and 0 <= y < h and src[x, y][3] > 0
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = src[x, y]
+            if not a:
+                continue
+            if not solid(x, y - 1) or not solid(x - 1, y):
+                px[x, y] = (min(255, int(r * 1.25) + 6), min(255, int(g * 1.25) + 6), min(255, int(b * 1.25) + 6), a)
+            elif not solid(x, y + 1) or not solid(x + 1, y):
+                px[x, y] = (int(r * 0.75), int(g * 0.75), int(b * 0.75), a)
+    return out
 
 
 def cyber_icon(spec):
@@ -810,10 +832,6 @@ def main():
         key = 'icon_' + name
         images[key] = im
         frames[key] = [0, 0, im.width, im.height, im.width // 2, im.height // 2]
-    for name, (path, post) in GEM_ICONS.items():  # 보석 (MELLE)
-        im = gem_icon(path, post)
-        images['icon_' + name] = im
-        frames['icon_' + name] = [0, 0, im.width, im.height, im.width // 2, im.height // 2]
     for name, spec in CYBER_ICONS.items():  # 팔 장비·강화칩·강화장신구·스킬 메뉴 (knekko Cybericons·Microchips)
         im = cyber_icon(spec)
         images['icon_' + name] = im
@@ -839,6 +857,9 @@ def main():
         im, (ox, oy) = attach_icon(spec)
         images['att_' + name] = im
         frames['att_' + name] = [0, 0, im.width, im.height, ox, oy]
+    for k in images:  # 아이콘 화풍 맞추기 (무기·방어구·소모품·파츠 — 크기는 그대로)
+        if k.startswith('icon_') or k.startswith('att_'):
+            images[k] = unify_icon(images[k])
     anchors = {}  # 무기 그림마다 파츠가 붙는 자리
     for wid, (kind, cat) in weapon_types().items():
         if 'icon_' + wid in images:

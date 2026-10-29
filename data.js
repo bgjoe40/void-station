@@ -1,7 +1,7 @@
 // ===== 게임 데이터 정의 (무기 / 탄약 / 수류탄 / 아이템 / 적) =====
 
 // 버전: GitHub에 커밋·푸시할 때마다 올림 (새 기능은 가운데 자리, 고침·작은 추가는 끝자리) — 타이틀·일시정지 화면에 표시, git 태그 v<버전>
-const VERSION = '0.30.0';
+const VERSION = '0.31.0';
 
 const CAT_NAMES = ['근접', '권총', '샷건', '라이플', '기관총', '에너지'];
 const MAX_LOAD = 30;   // 장착 + 가방 무기 무게 합이 넘으면 이동속도 감소
@@ -11,6 +11,7 @@ const STAMINA_MAX = 100;
 const SPRINT_MUL = 1.6;           // 달리기 이동속도 배율
 const STAMINA_SPRINT = 25;        // 달리기 초당 소모량 (최대치에서 4초)
 const STAMINA_DASH = 25;          // 회피 1회 소모량
+const DASH_CD = 1.5;              // 회피 대기시간 (초) — 회피 숙련 특성·장비 옵션으로 줄어듦 (연달아 쓸 수 없게)
 const STAMINA_REGEN = 22;         // 초당 회복량
 const STAMINA_REGEN_DELAY = 0.8;  // 마지막 소모 후 회복 시작까지 대기(초)
 const STAMINA_RECOVER = 30;       // 고갈 후 다시 달릴 수 있게 되는 수치

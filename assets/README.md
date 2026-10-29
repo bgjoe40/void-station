@@ -24,7 +24,7 @@
 
 ## Project Cordon Sprites — CC0 (퍼블릭 도메인)
 - 출처: https://github.com/doficia/project-cordon-sprites (doficia와 커뮤니티 기여자들, CC0-1.0)
-- 128px 픽셀아트 낱장을 그대로 씀: 전투 헬멧(army-helmet), 정찰 헬멧(kevlar-helmet), 조끼 4종(tactical-vest의 색만 바꿈),
+- 128px 픽셀아트 낱장을 1/2로 줄여 씀 (다른 아이콘과 픽셀 굵기를 맞춤): 전투 헬멧(army-helmet), 정찰 헬멧(kevlar-helmet), 조끼 4종(tactical-vest의 색만 바꿈),
   전투화(military-boots를 어두운 회색으로), HUD·상점의 소모품(medkit, painkillers, injection)
 
 ## knekko "Cybericons"·"Microchips" — CC0 (퍼블릭 도메인)
@@ -33,13 +33,13 @@
   최종 특성(붉은 조준경·회로 심장·전술 헤드셋, 헤드셋은 밝힘).
   네온 건틀릿은 은색 손을 청록으로 칠함
 
-## MELLE 보석 아이콘 — CC0 (퍼블릭 도메인)
-- 출처: https://opengameart.org/content/cc0-gem-icons (AntumDeluge가 모은 CC0 보석 아이콘, MELLE 묶음 — 원작 https://opengameart.org/node/89286)
-- 32x32 보석 5색을 그대로 씀. 사파이어는 루비를 파란 색조로, 다이아몬드는 하늘색 보석을 무채색으로 바꿈
-
 ## 갈무리 (Galmuri) — SIL Open Font License 1.1
 - 출처: https://github.com/quiple/galmuri (이민서), 웹 글꼴은 npm galmuri 2.40.3 (jsDelivr)
 - `fonts/Galmuri11.woff2`, `fonts/Galmuri11-Bold.woff2`, `fonts/Galmuri14.woff2`를 그대로 씀. 라이선스 전문: `fonts/LICENSE-galmuri.txt`
+
+## 아이콘 공통 가공 (화풍 맞추기)
+- 모든 아이콘(무기·방어구·소모품·파츠)은 평균 밝기가 낮으면 감마로 조금 밝히고 (평균 80까지, 감마 0.6 이상),
+  가장자리에 같은 빛 방향을 입힘 (위·왼쪽 가장자리는 밝게, 아래·오른쪽 가장자리는 어둡게). 회색 외곽선은 게임이 UI에 그릴 때 두름
 
 ## AlejandroHaibi "Liquid Splatter Pixel Texture" — CC0 (퍼블릭 도메인)
 - 출처: https://opengameart.org/content/liquid-splatter-pixel-texture

@@ -175,9 +175,9 @@ function weaponArt(w) {
 function drawWeaponArt(w, x, y, bw, bh) {
   const a = weaponArt(w);
   if (!a) { drawIcon('icon_' + w.id, x, y, bw, bh); return; }
-  const k = Math.min(bw / a.w, bh / a.h);
+  const c = a.ui || (a.ui = edged(a.c, 0, 0, a.w, a.h)), k = Math.min(bw / c.width, bh / c.height); // UI에서는 회색 외곽선 (바닥의 무기는 그대로)
   ctx.imageSmoothingEnabled = k < 1;
-  ctx.drawImage(a.c, x + (bw - a.w * k) / 2, y + (bh - a.h * k) / 2, a.w * k, a.h * k);
+  ctx.drawImage(c, x + (bw - c.width * k) / 2, y + (bh - c.height * k) / 2, c.width * k, c.height * k);
   ctx.imageSmoothingEnabled = true;
 }
 // 바닥에 떨어진 무기: 무기 그림의 아래 가운데가 (x, y)에 오게 (drawBottom과 같은 크기)
