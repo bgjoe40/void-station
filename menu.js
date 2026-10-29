@@ -369,6 +369,7 @@ function settingsScreen(back, tab = setTab) {
       <button class="opt act" data-nav id="oFull"><span class="lbl">전체 화면</span><span></span><span class="val">${document.fullscreenElement ? '켜짐' : '꺼짐'}</span></button>`,
     game: `<div class="sect">안내</div>${toggle('tips', '첫 플레이 안내')}
       <button class="opt act" data-nav id="oTips"><span class="lbl">본 안내 처음부터 다시 보기<small>지금까지 ${tipsSeen.size}개를 봤습니다</small></span><span></span><span class="val">초기화</span></button>
+      <div class="sect" style="margin-top:18px">전투</div>${toggle('autoAim', '자동 조준')}
       <div class="sect" style="margin-top:18px">전리품</div>${toggle('hideCommon', '바닥의 일반 등급 장비 숨기기')}`,
     keys: keysHTML(),
   }[tab];
@@ -397,7 +398,7 @@ function settingsScreen(back, tab = setTab) {
 // ===== 조작법 · 가이드 =====
 const KEY_GROUPS = [
   ['이동과 전투', [
-    [['W', 'A', 'S', 'D'], '이동', '방향키도 됨'], [['마우스'], '조준', '조준한 쪽의 가장 가까운 적을 자동 조준'],
+    [['W', 'A', 'S', 'D'], '이동', '방향키도 됨'], [['마우스'], '조준', '조준한 쪽의 가장 가까운 적을 자동 조준 (설정에서 끌 수 있음)'],
     [['좌클릭'], '공격', '자동화기는 누르고 있기'], [['우클릭'], '수류탄 던지기', '커서 위치로'], [['G'], '수류탄 종류 바꾸기'],
     [['R'], '재장전'], [['Shift'], '달리기', '스태미너를 계속 씀'], [['Space'], '회피 대시', '잠깐 무적'], [['1', '~', '4'], '무기 슬롯', '휠로도 바꿈']]],
   ['아이템과 스킬', [
