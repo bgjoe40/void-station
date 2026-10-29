@@ -60,7 +60,7 @@ function uiKey(code) {
 function confirmBox({ title, text, ok = '확인', cancel = '취소', danger = false, onOk, onCancel }) {
   const m = document.createElement('div');
   m.className = 'modal';
-  m.innerHTML = `<div class="frm cf"><div class="hd"><div class="grow"><div class="h1" style="font-size:24px">${title}</div></div></div>
+  m.innerHTML = `<div class="frm cf"><div class="hd"><div class="grow"><div class="h1" style="font-size:32px">${title}</div></div></div>
     <p>${text}</p><div class="ft"><button class="btn ${danger ? 'danger' : 'pri'} cf-ok" data-nav>${ok}</button><button class="btn cf-no" data-nav>${cancel}</button></div></div>`;
   overlay.appendChild(m); UI.modal = m; wireNav(m);
   const back = overlay.querySelector('.f'), done = fn => { m.remove(); UI.modal = null; UI.closeModal = null; if (fn) fn(); else if (back && back.isConnected) setFocus(back); };
@@ -148,7 +148,7 @@ function pipsHTML(d) { // 구역 1~9: 들어가 본 곳 · 지금 구역
   return `<div class="pips">${CAMPAIGN.map((_, k) => `<i class="${k + 1 === d.stage ? 'c' : vis.includes(k + 1) ? 'v' : ''}"></i>`).join('')}</div>`;
 }
 function slotHTML(d, k, attrs) { // k: 슬롯 번호 또는 'auto' (거점 자동 저장)
-  const no = k === 'auto' ? `<div class="no" style="font-size:15px">자동<small>거점</small></div>` : `<div class="no">${k + 1}<small>슬롯</small></div>`;
+  const no = k === 'auto' ? `<div class="no" style="font-size:16px">자동<small>거점</small></div>` : `<div class="no">${k + 1}<small>슬롯</small></div>`;
   if (!d) return `<button class="sl empty" data-nav ${attrs}>${no}<div><div class="t1">빈 슬롯</div></div></button>`;
   const p = d.player || {};
   return `<button class="sl" data-nav ${attrs}>${no}
@@ -283,7 +283,7 @@ function titleScreen() {
         <div class="row"><span>데이터 기록</span><b>${logN} / ${LOGS.length}</b></div>
         <div class="row"><span>탈출 성공</span><b>${clears.length ? clears.length + '회' : '없음'}</b></div></div>
     </aside>
-    <div class="t-foot"><span>그래픽, 소리, 음악: Freedoom (BSD)&nbsp;&nbsp;&nbsp;아이콘: knekko, MELLE, AlejandroHaibi (CC0)</span>
+    <div class="t-foot"><span>그래픽, 소리, 음악: Freedoom (BSD)&nbsp;&nbsp;&nbsp;아이콘: knekko, Project Cordon, AlejandroHaibi (CC0)&nbsp;&nbsp;&nbsp;글꼴: Neo둥근모 (OFL)</span>
       <span class="keys-h"><span><kbd>↑</kbd><kbd>↓</kbd> 선택</span><span><kbd>Enter</kbd> 확인</span></span><span class="ver">v${VERSION}</span></div>`,
   { cls: 'title', back: null, focus: UI.lastTitle || (L ? '#m_cont' : '#m_new'), hints: false });
   const go = (id, fn) => on(id, () => { UI.lastTitle = '#' + id; fn(); }); // 돌아오면 고르던 항목에
@@ -409,7 +409,7 @@ const KEY_GROUPS = [
     [['M'], '전체 지도'], [['H'], '안내 카드 닫기', '데이터 기록 재생도'], [['Esc'], '일시정지', '열린 창 닫기']]],
 ];
 function keysHTML() {
-  return `<div class="kgrid">${KEY_GROUPS.map(([t, rows]) => `<div class="kgroup"><div class="h1" style="font:15px var(--f-disp);margin-bottom:8px">${t}</div>
+  return `<div class="kgrid">${KEY_GROUPS.map(([t, rows]) => `<div class="kgroup"><div class="h1" style="font:16px var(--f-disp);margin-bottom:8px">${t}</div>
     ${rows.map(([ks, what, sub]) => `<div class="krow"><span class="keys">${ks.map(k => k === '~' ? '~' : `<kbd>${k}</kbd>`).join('')}</span><span>${what}${sub ? `<small>${sub}</small>` : ''}</span></div>`).join('')}</div>`).join('')}</div>`;
 }
 const GUIDE = [
@@ -433,7 +433,7 @@ const GUIDE = [
   ['log', '데이터 기록과 업적', 'pmapa0', `구역마다 휴대 단말기 둘. 주우면 승무원의 기록이 재생된다. <b>업적</b>은 모든 저장에서 함께 쌓인다. 둘 다 [J] 수집 도감에 모인다.`],
 ];
 let helpTab = 'keys', guideSel = 'hub';
-const guideDet = sel => { const G = GUIDE.find(g => g[0] === sel) || GUIDE[0]; return `<div class="gh">${G[2] ? img(G[2], 128) : ''}<div><div class="h1" style="font-size:24px">${G[1]}</div></div></div><p>${G[3]}</p>`; };
+const guideDet = sel => { const G = GUIDE.find(g => g[0] === sel) || GUIDE[0]; return `<div class="gh">${G[2] ? img(G[2], 128) : ''}<div><div class="h1" style="font-size:32px">${G[1]}</div></div></div><p>${G[3]}</p>`; };
 function helpScreen(back, tab = helpTab, sel = guideSel) {
   helpTab = tab; guideSel = sel;
   const body = tab === 'keys' ? keysHTML() : `<div class="guide" style="height:min(500px,58vh)">
@@ -463,10 +463,9 @@ function creditsScreen(back) {
       <h3><span class="eye">무기, 방어구 아이콘</span></h3><p>knekko: Futuristic Guns, Weapons and Items<small>CC0 (퍼블릭 도메인)</small></p>
       <h3><span class="eye">강화칩, 강화장신구 아이콘</span></h3><p>knekko: Cybericons, Microchips<small>CC0 (퍼블릭 도메인)</small></p>
       <h3><span class="eye">헬멧, 조끼, 전투화, 소모품 아이콘</span></h3><p>Project Cordon Sprites<small>doficia와 기여자들, CC0</small></p>
-      <h3><span class="eye">보석 아이콘</span></h3><p>MELLE: CC0 Gem Icons<small>AntumDeluge 모음, CC0</small></p>
       <h3><span class="eye">핏자국</span></h3><p>AlejandroHaibi: Liquid Splatter Pixel Texture<small>CC0</small></p>
       <h3><span class="eye">음악</span></h3>${songs}
-      <h3><span class="eye">글꼴</span></h3><p>갈무리 (이민서)<small>SIL Open Font License 1.1</small></p><p>Impact<small>로고, 시스템 글꼴</small></p>
+      <h3><span class="eye">글꼴</span></h3><p>Neo둥근모 (정은빈, 원작 둥근모꼴 김중태)<small>SIL Open Font License 1.1</small></p><p>Impact<small>로고, 시스템 글꼴</small></p>
       <h3 style="margin-top:90px"><span class="eye">감사합니다</span></h3><p>끝까지 함께해 주셔서 고맙습니다</p>
     </div></div>
     <div class="row-btns" style="position:absolute;right:40px;bottom:26px;margin:0"><button class="btn" data-nav id="cBack">닫기</button></div>`, { cls: 'solid', back, hints: false });
@@ -482,7 +481,7 @@ function pauseGame(from) {
   screen(`<div class="pz-wrap"><div class="pz"><div class="h1">일시정지</div>
       <nav class="mm">${items.map(([id, t], n) => `<button class="mi" data-nav id="p_${id}" style="--i:${n}"><span class="t">${t}</span></button>`).join('')}</nav></div>
     <aside class="pz-side frm" style="padding:22px 24px">
-      <div class="eye cy">작전 현황</div><div class="h1" style="font-size:24px">${where}</div>
+      <div class="eye cy">작전 현황</div><div class="h1" style="font-size:32px">${where}</div>
       ${box ? `<div class="obj"><small class="eye">목표</small>${escHtml(box.t)}</div>` : ''}
       <div class="stat-grid">
         <div><small>캐릭터 레벨</small><b>Lv ${p.clv}</b><div class="meter cy"><i style="--v:${clamp(xpF, 0, 1)}"></i></div></div>
@@ -492,7 +491,7 @@ function pauseGame(from) {
         <div><small>골드</small><b style="color:var(--gold)">${p.gold.toLocaleString()}</b></div>
         <div><small>무기 슬롯</small><b>${slotsOpen()} / ${WEAPON_SLOTS.max}</b></div>
       </div>
-      <div class="muted" style="font-size:12px;margin-top:10px;letter-spacing:.15em">v${VERSION}</div>
+      <div class="muted" style="font-size:16px;margin-top:10px;letter-spacing:.15em">v${VERSION}</div>
     </aside></div>`, { cls: 'dim', back: resumeGame, focus: from || 0 });
   on('p_res', resumeGame);
   on('p_set', () => settingsScreen(() => pauseGame('#p_set')));
@@ -535,10 +534,10 @@ function teleportScreen(cur) {
   state = 'menu'; mouse.down = false; closeInventory();
   const found = hubs.filter(h => h.found).length;
   const rows = hubs.map(h => h.found
-    ? `<button class="wr ${h === cur ? 'here' : ''}" data-nav data-hub="${h.n}" ${h === cur ? 'disabled' : ''}><span class="rn">${h.reg}</span><span><div class="w1">${escHtml(h.name)}</div><div class="w2">구역 ${h.reg} ${regName(h.reg)}</div></span><span class="go">${h === cur ? '현재 위치' : '이동 ›'}</span></button>`
+    ? `<button class="wr ${h === cur ? 'here' : ''}" data-nav data-hub="${h.n}" ${h === cur ? 'disabled' : ''}><span class="rn">${h.reg}</span><span><div class="w1">${escHtml(h.name)}</div><div class="w2">구역 ${h.reg} ${regName(h.reg)}</div></span><span class="go">${h === cur ? '현재 위치' : '이동 →'}</span></button>`
     : `<div class="wr lock"><span class="rn">${h.reg}</span><span><div class="w1">미발견 거점</div><div class="w2">구역 ${h.reg} ${regName(h.reg)}</div></span><span class="go">잠김</span></div>`).join('');
   screen(`<div class="center" style="position:absolute;inset:0"><div class="frm" style="width:min(560px,94vw)">
-      <div class="hd"><div class="grow"><div class="eye cy">순간이동 패드</div><div class="h1">${escHtml(cur.name)}</div></div><div class="muted num" style="font-size:12px">찾은 거점 ${found} / ${hubs.length}</div></div>
+      <div class="hd"><div class="grow"><div class="eye cy">순간이동 패드</div><div class="h1">${escHtml(cur.name)}</div></div><div class="muted num" style="font-size:16px">찾은 거점 ${found} / ${hubs.length}</div></div>
       <div class="bd"><div class="sect">보급 거점</div><div class="wlist">${rows}</div></div>
       <div class="ft"><span class="note"></span><button class="btn" data-nav id="tClose">닫기</button></div>
     </div></div>`, { cls: 'dim', back: closeMenu, focus: '[data-hub]:not(:disabled), #tClose' });

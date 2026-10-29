@@ -4,11 +4,12 @@
 
 const TW = 64, TH = 32, WALLH = 72;
 // 글자: 한 글꼴, 세 크기 — 작게 (부가 설명·좁은 칸), 보통 (이름표·본문), 크게 (제목·큰 숫자)
-// 글꼴: 갈무리 (한글 픽셀 글꼴, index.html의 @font-face) — Galmuri11은 12px의 배수, Galmuri14는 15px의 배수에서만 또렷해서
-// 크기를 그 배수로 맞춤: 14~17은 Galmuri14 15px (굵은 글꼴이 없어 보통), 나머지는 가장 가까운 12의 배수
-const FONT = "'Galmuri11', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif", FONT14 = "'Galmuri14', " + FONT, FS = 12, FM = 14, FL = 20;
-const font = (size, bold) => size >= 14 && size <= 17 ? `15px ${FONT14}` : `${bold ? 'bold ' : ''}${Math.max(1, Math.round(size / 12)) * 12}px ${FONT}`;
-for (const f of ["12px 'Galmuri11'", "bold 12px 'Galmuri11'", "15px 'Galmuri14'"]) document.fonts.load(f, '가A1').catch(() => {}); // 캔버스는 불러오기 전엔 다른 글꼴로 그리므로 처음부터
+// 글꼴: Neo둥근모 (한글 픽셀 글꼴, index.html의 @font-face) — 16px의 배수에서만 또렷해서 크기를 16·32·48px로 맞춤
+// (작은 글·보통 글은 16px, 큰 글은 32px, 아주 큰 글은 48px — 굵은 글꼴은 없음, bold는 무시). fpx: 실제로 그려지는 글자 크기
+const FONT = "'NeoDunggeunmo', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif", FS = 12, FM = 14, FL = 20;
+const fpx = size => size >= 40 ? 48 : size >= 18 ? 32 : 16;
+const font = size => `${fpx(size)}px ${FONT}`;
+document.fonts.load("16px 'NeoDunggeunmo'", '가A1').catch(() => {}); // 캔버스는 불러오기 전엔 다른 글꼴로 그리므로 처음부터
 const AUTO_AIM_CONE = 0.55; // 자동 조준 허용 각도 (화면 기준 한쪽, 라디안 ≈ 31°)
 const canvas = document.getElementById('game');
 const mainCtx = canvas.getContext('2d');
@@ -1243,14 +1244,14 @@ function drawLog() {
   if (!T || state !== 'play' || codexOpen || zoneCard) return; // 구역 카드가 사라진 뒤에 (그동안 시간도 멈춤)
   const L = LOGS[T.id], w = Math.min(500, W - 300), x = (W - w) / 2, tx = 70;
   ctx.font = font(FM);
-  const lines = wrapPx(`"${L.text}"`, w - tx - 16), h = 52 + lines.length * 19 + 18, y = escape ? 90 : bossBarOn() ? 82 : 50; // 자폭 시계·보스 체력 막대 아래
+  const lines = wrapPx(`"${L.text}"`, w - tx - 16), h = 52 + lines.length * 20 + 28, y = escape ? 90 : bossBarOn() ? 82 : 50; // 자폭 시계·보스 체력 막대 아래
   ctx.globalAlpha = clamp(Math.min((T.max - T.t) / 0.25, T.t / 0.6), 0, 1);
   pxCard(x, y, w, h);
   ctx.fillStyle = 'rgba(80,200,255,0.08)'; ctx.fillRect(x + 12, y + 14, 48, 48); drawIcon(Math.floor(gtime * 3) % 2 ? 'pmapb0' : 'pmapa0', x + 16, y + 18, 40, 40);
   ctx.textAlign = 'left'; ctx.font = font(FM, true); ctx.fillStyle = '#7fe0ff'; ctx.fillText(fitText(`데이터 기록: ${L.title}`, w - tx - 16), x + tx, y + 26);
   ctx.font = font(FS); ctx.fillStyle = '#8fb0b8'; ctx.fillText(`${L.who}, 구역 ${L.reg} ${CAMPAIGN[L.reg - 1].name}`, x + tx, y + 44);
   ctx.font = font(FM); ctx.fillStyle = '#e0f0f0';
-  lines.forEach((l, k) => ctx.fillText(l, x + tx, y + 66 + k * 19));
+  lines.forEach((l, k) => ctx.fillText(l, x + tx, y + 68 + k * 20));
   ctx.textAlign = 'right'; ctx.font = font(FS); ctx.fillStyle = '#5f8890'; ctx.fillText('[H] 닫기', x + w - 12, y + h - 8);
   ctx.fillStyle = 'rgba(63,184,216,0.55)'; ctx.fillRect(x + 8, y + h - 4, (w - 16) * clamp(T.t / T.max, 0, 1), 2);
   ctx.globalAlpha = 1;
@@ -4189,12 +4190,12 @@ function useItem(id) {
 // 스킬 칸은 왼쪽 클릭으로 집고 (가방이 열림) 우클릭으로 가방에 뺌
 let perkOpen = false, perkTab = 0; // 보고 있는 특성 탭
 function perkGeom() {
-  const pw = 494, y = 8;
+  const pw = 584, y = 8;
   return { x: trade ? Math.round(W / 2 - pw / 2) : 12, y, pw, ph: 474, ay: y + 52, aw: (pw - 24 - 3 * 8) / 4, ah: 62, tabY: y + 144, tw: (pw - 24 - 2 * 6) / 3, ty: y + 182, rowH: 88 };
 }
 const shellRect = (g, k) => [g.x + 12 + k * (g.aw + 8), g.ay, g.aw, g.ah];
 const perkTabRect = (g, t) => [g.x + 12 + t * (g.tw + 6), g.tabY, g.tw, 24];
-const perkNode = (g, k) => { const P = PERKS[k]; return [g.x + 92 + P.col * 216, g.ty + P.tier * g.rowH, 44, 44]; }; // 그림 칸 (이름·단계는 오른쪽)
+const perkNode = (g, k) => { const P = PERKS[k]; return [g.x + 137 + P.col * 216, g.ty + P.tier * g.rowH, 44, 44]; }; // 그림 칸 (이름·단계는 오른쪽)
 const respecBtn = g => [g.x + g.pw - 136, g.y + g.ph - 30, 124, 20];
 // 아직 못 배우는 까닭 (없으면 '')
 function perkLock(k) {
@@ -4258,10 +4259,10 @@ function drawPerks() {
     winGlyph(SHELL_SLOTS[k], r[0] + 4, r[1] + 4, HC.acc);
     if (sh) {
       const S = SKILLS[sh.id], cd = p.scd[sh.id] || 0;
-      drawIcon(S.icon, r[0] + 8, r[1] + 14, 40, 40);
-      ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = itemColor(sh); ctx.fillText(fitText(S.name, r[2] - 58), r[0] + 52, r[1] + 22);
-      ctx.font = font(FS); ctx.fillStyle = HC.dim; ctx.fillText(RARITY[sh.rarity].name, r[0] + 52, r[1] + 38);
-      ctx.fillStyle = HC.dim; ctx.fillText(cd > 0 ? `${Math.ceil(cd)}초 남음` : `대기 ${+shellVals(sh).cd.toFixed(1)}초`, r[0] + 52, r[1] + 54);
+      drawIcon(S.icon, r[0] + 6, r[1] + 18, 32, 32);
+      ctx.textAlign = 'left'; ctx.font = font(FS, true); ctx.fillStyle = itemColor(sh); ctx.fillText(fitText(S.name, r[2] - 46), r[0] + 42, r[1] + 22);
+      ctx.font = font(FS); ctx.fillStyle = HC.dim; ctx.fillText(RARITY[sh.rarity].name, r[0] + 42, r[1] + 38);
+      ctx.fillStyle = HC.dim; ctx.fillText(fitText(cd > 0 ? `${Math.ceil(cd)}초 남음` : `대기 ${+shellVals(sh).cd.toFixed(1)}초`, r[2] - 46), r[0] + 42, r[1] + 54);
       rarityLine(r, sh.rarity);
     } else { ctx.globalAlpha = 0.1; drawIcon('bfe1d0', r[0] + 10, r[1] + 16, 36, 36); ctx.globalAlpha = 1; }
   }
@@ -4417,7 +4418,7 @@ function achCard(A) {
   return { known: done, name: A.name, icon: A.icon, sub: done ? '달성' : `${v} / ${A.goal}`, col: '#ffe08a', tip: T, frac: v / A.goal };
 }
 function codexGeom() {
-  const pw = Math.min(W - 24, 880), ph = Math.min(VH - 16, 600), cw = 96, ch = 108, gap = 8;
+  const pw = Math.min(W - 24, 880), ph = Math.min(VH - 16, 600), cw = 120, ch = 124, gap = 8;
   return { x: Math.round((W - pw) / 2), y: Math.max(8, Math.round((VH - ph) / 2)), pw, ph, cw, ch, gap, cols: Math.max(1, Math.floor((pw - 24 + gap) / (cw + gap))) };
 }
 const codexCard = (g, n) => ({ x: g.x + 12 + (n % g.cols) * (g.cw + g.gap), y: g.y + 64 + Math.floor(n / g.cols) * (g.ch + g.gap) - codexScroll });
@@ -4463,13 +4464,15 @@ function drawCodex() {
     if (c.icon) { // 못 찾은 것은 검은 그림자 (업적은 흐린 회색)
       const ach = c.frac !== undefined;
       if (!c.known) { ctx.filter = ach ? 'grayscale(1) brightness(0.55)' : 'brightness(0)'; ctx.globalAlpha = ach ? 0.8 : 0.75; }
-      drawIcon(c.icon, q.x + 8, q.y + 6, g.cw - 16, g.ch - 42);
+      drawIcon(c.icon, q.x + 8, q.y + 6, g.cw - 16, g.ch - 62);
       ctx.filter = 'none'; ctx.globalAlpha = 1;
       if (!c.known && !ach) { ctx.textAlign = 'center'; ctx.font = font(FL, true); ctx.fillStyle = '#3a3d44'; ctx.fillText('?', q.x + g.cw / 2, q.y + 44); }
     }
-    ctx.textAlign = 'center'; ctx.font = font(FS, true); ctx.fillStyle = c.known ? c.col : '#4a4d55'; ctx.fillText(fitText(c.name, g.cw - 8), q.x + g.cw / 2, q.y + g.ch - 23);
+    ctx.textAlign = 'center'; ctx.font = font(FS, true); ctx.fillStyle = c.known ? c.col : '#4a4d55';
+    const nl = ctx.measureText(c.name).width <= g.cw - 8 ? [c.name] : wrapPx(c.name, g.cw - 8); // 긴 이름은 두 줄
+    (nl.length > 1 ? [nl[0], fitText(nl.slice(1).join(' '), g.cw - 8)] : nl).forEach((t, k, a) => ctx.fillText(t, q.x + g.cw / 2, q.y + g.ch - 23 - (a.length - 1 - k) * 17));
     ctx.font = font(FS); ctx.fillStyle = c.known ? HC.dim : '#3a3d44'; ctx.fillText(fitText(c.sub || '', g.cw - 8), q.x + g.cw / 2, q.y + g.ch - 9);
-    if (c.frac !== undefined && !c.known) { ctx.fillStyle = '#26282e'; ctx.fillRect(q.x + 8, q.y + g.ch - 37, g.cw - 16, 4); ctx.fillStyle = HC.acc; ctx.fillRect(q.x + 8, q.y + g.ch - 37, Math.round((g.cw - 16) * clamp(c.frac, 0, 1)), 4); } // 업적 진행
+    if (c.frac !== undefined && !c.known) { ctx.fillStyle = '#26282e'; ctx.fillRect(q.x + 8, q.y + g.ch - 58, g.cw - 16, 4); ctx.fillStyle = HC.acc; ctx.fillRect(q.x + 8, q.y + g.ch - 58, Math.round((g.cw - 16) * clamp(c.frac, 0, 1)), 4); } // 업적 진행
   });
   ctx.restore();
   if (max > 0) { // 스크롤 막대 (오른쪽)
@@ -4607,9 +4610,9 @@ function invMouseUp() {
 }
 
 // ===== 거래 창: 디아블로식 상점·판매·개조 (왼쪽 거래 창 + 오른쪽 인벤토리) =====
-// 무기 진열대는 기지에 돌아올 때마다 새로 채워지고, 판매한 무기는 '되사기' 칸에 남는다
+// 진열대는 거점마다 처음 열 때·5분마다 새로 채워지고, 판매한 장비는 '회수' 탭에 남는다 (진열대가 바뀌어도, 저장에도 — 칸이 차면 오래된 것부터)
 let trade = null;                 // { mode: 'shop' | 'upgrade' | 'stash', tab, note, sel(고른 장비) }
-let stock = [], buyback = [], shellStock = [], armorStock = []; // 무기 진열대, 되사기, 스킬 쉘·방어구 진열대
+let stock = [], buyback = [], shellStock = [], armorStock = []; // 무기 진열대, 회수 (판매한 장비), 스킬 쉘·방어구 진열대
 let stash = [];                   // 기지 창고에 보관한 무기 (진열대와 같은 격자, 저장 슬롯에 함께 저장)
 const VG_W = 10, VG_H = 8;        // 진열대·창고 격자
 const GOODS = [...Object.keys(ITEMS).map(id => ['item', id]), ...Object.keys(AMMO).map(id => ['ammo', id]), ...Object.keys(GRENADES).map(id => ['gren', id])];
@@ -4623,7 +4626,7 @@ function rollStock() {
   const ids = Object.keys(WEAPONS).filter(k => WEAPONS[k].minLvl <= level + 1);
   const ws = Array.from({ length: 14 }, () => makeWeapon(pickFresh(ids, k => WEAPONS[k].minLvl), Math.random() < 0.12 ? 2 : Math.random() < 0.4 ? 1 : 0))
     .sort((a, b) => b.s.size[0] * b.s.size[1] - a.s.size[0] * a.s.size[1]);
-  stock = []; buyback = [];
+  stock = [];
   for (const w of ws) {
     const spot = gridFindSpot(stock, w, VG_W, VG_H);
     if (spot) { w.gx = spot.gx; w.gy = spot.gy; stock.push(w); }
@@ -4653,20 +4656,29 @@ function tradeGeom() { // 탭이 하나뿐인 곳 (보관함)은 탭 줄 없이
   const x = 12, y = 12, pw = VG_W * CELL + 24, tabY = y + 30, gx = x + 12, gy = trade && TRADE_TABS[trade.mode].length > 1 ? tabY + 30 : y + 30;
   return { x, y, pw, ph: gy - y + VG_H * CELL + 56, tabY, gx, gy, footY: gy + VG_H * CELL + 8 };
 }
-const TRADE_TABS = { shop: [['weapons', '무기'], ['armor', '장비'], ['shells', '스킬 쉘'], ['attach', '파츠'], ['goods', '소모품'], ['sell', '판매']], upgrade: [['upgrade', '장비 개조'], ['attach', '파츠 개조'], ['forge', '분해']], stash: [['stash', '보관함']] };
+const TRADE_TABS = { shop: [['weapons', '무기'], ['armor', '장비'], ['shells', '스킬'], ['attach', '파츠'], ['goods', '소모품'], ['sell', '판매'], ['buyback', '회수']], upgrade: [['upgrade', '장비 개조'], ['attach', '파츠 개조'], ['forge', '분해']], stash: [['stash', '보관함']] };
 const tabW = n => Math.min(154, Math.floor((VG_W * CELL - (n - 1) * 6) / n)); // 탭 너비 (탭이 많으면 좁게)
-const tradeTabRect = (g, k, n) => [g.gx + k * (tabW(n) + 6), g.tabY, tabW(n), 24];
+// 탭 칸: 모두 같은 너비 — 글이 그 너비에 안 들어가면 글 너비만큼 나누고 남는 폭은 고르게 (탭이 많아도 글이 잘리지 않게)
+function tradeTabRects(g, tabs) {
+  const n = tabs.length, w0 = tabW(n), f0 = ctx.font;
+  ctx.font = font(FS); const ws = tabs.map(([, label]) => ctx.measureText(label).width + 12); ctx.font = f0;
+  if (ws.every(w => w <= w0)) return tabs.map((_, k) => [g.gx + k * (w0 + 6), g.tabY, w0, 24]);
+  const extra = (VG_W * CELL - 6 * (n - 1) - ws.reduce((s, w) => s + w, 0)) / n;
+  let x = g.gx;
+  return ws.map(w => { const r = [Math.round(x), g.tabY, Math.round(w + extra), 24]; x += w + extra + 6; return r; });
+}
+const tradeTabRect = (g, k) => tradeTabRects(g, TRADE_TABS[trade.mode])[k];
 function tradeButtons() {
   const g = tradeGeom(), p = player, cb = closeBtn(g.x, g.y, g.pw), B = [{ id: 'close', x: cb[0], y: cb[1], w: cb[2], h: cb[3], label: '', on: true, hdr: true }]; // 닫기: 제목 줄의 X (winHeader가 그림)
   if (trade.mode === 'shop' && trade.tab !== 'sell') B.push({ id: 'heal', x: g.gx, y: g.footY + 14, w: 150, h: 22, label: `체력 완전 회복 ${healCost()}G`, on: p.hp < p.maxhp && p.gold >= healCost() });
-  if (trade.mode === 'shop' && trade.tab === 'sell') { const n = bagCommons().length; B.push({ id: 'sellAll', x: g.gx, y: g.footY + 14, w: 210, h: 22, label: `가방의 일반 등급 모두 판매 (${n}개)`, on: n > 0 }); }
+  if (trade.mode === 'shop' && trade.tab === 'sell') { const n = bagCommons().length; B.push({ id: 'sellAll', x: g.gx, y: g.footY + 14, w: 210, h: 22, label: `일반 등급 모두 판매 (${n})`, on: n > 0 }); }
   if (trade.mode === 'upgrade' && trade.tab === 'attach') { // 파츠 개조: 칸 상자 (클릭하면 빼기)
     B.push(...attSlotBoxes(g));
   } else if (trade.mode === 'upgrade' && trade.tab === 'forge') { // 분해: 고른 장비의 분해 버튼, 일반 등급 일괄 분해
     const it = trade.sel && ownedItems().includes(trade.sel) ? trade.sel : null;
     if (it) { const eq = isEquipped(it); B.push({ id: 'salv', x: g.gx + 150, y: g.gy + 44, w: 130, h: 22, label: eq ? '장착 중 (분해 불가)' : `분해 → 부품 +${salvageValue(it)}`, on: !eq }); }
     const commons = bagCommons().length;
-    B.push({ id: 'salvAll', x: g.gx, y: g.footY + 14, w: 210, h: 22, label: `가방의 일반 등급 모두 분해 (${commons}개)`, on: commons > 0 });
+    B.push({ id: 'salvAll', x: g.gx, y: g.footY + 14, w: 210, h: 22, label: `일반 등급 모두 분해 (${commons})`, on: commons > 0 });
   } else if (trade.mode === 'upgrade') {
     Object.entries(UPGRADES).forEach(([k, u], n) => {
       const lv = p.up[k], c = upCost(k);
@@ -4689,13 +4701,11 @@ function tradeEntries() {
   if (trade.tab === 'armor') return armorStock.map(a => ({ kind: 'buyA', inst: a, gx: a.gx, gy: a.gy, w: a.s.size[0], h: a.s.size[1], price: buyPrice(a) }));
   if (trade.tab === 'attach') return attachStock.map(a => ({ kind: 'buyP', inst: a, gx: a.gx, gy: a.gy, w: 2, h: 2, price: buyPrice(a) })); // 무기 파츠 (2x2칸)
   if (trade.tab === 'goods') return GOODS.map(([k, id], n) => ({ kind: 'buyG', k, id, gx: (n % 5) * 2, gy: Math.floor(n / 5) * 2, w: 2, h: 2, price: goodInfo(k, id).price }));
-  if (trade.tab === 'sell') {
+  if (trade.tab === 'sell') { // 판매: 가진 소모품 (장비는 가방에서 우클릭)
     const own = GOODS.filter(([k, id]) => k !== 'ammo' && goodCount(k, id) > 0);
-    return [
-      ...buyback.map(w => ({ kind: 'back', inst: w, gx: w.gx, gy: w.gy, w: w.s.size[0], h: w.s.size[1], price: sellPrice(w) })),
-      ...own.map(([k, id], n) => ({ kind: 'sellG', k, id, gx: n % VG_W, gy: 6 + Math.floor(n / VG_W), w: 1, h: 1, price: Math.round(goodInfo(k, id).price * SELL_RATE) })),
-    ];
+    return own.map(([k, id], n) => ({ kind: 'sellG', k, id, gx: n % VG_W, gy: Math.floor(n / VG_W), w: 1, h: 1, price: Math.round(goodInfo(k, id).price * SELL_RATE) }));
   }
+  if (trade.tab === 'buyback') return buyback.map(w => ({ kind: 'back', inst: w, gx: w.gx, gy: w.gy, w: w.s.size[0], h: w.s.size[1], price: sellPrice(w) })); // 회수: 판 값 그대로
   return [];
 }
 function tradeHit(mx, my) {
@@ -4787,7 +4797,7 @@ function vendorClick(h) {
     if (!addWeapon(e.inst)) { trade.note = '가방에 공간이 없습니다'; Snd.play('deny'); return; }
     const list = e.kind === 'buyW' ? stock : e.kind === 'buyS' ? shellStock : e.kind === 'buyA' ? armorStock : e.kind === 'buyP' ? attachStock : buyback;
     list.splice(list.indexOf(e.inst), 1);
-    trade.note = `${e.inst.name} 구매`;
+    trade.note = `${e.inst.name} ${e.kind === 'back' ? '회수' : '구매'}`;
   }
   p.gold -= e.price; Snd.play('buy');
 }
@@ -4805,8 +4815,8 @@ function pressTradeButton(id) {
 function sellWeapon(inst) {
   const price = sellPrice(inst);
   player.gold += price;
-  let spot; // 되사기 칸: 자리가 없으면 오래된 것부터 치움
-  while (!(spot = gridFindSpot(buyback, inst, VG_W, 6)) && buyback.length) buyback.shift();
+  let spot; // 회수 칸: 자리가 없으면 오래된 것부터 치움
+  while (!(spot = gridFindSpot(buyback, inst, VG_W, VG_H)) && buyback.length) buyback.shift();
   if (spot) { inst.gx = spot.gx; inst.gy = spot.gy; buyback.push(inst); }
   trade.note = `${inst.name} 판매 +${price}G`; Snd.play('gold');
 }
@@ -4853,11 +4863,6 @@ function drawTrade() {
     for (let i = 0; i <= VG_W; i++) { ctx.moveTo(g.gx + i * CELL + 0.5, g.gy); ctx.lineTo(g.gx + i * CELL + 0.5, g.gy + VG_H * CELL); }
     for (let j = 0; j <= VG_H; j++) { ctx.moveTo(g.gx, g.gy + j * CELL + 0.5); ctx.lineTo(g.gx + VG_W * CELL, g.gy + j * CELL + 0.5); }
     ctx.stroke();
-    if (trade.tab === 'sell') {
-      ctx.fillStyle = 'rgba(216,154,58,0.04)'; ctx.fillRect(g.gx, g.gy + 6 * CELL, VG_W * CELL, 2 * CELL);
-      ctx.font = font(FS); ctx.textAlign = 'left'; ctx.fillStyle = HC.dim;
-      ctx.fillText('소모품 판매', g.gx + 6, g.gy + 6 * CELL - 4);
-    }
     const he = !held && hit && hit.area === 'grid' && entryAt(hit.cx, hit.cy); // 커서 아래 항목: 호박색 테두리
     for (const e of tradeEntries()) {
       const x = g.gx + e.gx * CELL, y = g.gy + e.gy * CELL, w = e.w * CELL, h = e.h * CELL, hot = he && he.gx === e.gx && he.gy === e.gy;
@@ -4896,7 +4901,7 @@ function drawTrade() {
   if (e) {
     let L;
     if (e.kind === 'stash') L = [...itemLines(e.inst), { t: '클릭: 집기, 우클릭: 가방으로', c: '#9a9' }];
-    else if (e.inst) L = [...itemLines(e.inst), { t: `${e.kind === 'back' ? '되사기' : '구매가'} ${e.price}G`, c: p.gold >= e.price ? '#ffd27a' : '#f66', b: true }];
+    else if (e.inst) L = [...itemLines(e.inst), { t: `${e.kind === 'back' ? '회수' : '구매가'} ${e.price}G`, c: p.gold >= e.price ? '#ffd27a' : '#f66', b: true }];
     else {
       const info = goodInfo(e.k, e.id);
       L = [{ t: info.name, c: info.color || '#c9a040', b: true }];
@@ -7235,7 +7240,7 @@ function drawMinimap() {
   let k = Z, w = Math.max(200, 120 * Z), h = Math.round(w * 0.63), x0 = W - w - 14, y0 = 14, sx = Math.round(mmX(player.x, player.y) - w / 2 / k), sy = Math.round(mmY(player.x, player.y) - h / 2 / k); // 작은 지도도 게임처럼 Z배 픽셀
   if (mapBig) { k = Math.min(2.4, (W - 80) / mapC.width, (VH - 90) / mapC.height); w = mapC.width * k; h = mapC.height * k; x0 = (W - w) / 2; y0 = (VH - h) / 2; sx = sy = 0; }
   const keyCols = R ? [...R.locks, ...(R.vault ? ['vault'] : [])] : [], keyRow = !inBase && keyCols.length ? 30 : 0; // 아래에 이 구역의 키카드 줄 (금고가 있으면 금고 열쇠도 — 주운 것만 그림)
-  pxCard(x0 - 8, y0 - 8, w + 16, h + 26 + keyRow);
+  pxCard(x0 - 8, y0 - 8, w + 16, h + 28 + keyRow);
   ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.clip();
   if (mapBig) ctx.drawImage(mapC, x0, y0, w, h);
   else { // 지도 캔버스 밖은 잘라서
@@ -7328,10 +7333,11 @@ function drawMinimap() {
   ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.restore();
   ctx.font = font(FS); ctx.textAlign = 'left'; ctx.fillStyle = '#9a9484';
-  ctx.fillText(fitText(`${inBase || !R ? '우주 기지' : `구역 ${level} ${CAMPAIGN[level - 1].name}`}   [M] ${mapBig ? '작게' : '전체 지도'}`, w), x0, y0 + h + 12);
+  ctx.fillText(fitText(inBase || !R ? '우주 기지' : `구역 ${level} ${CAMPAIGN[level - 1].name}`, w - 32), x0, y0 + h + 14);
+  ctx.textAlign = 'right'; ctx.fillText('[M]', x0 + w, y0 + h + 14); ctx.textAlign = 'left'; // 전체 지도 (M)
   if (keyRow) { // 이 구역에서 주운 키카드만 (없으면 아무것도 없음)
-    const ky = y0 + h + 20;
-    ctx.fillText('키카드', x0, ky + 15);
+    const ky = y0 + h + 22;
+    ctx.fillText('키카드', x0, ky + 16);
     keyCols.filter(c => keysHeld.has(`${level}:${c}`)).forEach((c, n) => {
       const K = KEYCARDS[c], bx = x0 + 40 + n * 30;
       ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(bx, ky, 24, 24);
@@ -7494,14 +7500,14 @@ function edgeGlow(col, a, r0) {
 function drawZoneCard() {
   const c = zoneCard, a = Math.min(1, c.t / 0.4, (c.dur - c.t) / 0.8);
   if (a <= 0) return;
-  const h = c.lines.reduce((s, [, sz]) => s + sz + 10, 16), y0 = Math.round(VH * c.at);
+  const h = c.lines.reduce((s, [, sz]) => s + fpx(sz) + 10, 16), y0 = Math.round(VH * c.at);
   ctx.save(); ctx.globalAlpha = a;
   const band = ctx.createLinearGradient(0, 0, W, 0);
   band.addColorStop(0, 'rgba(0,0,0,0)'); band.addColorStop(0.5, 'rgba(0,0,0,0.6)'); band.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = band; ctx.fillRect(0, y0, W, h);
   ctx.textAlign = 'center';
   let y = y0 + 6;
-  for (const [t, sz, col] of c.lines) { y += sz + 2; ctx.font = font(sz, true); ctx.fillStyle = col; ctx.fillText(t, W / 2, y); y += 8; }
+  for (const [t, sz, col] of c.lines) { y += fpx(sz) + 2; ctx.font = font(sz, true); ctx.fillStyle = col; ctx.fillText(t, W / 2, y); y += 8; }
   ctx.restore();
 }
 function drawHUD() {
@@ -7720,6 +7726,7 @@ function saveGame(slot, quiet = false) {
       slot: p.slot, up: p.up, equip: p.equip.map(packWeapon), bag: p.bag.map(packWeapon), clv: p.clv, xp: p.xp, pts: p.pts, perks: p.perks, shells: p.shells.map(packWeapon),
       gear: Object.fromEntries(GEAR_KEYS.map(g => [g, packWeapon(p.gear[g])])), parts: p.parts },
     stash: stash.map(packWeapon), // 기지 창고
+    buyback: buyback.map(packWeapon), // 보급 자판기 회수 탭 (판매한 장비)
   };
   if (slot === 'auto') s.auto = data; else s.slots[slot] = data;
   s.log = [{ time: data.time, slot, stage: level, gold: p.gold, kills }, ...s.log.filter(l => !(slot === 'auto' && l.slot === 'auto'))].slice(0, 20); // 자동 저장 기록은 마지막 하나만
@@ -7755,6 +7762,7 @@ function loadGame(slot) {
   player = p; applyUpgrades(p); p.stamina = staminaMax();
   kills = d.kills; playtime = d.playtime || 0; rescued = d.rescued || 0;
   stash = (d.stash || []).map(unpackWeapon).filter(Boolean); // 창고가 생기기 전 저장은 빈 창고
+  buyback = (d.buyback || []).map(unpackWeapon).filter(Boolean); // 회수 탭 (예전 저장은 비어 있음)
   p.gold += oldGold;
   const open = slotsFor(d.field && d.field.flags), extra = [];
   p.equip = new Array(NSLOT).fill(null);
@@ -7816,7 +7824,7 @@ function placePlayer(x, y) {
 const BASE_SPAWN = [27.5, 24.5]; // 타이틀 배경의 기지에서 플레이어 자리
 function newGame(diff = 'normal') {
   Snd.init(); Snd.play('menu');
-  difficulty = diff; kills = 0; playtime = 0; rescued = 0; stash = []; player = newPlayer();
+  difficulty = diff; kills = 0; playtime = 0; rescued = 0; stash = []; buyback = []; player = newPlayer();
   startField(newSeed());
   startIntro(() => { // 오프닝 컷신이 끝나면 (건너뛰어도)
     tipQueue = []; tip('controls');

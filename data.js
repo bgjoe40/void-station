@@ -1,7 +1,7 @@
 // ===== 게임 데이터 정의 (무기 / 탄약 / 수류탄 / 아이템 / 적) =====
 
 // 버전: GitHub에 커밋·푸시할 때마다 올림 (새 기능은 가운데 자리, 고침·작은 추가는 끝자리) — 타이틀·일시정지 화면에 표시, git 태그 v<버전>
-const VERSION = '0.31.1';
+const VERSION = '0.32.0';
 
 const CAT_NAMES = ['근접', '권총', '샷건', '라이플', '기관총', '에너지'];
 const MAX_LOAD = 30;   // 장착 + 가방 무기 무게 합이 넘으면 이동속도 감소
@@ -20,9 +20,9 @@ const AMMO = {
   pistol: { name: '권총탄',     max: 180, pack: 18, buy: 30,  price: 35 },
   shell:  { name: '산탄',       max: 60,  pack: 8,  buy: 12,  price: 45 },
   rifle:  { name: '소총탄',     max: 210, pack: 20, buy: 30,  price: 55 },
-  belt:   { name: '기관총 벨트', max: 500, pack: 60, buy: 100, price: 90 },
+  belt:   { name: '기관총 벨트', short: '벨트', max: 500, pack: 60, buy: 100, price: 90 },
   // 에너지·중화기용 (from: 이 구역부터 바닥·처치 보상에 섞여 나옴, 해당 무기를 가지고 있으면 언제든)
-  cell:   { name: '에너지 셀',   max: 300, pack: 40, buy: 50,  price: 120, from: 5 },
+  cell:   { name: '에너지 셀',   short: '에너지', max: 300, pack: 40, buy: 50,  price: 120, from: 5 },
   rocket: { name: '로켓',        max: 24,  pack: 3,  buy: 6,   price: 150, from: 5 },
 };
 

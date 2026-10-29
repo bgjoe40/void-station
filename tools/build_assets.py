@@ -10,8 +10,8 @@
       https://opengameart.org/content/cybericons, https://opengameart.org/content/microchips-cpus-ics
   - Project Cordon Sprites (CC0, doficia와 기여자들): 헬멧·조끼·전투화·소모품 아이콘 (128px 픽셀아트)
       https://github.com/doficia/project-cordon-sprites
-  - 갈무리 Galmuri (SIL OFL 1.1, 이민서): 한글 픽셀 글꼴 (웹 글꼴은 npm galmuri)
-      https://github.com/quiple/galmuri
+  - Neo둥근모 NeoDunggeunmo (SIL OFL 1.1, 정은빈 Dalgona.): 한글 픽셀 글꼴 (16px, 원작 둥근모꼴 김중태 — 퍼블릭 도메인)
+      https://github.com/neodgm/neodgm
 
 결과물 (assets/):
   atlas.png   스프라이트·아이콘 아틀라스
@@ -19,7 +19,7 @@
   tex/*.png   벽 텍스처(패치 합성)와 바닥 텍스처
   sfx/*.wav   효과음
   music/*.mid 배경음악 (Freedoom MIDI 그대로, 게임이 신시사이저로 연주)
-  fonts/*.woff2 글꼴 (갈무리), fonts/LICENSE-galmuri.txt
+  fonts/neodgm.woff2 글꼴 (Neo둥근모), fonts/LICENSE-neodgm.txt
   LICENSE-freedoom.txt, CREDITS-freedoom.txt, CREDITS-freedoom-music.txt, README.md
 
 아이콘 화풍 맞추기: 출처가 다른 아이콘(icon_*, att_*)을 한 묶음처럼 — Cordon 128px 그림은 1/2로 줄여 픽셀 굵기를 맞추고,
@@ -268,9 +268,11 @@ CORDON_ICONS = {
     'pills':       ('consumables/painkillers.png', None),
     'injection':   ('consumables/injection.png', None),
 }
-# 글꼴: 갈무리 (이민서, SIL OFL 1.1) — 한글 픽셀 글꼴. Galmuri11은 12px의 배수, Galmuri14는 15px의 배수에서 또렷함
-GALMURI = 'https://cdn.jsdelivr.net/npm/galmuri@2.40.3/dist/'
-FONTS = ['Galmuri11.woff2', 'Galmuri11-Bold.woff2', 'Galmuri14.woff2']
+# 글꼴: Neo둥근모 (정은빈 Dalgona., SIL OFL 1.1) — 한글 픽셀 글꼴. 16px의 배수에서 또렷함 (영문·숫자 8px, 한글 16px 폭)
+NEODGM_TAG = 'v1.601'
+NEODGM = f'https://github.com/neodgm/neodgm/releases/download/{NEODGM_TAG}/'
+NEODGM_LICENSE = f'https://raw.githubusercontent.com/neodgm/neodgm/{NEODGM_TAG}/LICENSE.txt'
+FONTS = ['neodgm.woff2']
 # 핏자국 (바닥 데칼): AlejandroHaibi "Liquid Splatter Pixel Texture" (CC0) — 흰 스플래터(8px 픽셀 덩어리)를 덩어리별로 나눠 변형을 만들고 1/4로 줄임
 # 게임에서 몬스터 체액 색으로 칠해 바닥에 눕혀 그림. 이름 -> 쓸 큰 덩어리 번호 (큰 것부터 0, 1, ...; 'all'은 전부) — 가까운 작은 방울은 함께
 SPLAT_FILE = 'blood_splatter_0.png'
@@ -310,9 +312,9 @@ README = """# assets/ — 그래픽 출처와 라이선스
   최종 특성(붉은 조준경·회로 심장·전술 헤드셋, 헤드셋은 밝힘).
   네온 건틀릿은 은색 손을 청록으로 칠함
 
-## 갈무리 (Galmuri) — SIL Open Font License 1.1
-- 출처: https://github.com/quiple/galmuri (이민서), 웹 글꼴은 npm galmuri 2.40.3 (jsDelivr)
-- `fonts/Galmuri11.woff2`, `fonts/Galmuri11-Bold.woff2`, `fonts/Galmuri14.woff2`를 그대로 씀. 라이선스 전문: `fonts/LICENSE-galmuri.txt`
+## Neo둥근모 (NeoDunggeunmo) — SIL Open Font License 1.1
+- 출처: https://github.com/neodgm/neodgm (정은빈 Dalgona., 릴리스 v1.601). 원작 둥근모꼴(김중태)은 퍼블릭 도메인
+- `fonts/neodgm.woff2`를 그대로 씀 (16px 격자 — 게임은 16·32·48px로 씀). 라이선스 전문: `fonts/LICENSE-neodgm.txt`
 
 ## 아이콘 공통 가공 (화풍 맞추기)
 - 모든 아이콘(무기·방어구·소모품·파츠)은 평균 밝기가 낮으면 감마로 조금 밝히고 (평균 80까지, 감마 0.6 이상),
@@ -912,10 +914,12 @@ def main():
         f.write('// tools/build_assets.py 가 생성한 파일 — 직접 고치지 마세요\n')
         f.write('window.ASSET_META = ' + json.dumps(meta, separators=(',', ':')) + ';\n')
 
-    os.makedirs(os.path.join(OUT, 'fonts'), exist_ok=True)  # 글꼴 (갈무리) + 라이선스 전문
-    for name in FONTS + ['LICENSE.txt']:
-        with open(fetch(GALMURI + name, 'galmuri_' + name), 'rb') as a, open(os.path.join(OUT, 'fonts', 'LICENSE-galmuri.txt' if name == 'LICENSE.txt' else name), 'wb') as b:
+    os.makedirs(os.path.join(OUT, 'fonts'), exist_ok=True)  # 글꼴 (Neo둥근모) + 라이선스 전문
+    for name in FONTS:
+        with open(fetch(NEODGM + name, 'neodgm_' + NEODGM_TAG + '_' + name), 'rb') as a, open(os.path.join(OUT, 'fonts', name), 'wb') as b:
             b.write(a.read())
+    with open(fetch(NEODGM_LICENSE, 'neodgm_' + NEODGM_TAG + '_LICENSE.txt'), 'rb') as a, open(os.path.join(OUT, 'fonts', 'LICENSE-neodgm.txt'), 'wb') as b:
+        b.write(a.read())
 
     # --- 라이선스 ---
     for src, dst in (('COPYING.adoc', 'LICENSE-freedoom.txt'), ('CREDITS', 'CREDITS-freedoom.txt'),

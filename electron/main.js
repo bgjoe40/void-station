@@ -37,7 +37,7 @@ function smoke(win) {
     try {
       result = await win.webContents.executeJavaScript(`(async () => ({
         game: typeof newGame === 'function', version: typeof VERSION !== 'undefined' ? VERSION : null,
-        atlas: typeof ART !== 'undefined' && ART.ready, font: document.fonts.check("12px 'Galmuri11'") && document.fonts.check("15px 'Galmuri14'"),
+        atlas: typeof ART !== 'undefined' && ART.ready, font: document.fonts.check("16px 'NeoDunggeunmo'"),
         sfx: (await fetch('assets/sfx/dspistol.wav')).ok, music: (await fetch('assets/music/d_e1m1.mid')).ok,
         save: (() => { try { localStorage.setItem('voidstation.smoke', '1'); localStorage.removeItem('voidstation.smoke'); return true; } catch (e) { return false; } })(),
       }))()`);

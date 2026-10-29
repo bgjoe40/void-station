@@ -82,6 +82,6 @@ npm run dist
 - knekko, [Cybericons](https://opengameart.org/content/cybericons) · [Microchips](https://opengameart.org/content/microchips-cpus-ics) (CC0) — 팔 장비 · 강화칩 · 강화장신구 아이콘
 - [Project Cordon Sprites](https://github.com/doficia/project-cordon-sprites) (CC0) — 헬멧 · 조끼 · 전투화 · 소모품 아이콘
 - AlejandroHaibi, [Liquid Splatter Pixel Texture](https://opengameart.org/content/liquid-splatter-pixel-texture) (CC0) — 핏자국
-- 이민서, [갈무리](https://github.com/quiple/galmuri) (SIL OFL 1.1) — 글꼴 · 라이선스 전문: [`assets/fonts/LICENSE-galmuri.txt`](assets/fonts/LICENSE-galmuri.txt)
+- 정은빈 (Dalgona.), [Neo둥근모](https://github.com/neodgm/neodgm) (SIL OFL 1.1, 원작 둥근모꼴 김중태) — 글꼴 · 라이선스 전문: [`assets/fonts/LICENSE-neodgm.txt`](assets/fonts/LICENSE-neodgm.txt)
 
 자세한 출처와 가공 내역은 [`assets/README.md`](assets/README.md)에 있습니다.

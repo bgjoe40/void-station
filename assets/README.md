@@ -33,9 +33,9 @@
   최종 특성(붉은 조준경·회로 심장·전술 헤드셋, 헤드셋은 밝힘).
   네온 건틀릿은 은색 손을 청록으로 칠함
 
-## 갈무리 (Galmuri) — SIL Open Font License 1.1
-- 출처: https://github.com/quiple/galmuri (이민서), 웹 글꼴은 npm galmuri 2.40.3 (jsDelivr)
-- `fonts/Galmuri11.woff2`, `fonts/Galmuri11-Bold.woff2`, `fonts/Galmuri14.woff2`를 그대로 씀. 라이선스 전문: `fonts/LICENSE-galmuri.txt`
+## Neo둥근모 (NeoDunggeunmo) — SIL Open Font License 1.1
+- 출처: https://github.com/neodgm/neodgm (정은빈 Dalgona., 릴리스 v1.601). 원작 둥근모꼴(김중태)은 퍼블릭 도메인
+- `fonts/neodgm.woff2`를 그대로 씀 (16px 격자 — 게임은 16·32·48px로 씀). 라이선스 전문: `fonts/LICENSE-neodgm.txt`
 
 ## 아이콘 공통 가공 (화풍 맞추기)
 - 모든 아이콘(무기·방어구·소모품·파츠)은 평균 밝기가 낮으면 감마로 조금 밝히고 (평균 80까지, 감마 0.6 이상),
