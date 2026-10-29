@@ -7525,15 +7525,17 @@ function drawMinimap() {
   ctx.font = font(FS); ctx.textAlign = 'left'; ctx.fillStyle = '#9a9484';
   ctx.fillText(fitText(inBase || !R ? '우주 기지' : `구역 ${level} ${CAMPAIGN[level - 1].name}`, w - 32), x0, y0 + h + 14);
   ctx.textAlign = 'right'; ctx.fillText('[M]', x0 + w, y0 + h + 14); ctx.textAlign = 'left'; // 전체 지도 (M)
-  if (keyRow) { // 이 구역에서 주운 키카드만 (없으면 아무것도 없음)
+  if (keyRow) { // 이 구역에서 주운 키카드만 (없으면 아무것도 없음), 금고 열쇠는 뒤에 따로 '금고' (금고 문과 같은 청동 테두리 — 노란 키카드와 헷갈리지 않게)
     const ky = y0 + h + 22;
-    ctx.fillText('키카드', x0, ky + 16);
-    keyCols.filter(c => keysHeld.has(`${level}:${c}`)).forEach((c, n) => {
-      const K = KEYCARDS[c], bx = x0 + 40 + n * 30;
+    let bx = x0 + ctx.measureText('키카드').width + 8;
+    const slot = (c, col) => {
       ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(bx, ky, 24, 24);
-      ctx.strokeStyle = K.color; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, ky + 0.5, 23, 23);
-      drawIcon(K.spr + 'a0', bx + 3, ky + 2, 18, 20);
-    });
+      ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, ky + 0.5, 23, 23);
+      drawIcon(KEYCARDS[c].spr + 'a0', bx + 3, ky + 2, 18, 20); bx += 30;
+    };
+    ctx.fillStyle = '#9a9484'; ctx.fillText('키카드', x0, ky + 16);
+    for (const c of keyCols) if (c !== 'vault' && keysHeld.has(`${level}:${c}`)) slot(c, KEYCARDS[c].color);
+    if (R.vault && keysHeld.has(`${level}:vault`)) { bx += 8; ctx.fillStyle = '#9a9484'; ctx.fillText('금고', bx, ky + 16); bx += ctx.measureText('금고').width + 8; slot('vault', '#b07a3c'); }
   }
 }
 function drawTopInfo() {
