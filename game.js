@@ -1961,9 +1961,10 @@ function bloodSplat(x, y, r, col, more = true) {
 // 플레이어 피격 (난이도 배율 적용). (sx, sy): 공격이 온 곳 — 맞은 방향 표시와 밀려남에 씀
 function hurtPlayer(dmg, sx, sy) {
   const p = player;
-  if (p.down || p.dash > 0 || p.inv > 0 || (state !== 'play' && state !== 'trade') || dmg <= 0 || inHub()) return false; // 쓰러진 동안·안전 지대에서는 다치지 않음
+  if (p.dash > 0 || p.inv > 0 || (state !== 'play' && state !== 'trade') || dmg <= 0 || inHub()) return false; // 안전 지대에서는 다치지 않음
   dmg *= DIFFICULTY[difficulty].dmg * (buff('berserk') ? 1 - SKILLS.berserk.guard : 1) * (buff('iron') ? 1 - SKILLS.iron.guard : 1) // 광폭화·강철 피부 중에는 덜 아픔
     * (1 - defCut(gearDef() * (p.fx.curse > 0 ? ELITE_FX.curse.def : 1))) * (shrineOn('guard') ? 1 - SHRINES.guard.cut : 1); // 방어구 (저주 중이면 절반), 수호의 신단
+  if (p.down) { bleedDown(dmg, sx, sy); return true; } // 쓰러짐: 체력 대신 버틸 시간
   const ab = Math.min(p.armor, dmg * 0.6);
   p.armor -= ab; const real = dmg - ab; p.hp -= real;
   hurtFlash = Math.min(1, hurtFlash + real / Math.max(35, p.maxhp * 0.25)); hitFlash = 1; p.painT = 0.2; p.hitT = 0.16; // 붉기: 최대 체력의 1/4을 한 번에 잃으면 가장 붉게
@@ -1983,6 +1984,16 @@ function hurtPlayer(dmg, sx, sy) {
   Snd.play('hurt');
   if (p.hp <= 0) { p.hp = 0; fallDown(); }
   return true;
+}
+// 쓰러진 동안 맞음: 버틸 시간이 줄어듦 (최대 체력만큼이면 DOWNED.bleed초) — 시간 막대에서 깎인 만큼 번쩍임
+function bleedDown(dmg, sx, sy) {
+  const p = player, D = p.down, cut = clamp(dmg / p.maxhp * DOWNED.bleed, DOWNED.bleedMin, DOWNED.bleedMax);
+  D.lost = (D.lostT > 0 ? D.lost : 0) + Math.min(cut, Math.max(0, D.t)); D.lostT = 0.5; D.t -= cut;
+  hurtFlash = Math.min(1, hurtFlash + 0.4); hitFlash = 1; p.painT = 0.2; p.hitT = 0.16; shake = Math.max(shake, 5);
+  addText(p.x, p.y, `-${cut.toFixed(1)}초`, '#f66', 44);
+  blood(p.x, p.y, 5, '#a01414');
+  if (sx !== undefined) { hurtDirs.push({ a: Math.atan2(sy - p.y, sx - p.x), t: 1 }); if (hurtDirs.length > 6) hurtDirs.shift(); }
+  Snd.play('hurt');
 }
 function hitEnemy(e, dmg, kx = 0, ky = 0, silent = false, crit = false, guard = false) { // guard: 방패에 막힘 (회색 숫자 + 방패의 푸른 불꽃)
   if (e.dead || hiddenE(e)) return; // 천장·땅속: 맞지 않음
@@ -4006,7 +4017,7 @@ function startReload() {
   const p = player, wi = curW(), w = wi.s;
   if (w.type !== 'gun' || p.reload > 0 || wi.mag >= w.mag || p.ammo[w.ammo] < (w.cost || 1)) return false;
   const n = Math.min(w.mag - wi.mag, Math.floor(p.ammo[w.ammo] / (w.cost || 1))), speed = (1 - perkV('reload')) * (1 - gearV('reload')); // 넣을 탄 수, 빠른 손·팔 옵션
-  if (w.cat === 2) { p.shellT = p.shellGap = w.reload / w.mag * SHELL_LOAD * speed; p.reload = p.reloadMax = p.shellGap * n; } // 샷건: 한 발씩 (넣을 만큼만 — 마지막 한 발은 finishReload)
+  if (w.cat === 2) { p.shellT = p.shellGap = w.shell * speed; p.reload = p.reloadMax = p.shellGap * n; } // 샷건: 한 발씩 (넣을 만큼만 — 마지막 한 발은 finishReload)
   else { p.shellGap = 0; p.reload = p.reloadMax = w.reload * speed; Snd.play('reload'); }
   p.charging = 0; return true;
 }
@@ -4089,6 +4100,7 @@ function weaponStats(inst) {
   }
   if (inst.uq) { s.uq = inst.uq; if (UNIQUES[inst.uq].tracer) s.tracer = UNIQUES[inst.uq].tracer; } // 고유 전설: 효과 키, 탄 색
   applyAttach(s, inst); // 끼운 파츠 (parts.js)
+  if (s.cat === 2) { s.shell = SHELL_LOAD * s.reload / b.reload; s.reload = s.shell * s.mag; } // 샷건: 한 발 시간, 재장전은 빈 탄창에 다 넣는 시간
   return s;
 }
 // 등급·옵션이 정해진 무기 개체 (저장 불러오기에도 사용). uq: 고유 전설 키, att: 끼운 파츠 { 칸: { id, rarity } }
@@ -5357,7 +5369,12 @@ function updatePlayer(dt) {
   if (f.burn > 0) { f.burn -= dt; if (!safe) p.hp -= 9 * dt * dm; if (Math.random() < dt * 15) fireBurst(p.x, p.y, 1, 0.3); }
   const rg = hpRegen(); if (rg > 0 && !p.down) p.hp = Math.min(p.maxhp, p.hp + rg * dt); // 방어구 체력 회복 옵션, 재생 조직
   if (p.hp <= 0 && !p.down) { p.hp = 0; fallDown(); if (state !== 'play') return; }
-  if (p.down) { const D = p.down; if ((D.t -= dt) <= 0) { p.down = null; die(); return; } if (D.dmg >= D.need || D.kills >= DOWNED.kills || D.ammo >= DOWNED.ammo) standUp(); }
+  if (p.down) {
+    const D = p.down; D.age += dt; D.pulse = Math.max(0, D.pulse - dt * 2.5); D.lostT = Math.max(0, D.lostT - dt);
+    if ((D.beat -= dt) <= 0) { D.beat = 0.35 + 0.6 * clamp(D.t / DOWNED.time, 0, 1); D.pulse = 1; Snd.play('heart'); } // 심장: 남은 시간이 줄수록 빨리
+    if ((D.t -= dt) <= 0) { p.down = null; die(); return; }
+    if (D.dmg >= D.need || D.kills >= DOWNED.kills || D.ammo >= DOWNED.ammo) standUp();
+  }
   else p.downMax = Math.min(DOWNED.time, p.downMax + DOWNED.regen * dt);
   p.poolT = Math.max(0, (p.poolT || 0) - dt);
   if (!p.down && !safe && p.poolT <= 0 && poolMap[Math.floor(p.y) * MW + Math.floor(p.x)]) { // 독극물 웅덩이: tick초마다 (회피 중엔 hurtPlayer가 막음)
@@ -5408,7 +5425,7 @@ function updatePlayer(dt) {
   p.look += angDiff(p.aim, p.look) * Math.min(1, dt * 12);
   p.target = w.type === 'gun' && settings.autoAim ? findTarget(w.range || 16) : null; // 설정의 자동 조준
 
-  const rate = (f.adren > 0 ? 1.35 : 1) * (buff('berserk') ? SKILLS.berserk.rate : 1) * (buff('deadeye') ? 1.25 : 1) * (shrineOn('haste') ? SHRINES.haste.rate : 1); // 아드레날린, 광폭화, 집중 사격, 신속의 신단
+  const rate = (f.adren > 0 ? 1.35 : 1) * (buff('berserk') ? SKILLS.berserk.rate : 1) * (buff('deadeye') ? 1.25 : 1) * (shrineOn('haste') ? SHRINES.haste.rate : 1) * (p.down ? DOWNED.rate : 1); // 아드레날린, 광폭화, 집중 사격, 신속의 신단, 쓰러짐 (쏘기·장전이 느림)
   p.cool -= dt * rate; p.swing -= dt; p.fireT -= dt; p.painT -= dt; p.hitT -= dt;
   for (const k in p.scd) if (p.scd[k] > 0) p.scd[k] -= dt; // 스킬 대기시간
   for (const k in p.sk) { const b = p.sk[k]; if (b.t > 0 && (b.t -= dt) <= 0) skillEnd(k); } // 지속 중인 스킬 효과
@@ -6869,7 +6886,7 @@ function tooltipLines(inst) {
   for (const t of wrapWords(s.desc || '', 30)) L.push({ t, c: '#d8c89a' }); // 무기 설명
   L.push({ t: `피해 ${Math.round(s.dmg)}${s.pellets ? ' x' + s.pellets : ''}, DPS ${Math.round(weaponDps(s))}`, c: '#eee' });
   if (s.type === 'gun') {
-    L.push({ t: `발사 간격 ${s.rate.toFixed(2)}초, 장탄 ${s.mag}, 재장전 ${s.reload.toFixed(1)}초${s.cat === 2 ? ` (한 발 ${(s.reload / s.mag).toFixed(2)}초)` : ''}`, c: '#ccc' });
+    L.push({ t: `발사 간격 ${s.rate.toFixed(2)}초, 장탄 ${s.mag}, 재장전 ${s.reload.toFixed(1)}초${s.cat === 2 ? ` (한 발 ${s.shell.toFixed(2)}초)` : ''}`, c: '#ccc' });
     L.push({ t: `탄퍼짐 ${s.spread.toFixed(2)}, 사거리 ${s.range || 16}, ${AMMO[s.ammo].name}`, c: '#ccc' });
     if (s.blast || s.charge || s.cost) L.push({ t: [s.blast && `폭발 반경 ${s.blast}칸`, s.charge && `충전 ${s.charge}초`, s.cost && `한 발에 ${AMMO[s.ammo].name} ${s.cost}`].filter(Boolean).join(', '), c: '#9cf' });
   } else {
@@ -7009,13 +7026,27 @@ function equippedFor(it) {
   return p.equip[p.slot] ? [p.equip[p.slot]] : [];
 }
 // 창의 툴팁 + 비교: 착용 중인 장비의 툴팁을 커서에서 먼 쪽 옆에 ('착용 중' 줄, 둘이면 아래로 쌓음 — 그쪽에 자리가 없으면 반대쪽)
+// 좁은 화면이라 양옆 다 자리가 없으면 위아래로 (아래 → 위 → 둘을 함께 위로), 그래도 안 되면 둘을 나란히 커서 옆으로 옮김
 function drawTipQ() {
-  const [L, x, y, cmp] = tipQ, r = drawTooltip(L, x, y, VH);
-  if (!cmp || !cmp.length) return;
-  const C = cmp.map(it => [{ t: '착용 중', c: HC.dim }, ...itemLines(it)]), cw = Math.max(...C.map(c => tipSize(c)[0]));
-  const left = r[0] + r[2] / 2 < mouse.x ? r[0] - 8 - cw >= 6 : r[0] + r[2] + 8 + cw > W - 6;
-  let cy = r[1];
-  C.forEach((c, k) => { const q = drawTooltip(c, left ? r[0] - 8 - cw : r[0] + r[2] + 8, cy, VH, itemColor(cmp[k])); cy = q[1] + q[3] + 6; });
+  const [L, x, y, cmp] = tipQ;
+  if (!cmp || !cmp.length) { drawTooltip(L, x, y, VH); return; }
+  const C = cmp.map(it => [{ t: '착용 중', c: HC.dim }, ...itemLines(it)]), S = C.map(tipSize), [w, h] = tipSize(L);
+  const cw = Math.max(...S.map(s => s[0])), ch = S.reduce((a, s) => a + s[1] + 6, -6), tw = w + 8 + cw;
+  let mx = clamp(x, 6, W - w - 6), my = clamp(y, 6, VH - h - 6), cx, cy = my;
+  const fitL = mx - 8 - cw >= 6, fitR = mx + tw <= W - 6;
+  if (mx + w / 2 < mouse.x ? fitL : !fitR && fitL) cx = mx - 8 - cw;
+  else if (fitR) cx = mx + w + 8;
+  else if (h + 6 + ch <= VH - 12) {
+    cx = clamp(mx, 6, W - 6 - cw);
+    if (my + h + 6 + ch <= VH - 6) cy = my + h + 6;
+    else if (my - 6 - ch >= 6) cy = my - 6 - ch;
+    else { my = VH - 6 - ch - 6 - h; cy = my + h + 6; }
+  } else if (tw <= W - 12) { // 커서 오른쪽이면 [툴팁][착용 중], 왼쪽이면 [착용 중][툴팁]
+    if (mouse.x < W / 2) { mx = clamp(mouse.x + 18, 6, W - 6 - tw); cx = mx + w + 8; }
+    else { mx = clamp(mouse.x - 18 - w, 14 + cw, W - 6 - w); cx = mx - 8 - cw; }
+  } else { cx = clamp(mx, 6, W - 6 - cw); cy = my + h + 6; } // 어디에도 다 들어가지 않음: 아래로 (겹칠 수 있음)
+  drawTooltip(L, mx, my, VH);
+  C.forEach((c, k) => { const q = drawTooltip(c, cx, cy, VH, itemColor(cmp[k])); cy = q[1] + q[3] + 6; });
 }
 function winCard(x, y, w, h) { const f = HC.fill; HC.fill = WIN_FILL; pxCard(x, y, w, h, true); HC.fill = f; }
 // 오목한 칸 r = [x, y, w, h]: 테두리 (hot: 호박색), 위·왼쪽 그림자, 아래·오른쪽 밝은 선, glow: 등급 빛 'r,g,b'
@@ -7307,6 +7338,7 @@ function render() {
 function drawScreen() {
   const scene = state === 'title', cine = state === 'intro';
   const p = player;
+  if (p && p.down && !scene && !cine) downedVeil();
   if (!scene && !cine) { drawLootLabels(); drawEliteLabels(); drawTerminalLabels(); drawMissionLabels(); drawHazardLabels(); }
 
   // 떠오르는 숫자
@@ -7321,7 +7353,7 @@ function drawScreen() {
   ctx.globalAlpha = 1;
 
   // 피격 비네트: 화면 가장자리만 (가운데는 맑게)
-  const low = p.hp < p.maxhp * 0.25;
+  const low = p.hp < p.maxhp * 0.25 && !p.down;
   if (settings.hurtFx && (hurtFlash > 0 || low)) edgeGlow('200,0,0', Math.max(hurtFlash * 0.5, low ? 0.22 + 0.1 * Math.sin(gtime * 6) : 0), 0.6); // 설정의 피격 화면 효과
   if (settings.hurtFx && hitFlash > 0) edgeGlow('255,30,20', 0.3 * hitFlash, 0.75); // 맞은 순간 가장자리가 붉게 번쩍
   if (escape) { ctx.fillStyle = `rgba(255,20,0,${0.06 + 0.05 * Math.sin(gtime * 6)})`; ctx.fillRect(0, 0, W, VH); } // 자폭 경보등
@@ -7339,7 +7371,7 @@ function drawScreen() {
   drawTip();
   drawLog();
   drawHUD();
-  if (player.down) drawDowned();
+  if (player.down) drawDowned(); else if (reviveFx > 0) drawRevive();
   if (zoneCard && (state === 'play' || state === 'trade')) drawZoneCard();
   if (state === 'trade') drawTrade();
   if (invOpen && (state === 'play' || state === 'trade')) drawInventory();
@@ -7894,6 +7926,7 @@ function hudTick(dt) {
   hudFx.name = Math.max(0, hudFx.name - dt); hudFx.xpT = Math.max(0, hudFx.xpT - dt);
   if (hudFx.dashCd > 0 && p.dashCd <= 0) hudFx.dashReady = 0.4; // 회피가 다시 찼음
   hudFx.dashCd = p.dashCd; hudFx.dashReady = Math.max(0, hudFx.dashReady - dt); hudFx.dashDeny = Math.max(0, hudFx.dashDeny - dt);
+  reviveFx = Math.max(0, reviveFx - dt);
   hudFx.stamA = p.stamina < staminaMax() - 0.01 ? 1 : Math.max(0, hudFx.stamA - dt * 2.5); // 스태미너 막대: 쓰거나 차오르는 동안 보이고, 다 차면 서서히 사라짐
 }
 // 화면 가장자리 빛: 가운데(화면 반지름의 r0배)는 맑고 모서리로 갈수록 col (화면 비율의 타원)
@@ -7996,19 +8029,53 @@ function drawHUD() {
   if (menuHover && !held) drawTooltip(menuHover.L, menuHover.x - 20, y - menuHover.L.length * 17 - 18, VH);
   if (dashHover && !held) drawTooltip(dashHover.L, dashHover.x - 20, y - dashHover.L.length * 17 - 18, VH);
 }
-// 쓰러짐: 붉은 가장자리, 아래 HUD 위에 남은 시간 막대와 다시 일어날 조건 셋 (피해·처치·탄약 — 하나만 채우면 됨)
+// 쓰러짐: 세상이 잿빛으로 어두워지고 (남은 시간이 줄수록 더), 심장이 뛸 때마다 붉은 가장자리가 조여 옴
+function downedVeil() {
+  const D = player.down, k = 1 - clamp(D.t / D.max, 0, 1), a = clamp(D.age / 0.3, 0, 1);
+  ctx.save(); ctx.globalCompositeOperation = 'saturation'; ctx.globalAlpha = (0.5 + 0.35 * k) * a; ctx.fillStyle = '#808080'; ctx.fillRect(0, 0, W, VH); ctx.restore();
+  ctx.fillStyle = `rgba(0,0,0,${((0.08 + 0.2 * k) * a).toFixed(3)})`; ctx.fillRect(0, 0, W, VH);
+  edgeGlow('170,0,0', (0.36 + 0.25 * D.pulse + 0.2 * k) * a, 0.64 - 0.2 * k - 0.08 * D.pulse);
+}
+// 쓰러짐: 위 가운데에 '쓰러짐' (처음에 크게 찍히고 심장이 뛸 때 떨림), 양 끝에서 가운데로 줄어드는 버틸 시간 막대 (맞아서 깎인 만큼 흰빛),
+// 그 아래 다시 일어날 조건 셋 — 둥근 게이지 안에 든 무기 (피해)·해골 (처치)·탄약 상자 (탄약), 하나만 채우면 됨 (오르면 번쩍)
 function drawDowned() {
-  const D = player.down, w = 330, h = 58, x = Math.round(W / 2 - w / 2), y = Math.round(hudBottom() - h - 10);
-  edgeGlow('150,0,0', 0.5 + 0.12 * Math.sin(gtime * 7), 0.4);
-  pxCard(x, y, w, h, false, '#d8222c');
-  ctx.font = font(FS); ctx.textAlign = 'left'; ctx.fillStyle = '#ff6a5a'; ctx.fillText('쓰러짐', x + 10, y + 20);
-  ctx.textAlign = 'right'; ctx.fillStyle = INK; ctx.fillText(`${Math.max(0, D.t).toFixed(1)}초`, x + w - 10, y + 20);
-  ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(x + 64, y + 12, w - 140, 6); ctx.fillStyle = '#d8222c'; ctx.fillRect(x + 64, y + 12, Math.round((w - 140) * clamp(D.t / D.max, 0, 1)), 6);
-  [['피해', D.dmg / D.need, `${Math.floor(Math.min(D.dmg, D.need))}/${D.need}`], ['처치', D.kills / DOWNED.kills, `${D.kills}/${DOWNED.kills}`], ['탄약', D.ammo / DOWNED.ammo, `${Math.floor(Math.min(1, D.ammo / DOWNED.ammo) * 100)}%`]].forEach(([t, f, v], k) => {
-    const cx = x + 10 + k * 106;
-    ctx.textAlign = 'left'; ctx.fillStyle = HC.dim; ctx.fillText(t, cx, y + 44); ctx.textAlign = 'right'; ctx.fillStyle = f >= 1 ? '#9f9' : INK; ctx.fillText(v, cx + 98, y + 44);
-    ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(cx, y + 49, 98, 3); ctx.fillStyle = '#9f9'; ctx.fillRect(cx, y + 49, Math.round(98 * clamp(f, 0, 1)), 3);
+  const D = player.down, cx = Math.round(W / 2), y0 = Math.round(Math.max(70, VH * 0.17)), fr = clamp(D.t / D.max, 0, 1), urgent = D.t < 1.5;
+  const pop = clamp(D.age / 0.22, 0, 1), sc = 1 + (1 - pop) * 0.9, jit = D.pulse > 0.7 ? Math.round(rnd(-1.5, 1.5)) : 0;
+  ctx.save(); ctx.translate(cx + jit, y0); ctx.scale(sc, sc); ctx.globalAlpha = pop; ctx.textAlign = 'center'; ctx.font = font(32);
+  ctx.fillStyle = '#000'; ctx.fillText('쓰러짐', 3, 3);
+  ctx.fillStyle = urgent && Math.sin(gtime * 20) > 0 ? '#ffd0c8' : '#ff3a2e'; ctx.fillText('쓰러짐', 0, 0);
+  ctx.restore();
+  const bw = 300, bh = 8, by = y0 + 14, half = Math.round(bw / 2 * fr);
+  ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillRect(cx - bw / 2 - 3, by - 3, bw + 6, bh + 6);
+  ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(cx - bw / 2, by, bw, bh);
+  if (D.lostT > 0) { const lw = Math.min(bw / 2 - half, Math.round(bw / 2 * D.lost / D.max)); ctx.fillStyle = `rgba(255,240,230,${(D.lostT / 0.5).toFixed(3)})`; ctx.fillRect(cx - half - lw, by, lw, bh); ctx.fillRect(cx + half, by, lw, bh); }
+  ctx.fillStyle = urgent ? (Math.sin(gtime * 20) > 0 ? '#ff2a1a' : '#8a0000') : '#d8222c'; ctx.fillRect(cx - half, by, half * 2, bh);
+  ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(cx - half, by, half * 2, 2);
+  ctx.font = font(FS); ctx.textAlign = 'center'; ctx.fillStyle = '#000'; ctx.fillText(Math.max(0, D.t).toFixed(1), cx + 1, by + bh + 19);
+  ctx.fillStyle = urgent ? '#ff8a7a' : INK; ctx.fillText(Math.max(0, D.t).toFixed(1), cx, by + bh + 18);
+  const wi = curW(), r = 21, gy = by + bh + 60;
+  [[D.dmg / D.need, `${Math.floor(Math.min(D.dmg, D.need))}/${D.need}`], [D.kills / DOWNED.kills, `${D.kills}/${DOWNED.kills}`], [D.ammo / DOWNED.ammo, `${Math.floor(D.ammo)}/${DOWNED.ammo}`]].forEach(([f, v], k) => {
+    const x = cx + (k - 1) * 84; f = clamp(f, 0, 1);
+    if (f > D.seen[k]) { D.seen[k] = f; D.flT[k] = gtime; }
+    const fl = clamp(1 - (gtime - D.flT[k]) / 0.35, 0, 1);
+    ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.beginPath(); ctx.arc(x, gy, r + 5, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.beginPath(); ctx.arc(x, gy, r, 0, Math.PI * 2); ctx.stroke();
+    if (f > 0) { ctx.strokeStyle = fl > 0 ? `rgb(255,${Math.round(200 + 55 * fl)},${Math.round(120 + 135 * fl)})` : HC.acc; ctx.beginPath(); ctx.arc(x, gy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * f); ctx.stroke(); }
+    if (fl > 0) { ctx.globalAlpha = fl * 0.5; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, gy, r + 5 + 6 * (1 - fl), 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; }
+    ctx.lineWidth = 1;
+    const s = 26 + Math.round(4 * fl);
+    if (k === 0) { if (wi === FISTS) drawIcon('puffa0', x - s / 2, gy - s / 2, s, s); else drawWeaponArt(wi, x - s / 2 - 4, gy - s / 2, s + 8, s); }
+    else drawIcon(k === 1 ? 'skula1' : 'ammoa0', x - s / 2, gy - s / 2, s, s);
+    ctx.font = font(FS); ctx.textAlign = 'center'; ctx.fillStyle = '#000'; ctx.fillText(v, x + 1, gy + r + 22); ctx.fillStyle = f > 0 ? '#ffe2a0' : '#c8c2b4'; ctx.fillText(v, x, gy + r + 21);
   });
+}
+// 다시 일어섬: 같은 자리에 초록 글자가 크게 찍혔다가 사라지고, 화면이 잠깐 밝게
+function drawRevive() {
+  const t = REVIVE_FX - reviveFx, a = Math.min(1, reviveFx / 0.4), sc = 1 + Math.max(0, 0.18 - t) / 0.18 * 0.8, y0 = Math.round(Math.max(70, VH * 0.17));
+  if (t < 0.25) { ctx.fillStyle = `rgba(210,255,220,${((0.25 - t) * 1.1).toFixed(3)})`; ctx.fillRect(0, 0, W, VH); }
+  ctx.save(); ctx.globalAlpha = a; ctx.translate(Math.round(W / 2), y0); ctx.scale(sc, sc); ctx.textAlign = 'center'; ctx.font = font(32);
+  ctx.fillStyle = '#000'; ctx.fillText('다시 일어섰다', 3, 3); ctx.fillStyle = '#7dff8a'; ctx.fillText('다시 일어섰다', 0, 0);
+  ctx.restore();
 }
 // 죽음: 어둡게, 가운데 '죽었습니다', 조금 뒤 아래에 누르고 있으면 다시 일어나기 (오프닝 건너뛰기와 같은 둥근 게이지)
 function drawDeath() {
@@ -8288,7 +8355,7 @@ function fallDown() {
   if (p.down) return;
   if (escape) { die(); return; }
   if (state === 'trade') closeTrade(); // 자판기 앞에서 쓰러지면 창을 닫음
-  p.down = { t: p.downMax, max: p.downMax, dmg: 0, kills: 0, ammo: 0, need: Math.round(DOWNED.dmg * (1 + ENEMY_GROW.hp * (lv - 1)) * DIFFICULTY[difficulty].hp * curveAt(CURVE.hp, lv)) };
+  p.down = { t: p.downMax, max: p.downMax, age: 0, beat: 0, pulse: 0, lost: 0, lostT: 0, seen: [0, 0, 0], flT: [-9, -9, -9], dmg: 0, kills: 0, ammo: 0, need: Math.round(DOWNED.dmg * (1 + ENEMY_GROW.hp * (lv - 1)) * DIFFICULTY[difficulty].hp * curveAt(CURVE.hp, lv)) };
   p.downMax = Math.max(DOWNED.min, p.downMax - DOWNED.cost);
   p.fx.poison = p.fx.burn = 0; p.dash = 0; p.charging = 0; p.stagger = 0;
   Snd.play('bigHurt'); shake = Math.max(shake, 8); tip('downed');
@@ -8296,11 +8363,12 @@ function fallDown() {
 function standUp() {
   const p = player; p.down = null;
   p.hp = Math.max(1, Math.round(p.maxhp * DOWNED.hp)); p.inv = Math.max(p.inv, DOWNED.inv);
-  msg('다시 일어섰다!', '#9f9'); addText(p.x, p.y, '다시 일어섰다', '#9f9', 60, true); Snd.play('levelUp');
-  flashes.push({ x: p.x, y: p.y, r: 360, t: 0.4, max: 0.4, col: '120,255,140' });
+  msg('다시 일어섰다!', '#9f9'); reviveFx = REVIVE_FX; Snd.play('levelUp'); shake = Math.max(shake, 6);
+  flashes.push({ x: p.x, y: p.y, r: 360, t: 0.4, max: 0.4, col: '120,255,140' }); rings.push({ x: p.x, y: p.y, R: 3, t: 0, max: 0.45, col: '120,255,140' });
 }
 // 죽음: 가운데 '죽었습니다' (drawDeath) — DOWNED.wait초 뒤부터 누르고 있으면 마지막으로 들른 보급 거점에서 다시 일어남 (respawn). 자폭 중이거나 자폭에 휘말리면 임무 실패
 let deadHold = 0, deadArm = false; // 누르고 있은 시간, 죽을 때 누르고 있던 것을 한 번 뗐는지
+const REVIVE_FX = 1.4; let reviveFx = 0; // 다시 일어선 순간의 큰 글자 (drawRevive)
 function deadTick(dt) {
   const held = mouse.down || Object.values(keys).some(Boolean);
   if (!held) deadArm = true;

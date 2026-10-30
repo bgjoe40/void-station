@@ -1,7 +1,7 @@
 // ===== 게임 데이터 정의 (무기 / 탄약 / 수류탄 / 아이템 / 적) =====
 
 // 버전: GitHub에 커밋·푸시할 때마다 올림 (새 기능은 가운데 자리, 고침·작은 추가는 끝자리) — 타이틀·일시정지 화면에 표시, git 태그 v<버전>
-const VERSION = '0.40.0';
+const VERSION = '0.41.0';
 
 const CAT_NAMES = ['근접', '권총', '샷건', '라이플', '기관총', '에너지'];
 const MAX_LOAD = 30;   // 장착 + 가방 무기 무게 합이 넘으면 이동속도 감소
@@ -337,7 +337,7 @@ const ATTACH_DROP = { kill: 0.015, elite: 0.4, crate: 0.08, boss: 2, thief: 2 };
 const ATTACH_ON_LOOT = 0.3;          // 희귀 이상 무기가 맞는 파츠 하나를 달고 나올 확률
 const ATTACH_STOCK = 12;             // 보급 자판기 '파츠' 진열 수
 const BURST_GAP = 0.07;              // 점사 무기의 발과 발 사이 (초)
-const SHELL_LOAD = 0.75;             // 샷건: 한 발씩 장전 — 한 발 시간 = 재장전 / 장탄 x SHELL_LOAD (넣는 대로 장탄이 오르고 한 발마다 소리, 쏘면 장전을 멈추고 넣은 만큼 쏨)
+const SHELL_LOAD = 0.7;              // 샷건: 한 발씩 장전 — 한 발 0.7초 (무기 옵션·파츠의 재장전 비율로 줄고 늚, 넣는 대로 장탄이 오르고 한 발마다 소리, 쏘면 장전을 멈추고 넣은 만큼 쏨)
 const PICKUP_MAGNET = { r: 2.2, v: 10 };            // 골드: 이 거리(칸) 안이면 v칸/초로 끌려와 저절로 주워짐
 
 // ===== 고유 전설 장비 =====
@@ -756,11 +756,12 @@ const ARENA_FEED = { every: 5, n: [1, 2], max: 4, chance: 0.35, pack: 1 };
 const FIELD_ORDER = [[0, 0], [1, 0], [2, 0], [2, 1], [1, 1], [0, 1], [0, 2], [1, 2], [2, 2]]; // 구역 1~9가 놓이는 칸 (열, 행)
 // 다음 구역으로 가는 길목의 봉쇄 격벽: boss — 그 구역 보스를 처치하면, mission — 그 구역 임무를 이루면 열림
 const GATES = { 3: 'boss', 6: 'boss', 8: 'mission' };
-// 쓰러짐: 체력이 0이 되면 바로 끝나지 않고 몇 초 동안 기어 다니며 싸움 (spd배로 느리게, 쏘기·장전만 — 회피·달리기·스킬·소모품·수류탄·[F] 없음, 더 다치지 않음)
-// 그동안 피해 dmg (그 구역 적 체력 배율만큼) 이상 주거나, kills마리 처치하거나, 탄약을 ammo묶음 이상 주우면 다시 일어남 (최대 체력의 hp, inv초 무적)
+// 쓰러짐: 체력이 0이 되면 바로 끝나지 않고 몇 초 동안 기어 다니며 싸움 (spd배로 느리게, 쏘기·장전만 rate배 빠르기로 — 회피·달리기·스킬·소모품·수류탄·[F] 없음)
+// 그동안 맞으면 체력 대신 버틸 시간이 줄어듦 (최대 체력만큼 맞으면 bleed초 — 한 번에 bleedMin~bleedMax초)
+// 피해 dmg (그 구역 적 체력 배율만큼) 이상 주거나, kills마리 처치하거나, 탄약을 ammo묶음 이상 주우면 다시 일어남 (최대 체력의 hp, inv초 무적)
 // 버틸 시간은 처음 time초 — 쓰러질 때마다 다음 시간은 cost초 줄고 (min초까지), 살아 있는 동안 초당 regen초씩 다시 늘어남 (time초까지)
 // 시간이 다 되면 죽음: 가운데 '죽었습니다', wait초 뒤부터 hold초 누르고 있으면 마지막으로 들른 거점에서 다시 일어남
-const DOWNED = { time: 5, min: 1.5, cost: 1.5, regen: 0.05, spd: 0.35, dmg: 160, kills: 2, ammo: 1, hp: 0.35, inv: 2, wait: 1.2, hold: 1 };
+const DOWNED = { time: 5, min: 1.5, cost: 1.5, regen: 0.025, spd: 0.35, rate: 0.5, bleed: 3, bleedMin: 0.2, bleedMax: 1.5, dmg: 400, kills: 3, ammo: 2, hp: 0.35, inv: 2, wait: 1.2, hold: 1 };
 const DEATH_GOLD = 0.15;                    // 쓰러지면 잃는 골드 비율 — 마지막으로 들른 보급 거점에서 다시 일어남
 const DEATH_XP = 0.9;                       // 쓰러지면 레벨은 그대로, 지금 레벨에서 모은 경험치는 0이 되어 쓰러진 자리에 떨어짐 — 주우면 이 비율만큼 되찾음
 const REGION_BONUS = { gold: 100, xp: 100 }; // 새 구역에 처음 들어가면 골드·경험치 x (구역-1)
@@ -990,7 +991,7 @@ const TIPS = {
   armor:     { title: '장갑 몬스터', icon: 'bos2a1', lines: ['약한 탄은 잘 안 통하지만 몇 발에 한 발은 뚫린다', '강한 한 방이나 철갑탄 탄창이 잘 통한다'] },
   dodge:     { title: '총알을 피하는 적', icon: 'trooa1', lines: ['넓게 쏘거나 피한 직후를 노려라'] },
   boss:      { title: '보스', icon: 'cybra1', lines: ['체력이 절반 밑이면 격노한다', '보스방에 들어서면 입구가 잠긴다. 처치하거나 쓰러지면 열린다', '갇힌 동안 나타나는 작은 적은 가끔 탄약을 떨어뜨린다'] },
-  downed:    { title: '쓰러짐', icon: 'playk0', lines: ['기어 다니며 쏠 수 있다', '피해를 주거나 적을 처치하거나 탄약을 주우면 다시 일어난다'] },
+  downed:    { title: '쓰러짐', icon: 'playk0', lines: ['기어 다니며 쏠 수 있다 (쏘기·장전이 느림)', '맞으면 버틸 시간이 줄어든다', '피해를 주거나 적을 처치하거나 탄약을 주우면 다시 일어난다'] },
   pool:      { title: '독극물 웅덩이', icon: null, lines: ['밟고 있으면 계속 다친다. 회피로 건너면 다치지 않는다'] },
   levelup:   { title: '레벨 업', icon: 'icon_syringe_blue', lines: ['특성은 스킬 창 [K]에서 올린다'] },
   xpdrop:    { title: '잃어버린 경험치', icon: 'playn0', lines: [`쓰러진 자리에서 주우면 ${Math.round(DEATH_XP * 100)}%를 되찾는다`] },
