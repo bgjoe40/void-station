@@ -712,13 +712,16 @@ function placeDoors() {
   for (const L of links) {
     if (L.gate) {
       const d = doors[addDoor(L.B.cells)];
-      d.gate = L.gate; d.locked = true;
-      if (L.len >= 5 && Math.random() < 0.7) addDoor(L.A.cells);
+      d.gate = L.gate; d.locked = true; if (L.B.room.arena) d.arena = L.B.room;
+      if (L.A.room.arena) doors[addDoor(L.A.cells)].arena = L.A.room;
+      else if (L.len >= 5 && Math.random() < 0.7) addDoor(L.A.cells);
       continue;
     }
-    const ends = [L.A, L.B].filter(() => Math.random() < 0.7);
-    if (L.len < 5 && ends.length > 1) ends.splice(irnd(0, 1), 1);
-    for (const s of ends) addDoor(s.cells);
+    let ends = [L.A, L.B].filter(() => Math.random() < 0.7);
+    const ar = [L.A, L.B].filter(s => s.room.arena); // 보스방 쪽 끝: 언제나 문 (짧은 통로면 그 문 하나만)
+    if (ar.length) ends = L.len < 5 ? ar : [...new Set([...ends, ...ar])];
+    else if (L.len < 5 && ends.length > 1) ends.splice(irnd(0, 1), 1);
+    for (const s of ends) { const n = addDoor(s.cells); if (s.room.arena) doors[n].arena = s.room; }
   }
 }
 // 방의 입구를 막아도 (거점 1에서) 방 바깥의 갈 수 있는 곳이 끊기지 않는지 — 지나가는 길목이 아닌 방
@@ -842,6 +845,7 @@ function updateDoors(dt) {
       }
       d.locked = false; flowTile = -1; Snd.play('unlock', d.x, d.y); // 몬스터 길찾기 다시 계산
     }
+    if (d.arena && bossDoor(d, dt)) continue;
     const want = near(d, player, 2.3) || enemies.some(e => near(d, e, 2.1)) || fol.some(s => near(d, s, 2.1));
     const prev = d.open;
     d.open = clamp(d.open + (want ? dt * 3 : -dt * 1.6), 0, 1);
@@ -849,6 +853,29 @@ function updateDoors(dt) {
     if (prev === 0 && d.open > 0) Snd.play('door', d.x, d.y);
     else if (prev === 1 && d.open < 1) Snd.play('doorClose', d.x, d.y);
   }
+}
+
+// 보스방 문: 보스가 살아 있으면 닫혀 있음 (총알·시야를 막고 적은 열지 못함) — 바깥에서 문 쪽으로 걸으면 열리고,
+// 플레이어가 문 안쪽까지 저절로 걸어 들어간 뒤 닫힘 (곧 봉쇄). 안에서는 열리지 않고, 보스를 처치하면 보통 문. false: 보통 문으로 다룸
+function bossDoor(d, dt) {
+  const p = player, r = d.arena, prev = d.open;
+  if (flags.bosses.includes(r.reg)) { d.arena = null; return false; }
+  if (escape) return false; // 자폭 중에는 보통 문
+  if (!p.enter && d.open < DOOR_PASS && d.cells.some(k => Math.abs(k % MW + 0.5 - p.x) < 0.5 + p.r && Math.abs(((k / MW) | 0) + 0.5 - p.y) < 0.5 + p.r)) { // 문간에 남지 않게 바깥으로
+    const [ox, oy] = d.y < r.y ? [0, -1] : d.y > r.y + r.h ? [0, 1] : d.x < r.x ? [-1, 0] : [1, 0]; placePlayer(d.x + ox * 1.3, d.y + oy * 1.3);
+  }
+  if (!p.enter && !p.down && !inCage(r, p.x, p.y) && Math.abs(p.x - d.x) < 1.4 && Math.abs(p.y - d.y) < 1.4 && p.mvx * (d.x - p.x) + p.mvy * (d.y - p.y) > 0.1) // 문을 향해 걸음
+    p.enter = { d, tx: clamp(d.x, r.x + 1.6, r.x + r.w - 1.6), ty: clamp(d.y, r.y + 1.6, r.y + r.h - 1.6), t: 0 };
+  d.open = clamp(d.open + (p.enter && p.enter.d === d ? dt * 6 : -dt * 4), 0, 1);
+  if (prev === 0 && d.open > 0) Snd.play('door', d.x, d.y);
+  return true;
+}
+// 보스방에 들어가는 중: 문이 열리면 안쪽까지 저절로 걸어감 (쏘기·회피·스킬 없음) — 막히면 잠시 뒤 안쪽으로 옮김
+function enterTick(dt) {
+  const p = player, E = p.enter, ex = E.tx - p.x, ey = E.ty - p.y, el = Math.hypot(ex, ey);
+  if (p.down || el < 0.3) { p.enter = null; return null; }
+  if ((E.t += dt) > 2) { placePlayer(E.tx, E.ty); p.enter = null; return null; }
+  return E.d.open >= DOOR_PASS ? [ex / el, ey / el] : [0, 0];
 }
 
 // 타이틀 화면 뒤의 우주 기지 풍경: 중앙 홀(단말기) + 통로 + 패드 방
@@ -1615,6 +1642,7 @@ function respawn() {
   if (state !== 'dead') return;
   if (trialOn) endTrial(trialOn, false); // 시련: 막이 걷히고 처음부터
   if (bossSeal) endBossSeal(); // 보스방: 막이 걷힘 (보스는 체력을 되찾음)
+  player.enter = null;
   player.shrine = null;
   const p = player, h = hubs[lastHub] || hubs[0], lost = Math.round(p.gold * DEATH_GOLD), xp = p.xp;
   if (xp > 0) { addPickup(p.x, p.y, 'xp', null, Math.round(xp * DEATH_XP)); p.xp = 0; } // 레벨은 그대로 — 주우면 DEATH_XP만큼 되찾음
@@ -4280,7 +4308,7 @@ function unequipToBag(c) {
 function addAmmo(a, n) { player.ammo[a] = Math.min(ammoMax(a), player.ammo[a] + n); }
 function throwGrenade() {
   const p = player;
-  if (state !== 'play' || p.gcool > 0 || inBase || p.down) return;
+  if (state !== 'play' || p.gcool > 0 || inBase || p.down || p.enter) return;
   if (inHub()) { noFight(); return; }
   if (p.gren[p.gsel] <= 0) { msg(`${GRENADES[p.gsel].name} 없음`, '#a99'); return; }
   const m = screenToWorld(mouse.x, mouse.y);
@@ -5338,7 +5366,7 @@ function onKey(code) {
   if (state === 'trade' && code in ITEM_KEYS) { useItem(ITEM_KEYS[code]); return; } // 거래 중에도 소모품 (자판기를 쓰는 동안에도 게임은 계속)
   if (state !== 'play') return;
   const p = player;
-  if (p.down && (code in ITEM_KEYS || code in SKILL_KEYS || code === 'KeyF' || code === 'Space')) return; // 쓰러짐: 쏘기·장전만
+  if ((p.down || p.enter) && (code in ITEM_KEYS || code in SKILL_KEYS || code === 'KeyF' || code === 'Space')) return; // 쓰러짐: 쏘기·장전만, 보스방에 들어가는 중: 아무것도
   if (code in ITEM_KEYS) useItem(ITEM_KEYS[code]); // 소모품 (메디킷 Q, 치료제 E, 아드레날린 T)
   else if (code.startsWith('Digit')) { const n = +code.slice(5); if (n >= 1 && n <= NSLOT) selectSlot(n - 1); }
   else if (code === 'KeyI' || code === 'Tab') toggleInv();
@@ -5389,6 +5417,7 @@ function updatePlayer(dt) {
   if (keys.KeyS || keys.ArrowDown) sy++;
   let mx = 0, my = 0;
   if (sx || sy) { const a = sx / (TW / 2), b = sy / (TH / 2); mx = (a + b) / 2; my = (b - a) / 2; const l = Math.hypot(mx, my); mx /= l; my /= l; }
+  if (p.enter) { const v = enterTick(dt); if (v) { [mx, my] = v; sx = mx || my ? 1 : 0; sy = 0; } }
   p.mvx = mx; p.mvy = my;
   const wi = curW(), w = wi.s;
   const heavy = w.slow && !(w.uq === 'fury' && p.spin >= 0.99); // 분노의 회전: 총열이 다 돌면 느려지지 않음
@@ -5444,7 +5473,8 @@ function updatePlayer(dt) {
     if (w.burst && wi.mag > 0 && p.reload <= 0 && !noAtk) { fireGun(w); p.burstN--; p.burstT = BURST_GAP; } else p.burstN = 0;
   }
   if (w.spin) p.spin = mouse.down ? Math.min(1, p.spin + dt / 0.7) : Math.max(0, p.spin - dt);
-  const trig = (w.type === 'melee' || w.auto) ? (mouse.down || mouse.pressed) : mouse.pressed;
+  if (p.enter) mouse.pressed = false; // 보스방에 들어가는 중
+  const trig = !p.enter && ((w.type === 'melee' || w.auto) ? (mouse.down || mouse.pressed) : mouse.pressed);
   if (trig && p.shellGap > 0 && p.reload > 0 && wi.mag > 0 && !noAtk && !inBase) { p.reload = 0; p.shellGap = 0; } // 샷건: 장전 중에 쏘면 멈추고 넣은 만큼 쏨
   if (inBase) mouse.pressed = false; // 기지 안에서는 공격하지 않음
   else if (noAtk) { if (trig) noFight(); mouse.pressed = false; } // 보급 거점(안전 지대)
@@ -6301,7 +6331,7 @@ function drawDoor(i, j) {
   if (!tex || d.open >= 0.99) return;
   const b = WALLH * d.open, h = WALLH - b, v0 = tex.height * d.open, vh = tex.height - v0;
   const same = (ii, jj) => tileAt(ii, jj) === T.DOOR && doorOf[jj * MW + ii] === doorOf[k];
-  const strip = d.key && d.key !== 'vault' ? ART.tex[KEYCARDS[d.key].tex] : (d.gate || d.key === 'vault') && ART.tex.wall_doortrak, SW = 0.22; // 보안문은 키카드 색 표시등, 봉쇄 격벽·금고 문은 문틀
+  const strip = d.key && d.key !== 'vault' ? ART.tex[KEYCARDS[d.key].tex] : (d.gate || d.arena || d.key === 'vault') && ART.tex.wall_doortrak, SW = 0.22; // 보안문은 키카드 색 표시등, 봉쇄 격벽·금고 문은 문틀
   if (!same(i, j + 1) && !isWallT(tileAt(i, j + 1))) {
     texFace(tex, PX(i, j + 1), PY(i, j + 1) - b, TW / 2, TH / 2, (i * 64) % tex.width, v0, vh, h, 0.1);
     if (strip && !same(i - 1, j)) stripFace(strip, i, j + 1, i + SW, j + 1, b, d.open, 0.1);
@@ -6315,6 +6345,7 @@ function drawDoor(i, j) {
   diamond(PX(i, j), PY(i, j) - WALLH);
   ctx.fillStyle = '#262a30'; ctx.fill();
   if (d.key) { ctx.fillStyle = `rgba(${KEYCARDS[d.key].rgb},${d.locked ? 0.55 : 0.25})`; ctx.fill(); }
+  else if (d.arena) { ctx.fillStyle = `rgba(255,40,30,${0.45 + 0.2 * Math.sin(gtime * 3)})`; ctx.fill(); } // 보스방 문: 깜박이는 빨강
   else if (d.gate) { ctx.fillStyle = `rgba(255,130,20,${0.45 + 0.2 * Math.sin(gtime * 4)})`; ctx.fill(); } // 봉쇄 격벽: 깜박이는 주황
   ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.stroke();
 }
@@ -7185,7 +7216,8 @@ function render() {
     else { ctx.fillStyle = d.col; ctx.globalAlpha = 0.6; isoEllipse(d.x, d.y, d.r); ctx.fill(); }
   }
   ctx.globalAlpha = 1;
-  for (const c of corpses) drawCorpse(c);
+  const onScr = (x, y) => { const sx = PX(x, y), sy = PY(x, y); return sx > -160 && sx < W + 160 && sy > -60 && sy < VH + 260; }; // 화면 근처 (키 큰 그림은 발이 화면 아래여도 보임) — 먼 것은 그리지 않음
+  for (const c of corpses) if (onScr(c.x, c.y)) drawCorpse(c);
   for (const a of areas) drawArea(a);
   drawGasFog(false);
   drawMissionFloor();
@@ -7212,17 +7244,17 @@ function render() {
   }
   if (!scene && !(cine && intro.t < INTRO.walk[0])) list.push({ d: pd, f: drawPlayer, a: [] }); // 컷신: 폭파 연기 속에서 나타남
   for (const e of enemies) if (canSee(e.x, e.y)) list.push({ d: e.x + e.y, f: drawEnemy, a: [e] }); // 시야 밖의 적은 그리지 않음
-  for (const s of survivors) if (s.state !== 'safe' && survivorShown(s)) list.push({ d: s.x + s.y, f: drawSurvivor, a: [s] });
-  for (const h of hazards) if (h.type === 'breach') list.push({ d: h.x + h.y, f: drawBreach, a: [h] }); // 벽 면 바로 앞 깊이
-  for (const t of turrets) list.push({ d: t.x + t.y, f: drawTurret, a: [t] });
-  for (const c of coils) list.push({ d: c.x + c.y, f: drawCoil, a: [c] });
-  for (const d of decoys) list.push({ d: d.x + d.y, f: drawDecoy, a: [d] });
-  for (const c of chests) list.push({ d: c.x + c.y, f: drawChest, a: [c] });
-  for (const sp of spots) list.push({ d: sp.x + sp.y, f: drawSpot, a: [sp] });
-  for (const w of wells) list.push({ d: w.x + w.y - 0.6, f: drawWell, a: [w] }); // 바닥 (가운데 구체는 조명 위에)
-  for (const b of barrels) list.push({ d: b.x + b.y, f: drawBarrel, a: [b] });
-  for (const it of pickups) list.push({ d: it.x + it.y - 0.2, f: drawPickup, a: [it] });
-  for (const l of lamps) if (!l.exit) list.push({ d: l.x + l.y, f: drawLamp, a: [l] });
+  for (const s of survivors) if (s.state !== 'safe' && survivorShown(s) && onScr(s.x, s.y)) list.push({ d: s.x + s.y, f: drawSurvivor, a: [s] });
+  for (const h of hazards) if (h.type === 'breach' && onScr(h.x, h.y)) list.push({ d: h.x + h.y, f: drawBreach, a: [h] }); // 벽 면 바로 앞 깊이
+  for (const t of turrets) if (onScr(t.x, t.y)) list.push({ d: t.x + t.y, f: drawTurret, a: [t] });
+  for (const c of coils) if (onScr(c.x, c.y)) list.push({ d: c.x + c.y, f: drawCoil, a: [c] });
+  for (const d of decoys) if (onScr(d.x, d.y)) list.push({ d: d.x + d.y, f: drawDecoy, a: [d] });
+  for (const c of chests) if (onScr(c.x, c.y)) list.push({ d: c.x + c.y, f: drawChest, a: [c] });
+  for (const sp of spots) if (onScr(sp.x, sp.y)) list.push({ d: sp.x + sp.y, f: drawSpot, a: [sp] });
+  for (const w of wells) if (onScr(w.x, w.y)) list.push({ d: w.x + w.y - 0.6, f: drawWell, a: [w] }); // 바닥 (가운데 구체는 조명 위에)
+  for (const b of barrels) if (onScr(b.x, b.y)) list.push({ d: b.x + b.y, f: drawBarrel, a: [b] });
+  for (const it of pickups) if (onScr(it.x, it.y)) list.push({ d: it.x + it.y - 0.2, f: drawPickup, a: [it] });
+  for (const l of lamps) if (!l.exit && onScr(l.x, l.y)) list.push({ d: l.x + l.y, f: drawLamp, a: [l] });
   for (const h of hubs) for (const b of h.edges) list.push({ d: b.d, f: drawBarrier, a: [b, h] });
   if (trialOn) for (const b of trialOn.edges) list.push({ d: b.d, f: drawBarrier, a: [b, null, true] }); // 시련의 방: 잠긴 입구
   if (bossSeal) for (const b of bossSeal.edges) list.push({ d: b.d, f: drawBarrier, a: [b, null, true] }); // 보스방: 잠긴 입구
@@ -7465,18 +7497,23 @@ function lampRegion(path, l) {
   }
   flush();
 }
-// 벽 블록(윗면 + 앞 두 면)의 화면 윤곽
-function wallHex(path, i, j) {
-  const ax = PX(i, j), ay = PY(i, j);
-  path.moveTo(ax, ay - WALLH); path.lineTo(ax + TW / 2, ay + TH / 2 - WALLH); path.lineTo(ax + TW / 2, ay + TH / 2);
-  path.lineTo(ax, ay + TH); path.lineTo(ax - TW / 2, ay + TH / 2); path.lineTo(ax - TW / 2, ay + TH / 2 - WALLH); path.closePath();
+// 같은 줄(j)에서 이어진 칸 i0~i1의 화면 윤곽: 바닥 마름모를 이은 평행사변형, h(벽 높이)를 주면 윗면 + 앞 두 면까지 늘인 육각형
+// (칸마다 따로 잇는 것보다 경로가 훨씬 단순해 조명의 채우기·잘라내기가 빠름)
+function isoRun(path, i0, i1, j, h = 0) {
+  const ax0 = PX(i0, j), ay0 = PY(i0, j), ax1 = PX(i1, j), ay1 = PY(i1, j);
+  path.moveTo(ax0, ay0 - h); path.lineTo(ax1 + TW / 2, ay1 + TH / 2 - h);
+  if (h) path.lineTo(ax1 + TW / 2, ay1 + TH / 2);
+  path.lineTo(ax1, ay1 + TH); path.lineTo(ax0 - TW / 2, ay0 + TH / 2);
+  if (h) path.lineTo(ax0 - TW / 2, ay0 + TH / 2 - h);
+  path.closePath();
 }
 // 화면에서 보이는 영역 — main: 바닥 다각형(부채꼴·주변) + 보이는 벽 블록(윗면·앞면) + 보이는 캐릭터 몸, all: main + 조명이 비추는 바닥
 function visionPath() {
   const area = new Path2D();
   vis.pts.forEach(([x, y], k) => k ? area.lineTo(PX(x, y), PY(x, y)) : area.moveTo(PX(x, y), PY(x, y)));
   area.closePath();
-  for (const c of vis.walls) wallHex(area, c % MW, (c / MW) | 0);
+  const ws = vis.walls.slice().sort((a, b) => a - b); // 보이는 벽: 같은 줄에서 이어진 것끼리 하나로
+  for (let n = 0; n < ws.length;) { let m = n; while (m + 1 < ws.length && ws[m + 1] === ws[m] + 1 && ws[m + 1] % MW) m++; isoRun(area, ws[n] % MW, ws[m] % MW, (ws[n] / MW) | 0, WALLH); n = m + 1; }
   const blob = (x, y, rx, ry) => { area.moveTo(x + rx, y); area.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); };
   blob(PX(player.x, player.y), PY(player.x, player.y) - 28, 26, 36);
   // 시야(부채꼴·주변) 바닥 다각형 안쪽인지 — 적의 발밑과 화면에서 머리 위쪽 바닥이 둘 다 안쪽이면 몸 전체가 이미 밝으므로 따로 영역을 붙이지 않음
@@ -7495,7 +7532,7 @@ function visionPath() {
 }
 
 // 화면 근처의 보안문 (색 조명용, 다 열린 문은 제외)
-const keyDoorsOnScreen = () => doors.filter(d => d.key && d.open < 0.99 && Math.abs(PX(d.x, d.y) - W / 2) < W / 2 + 120 && Math.abs(PY(d.x, d.y) - VH / 2) < VH / 2 + 120);
+const keyDoorsOnScreen = () => doors.filter(d => (d.key || d.arena) && d.open < 0.99 && Math.abs(PX(d.x, d.y) - W / 2) < W / 2 + 120 && Math.abs(PY(d.x, d.y) - VH / 2) < VH / 2 + 120);
 function drawLighting() {
   const p = player, psx = PX(p.x, p.y), psy = PY(p.x, p.y) - 16, vp = !inBase && vis ? visionPath() : null, area = vp && vp.main;
   const look = (area ? p.look : p.aim) + (p.moving ? Math.sin(p.walk * 1.6) * 0.035 : 0); // 걸을 때 손전등이 살짝 흔들림
@@ -7523,11 +7560,16 @@ function drawLighting() {
   g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.7, 'rgba(0,0,0,0.75)'); g.addColorStop(1, 'rgba(0,0,0,0)');
   if (area) { // 한 번 본 곳(벽·닫힌 문·바닥)은 시야 밖이어도 어둑하게 남김 (방 모양을 기억, 처음 보는 곳만 캄캄)
     const memo = new Path2D(), { i0, i1, j0, j1 } = visibleBounds();
-    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-      const k = j * MW + i, t = tiles[k];
-      if (!mapSeen[k]) continue;
-      if (t === T.WALL || (t === T.DOOR && doors[doorOf[k]].open < 0.99)) { if (visMark[k] !== 2) wallHex(memo, i, j); }
-      else if (!visMark[k] && walkable(t)) { const ax = PX(i, j), ay = PY(i, j); memo.moveTo(ax, ay); memo.lineTo(ax + TW / 2, ay + TH / 2); memo.lineTo(ax, ay + TH); memo.lineTo(ax - TW / 2, ay + TH / 2); memo.closePath(); }
+    for (let j = j0; j <= j1; j++) { // 줄마다 같은 종류(1: 벽·닫힌 문, 2: 바닥)로 이어진 칸을 하나로
+      let s = 0, kind = 0;
+      for (let i = i0; i <= i1 + 1; i++) {
+        let c = 0;
+        if (i <= i1) {
+          const k = j * MW + i, t = tiles[k];
+          if (mapSeen[k]) { if (t === T.WALL || (t === T.DOOR && doors[doorOf[k]].open < 0.99)) c = visMark[k] !== 2 ? 1 : 0; else if (!visMark[k] && walkable(t)) c = 2; }
+        }
+        if (c !== kind) { if (kind) isoRun(memo, s, i - 1, j, kind === 1 ? WALLH : 0); kind = c; s = i; }
+      }
     }
     lctx.fillStyle = 'rgba(0,0,0,0.45)'; lctx.fill(memo);
   }
@@ -7629,7 +7671,7 @@ function drawLighting() {
     g2.addColorStop(0, `rgba(${gl},0)`); g2.addColorStop(1, `rgba(${gl},${0.32 + 0.1 * Math.sin(gtime * 3)})`);
     ctx.fillStyle = g2; ctx.fillRect(x - 7, y - 230, 14, 230); ctx.fillRect(x - 2, y - 230, 4, 230);
   }
-  for (const d of keyDoorsOnScreen()) glow(PX(d.x, d.y), PY(d.x, d.y) - 40, 70, KEYCARDS[d.key].rgb, d.locked ? 0.22 : 0.1);
+  for (const d of keyDoorsOnScreen()) glow(PX(d.x, d.y), PY(d.x, d.y) - 40, 70, d.key ? KEYCARDS[d.key].rgb : '255,50,40', d.locked || d.arena ? 0.22 : 0.1);
   for (const it of pickups) if (it.kind === 'key') glow(PX(it.x, it.y), PY(it.x, it.y) - 12, 50, KEYCARDS[it.id].rgb, 0.3 + 0.12 * Math.sin(gtime * 5));
   for (const it of pickups) if (it.kind === 'xp') glow(PX(it.x, it.y), PY(it.x, it.y) - 12, 50, XP_ORB.rgb, 0.3 + 0.12 * Math.sin(gtime * 4 + it.bob));
   for (const c of chests) if (!c.open) glow(PX(c.x, c.y), PY(c.x, c.y) - 10, 46, c.trial ? '255,110,70' : '255,200,90', 0.22 + 0.08 * Math.sin(gtime * 3 + c.x)); // 금고 보물함
