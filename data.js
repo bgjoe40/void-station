@@ -1,7 +1,7 @@
 // ===== 게임 데이터 정의 (무기 / 탄약 / 수류탄 / 아이템 / 적) =====
 
 // 버전: GitHub에 커밋·푸시할 때마다 올림 (새 기능은 가운데 자리, 고침·작은 추가는 끝자리) — 타이틀·일시정지 화면에 표시, git 태그 v<버전>
-const VERSION = '0.36.0';
+const VERSION = '0.37.0';
 
 const CAT_NAMES = ['근접', '권총', '샷건', '라이플', '기관총', '에너지'];
 const MAX_LOAD = 30;   // 장착 + 가방 무기 무게 합이 넘으면 이동속도 감소
@@ -505,7 +505,8 @@ const START_EASE = [0.5, 0.75]; // 막 첫 구역(1·4·7)에서 들어오는 �
 // 적이 적은 만큼 일반 적 한 마리의 경험치·골드·장비 확률은 1 / room 배 (구역마다 얻는 양은 비슷하게)
 // 구역마다 적이 세지는 정도 (구역 1 기준): 체력·피해 (앞 구역은 아래 CURVE로 더 약하게)
 const ENEMY_GROW = { hp: 0.13, dmg: 0.12 };
-const BOSS_BOOST = { hp: 3.9, dmg: 3.6 }; // 보스(구역 보스·막 보스)의 체력·피해 배율 (CURVE.boss·ENEMY_GROW 위에)
+const BOSS_BOOST = { hp: 5.1, dmg: 4.5 }; // 보스(구역 보스·막 보스)의 체력·피해 배율 (CURVE.boss·ENEMY_GROW 위에) — 0.37: 0.34의 x1.3 · x1.25
+const BOSS_CAGE = { regen: 0.25 }; // 보스는 보스방 밖으로 나오지 않음. 플레이어가 보스방 밖이면 쫓지 않고 제자리로, 초당 최대 체력의 regen만큼 회복 (밖에서 쏴서는 못 잡음)
 const CURVE = {
   room:  [0.65, 0.75, 0.85, 0.95, 1, 1, 1, 1, 1],
   hp:    [0.8, 0.88, 0.94, 0.98, 1, 1, 1, 1, 1],
@@ -587,7 +588,7 @@ const SKILLS = {
               v: { dmg: 80, n: 5, r: 2.2 }, mods: ['n', 'r'], life: 45, cap: 16,
               desc: v => `바라보는 쪽에 지뢰 ${v.n}개. 적이 밟으면 폭발 (반경 ${v.r}칸, 피해 ${v.dmg})` },
   turret:   { name: '포탑 배치', color: '#9f9', icon: 'mguna0', from: 5, price: 910, cd: 30,
-              v: { dmg: 7, dur: 14, hp: 144 }, mods: ['dur'], rate: 0.16, range: 9, // 설치 스킬 기준: 켜져 있는 동안 그 시점 총과 비슷한 DPS, 대기시간의 절반쯤 켜짐 (탄은 반드시 맞음)
+              v: { dmg: 7, dur: 10, hp: 100 }, mods: ['dur'], rate: 0.16, range: 9, // 설치 스킬 기준: 켜져 있는 동안 그 시점 총과 비슷한 DPS, 대기시간의 절반쯤 켜짐 (탄은 반드시 맞음) — 포탑은 0.37에서 지속 14→10초·내구도 144→100으로 줄임
               desc: v => `${v.dur}초 동안 ${SKILLS.turret.range}칸 안의 적을 쏘는 포탑 (한 발 ${v.dmg}, 초당 6발, 내구도 ${v.hp})` },
   drone:    { name: '전투 드론', color: '#7ef', icon: 'fskua0', from: 6, price: 1070, cd: 26,
               v: { dmg: 18, dur: 12 }, mods: ['dur'], rate: 0.4, range: 8, // 포탑과 같은 기준
@@ -732,7 +733,9 @@ const MONSTER_DESC = {
 // hubs: 보급 거점(자판기·순간이동 패드)이 있는 구역 — 구역마다 하나씩 (생존자 구출 구역 2·7에는 꼭), hubGap: 자판기끼리 떨어뜨릴 칸 수 (방이 좁으면 덜)
 // spawn: 방에 이만큼(칸) 다가가면 그 방의 적이 나타남, sleep: 이보다 멀리 있는 적은 쉼 (쫓아오는 적은 제외)
 const FIELD = { block: 52, margin: 2, rooms: [8, 11], hubs: [1, 2, 4, 6, 7, 9], hubGap: [3, 2, 1], spawn: 20, sleep: 34 };
-const FIELD_VER = 3; // 지도 만드는 방식의 판 (저장에 남김 — 판이 다르면 같은 씨앗이라도 지도가 다름)
+const FIELD_VER = 4; // 지도 만드는 방식의 판 (저장에 남김 — 판이 다르면 같은 씨앗이라도 지도가 다름). 4: 구역마다 보스방
+// 보스방: 구역마다 하나, 그 구역 보스는 여기에만 (다른 방보다 넓게 — w·h 칸). 2x2 기둥(총알·시야를 막음) pillars개, 상자 crates개를 흩어 놓고 네 구석에 조명
+const ARENA = { w: [16, 19], h: [14, 16], pillars: [4, 6], crates: [3, 6] };
 const FIELD_ORDER = [[0, 0], [1, 0], [2, 0], [2, 1], [1, 1], [0, 1], [0, 2], [1, 2], [2, 2]]; // 구역 1~9가 놓이는 칸 (열, 행)
 // 다음 구역으로 가는 길목의 봉쇄 격벽: boss — 그 구역 보스를 처치하면, mission — 그 구역 임무를 이루면 열림
 const GATES = { 3: 'boss', 6: 'boss', 8: 'mission' };
@@ -964,7 +967,7 @@ const TIPS = {
   elite:     { title: '정예 몬스터', icon: 'trooa1', lines: ['강하지만 좋은 장비를 떨어뜨린다'] },
   armor:     { title: '장갑 몬스터', icon: 'bos2a1', lines: ['약한 탄은 잘 안 통하지만 몇 발에 한 발은 뚫린다', '강한 한 방이나 철갑탄 탄창이 잘 통한다'] },
   dodge:     { title: '총알을 피하는 적', icon: 'trooa1', lines: ['넓게 쏘거나 피한 직후를 노려라'] },
-  boss:      { title: '보스', icon: 'cybra1', lines: ['체력이 절반 밑이면 격노한다'] },
+  boss:      { title: '보스', icon: 'cybra1', lines: ['체력이 절반 밑이면 격노한다', '보스방을 나가면 쫓아오지 않고 체력을 되찾는다'] },
   levelup:   { title: '레벨 업', icon: 'icon_syringe_blue', lines: ['특성은 스킬 창 [K]에서 올린다'] },
   xpdrop:    { title: '잃어버린 경험치', icon: 'playn0', lines: [`쓰러진 자리에서 주우면 ${Math.round(DEATH_XP * 100)}%를 되찾는다`] },
   rescue:    { title: '임무: 생존자 구출', icon: 'sswva1', lines: ['생존자를 거점 패드까지 데려가라'] },

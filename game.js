@@ -246,8 +246,8 @@ const Snd = {
 
 // ===== 설정 (음량) — 브라우저 localStorage에 저장 =====
 const SETTINGS_KEY = 'voidstation.settings.v1';
-const settings = { master: 0.9, music: 0.6, sfx: 0.9, amb: 0.8, tips: true, shake: 1, dmgNums: true, hurtFx: true, hideCommon: false, autoAim: true }; // amb: 환경음, tips: 첫 플레이 안내, shake: 화면 흔들림 배율, dmgNums: 피해 숫자, hurtFx: 피격 화면 효과, hideCommon: 바닥의 일반 등급 장비 숨기기, autoAim: 자동 조준 (끄면 커서 쪽으로 곧게)
-try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}); } catch (e) { /* 저장소를 못 쓰면 기본값 */ }
+const settings = { master: 0.9, music: 0.6, sfx: 0.9, amb: 0.8, tips: true, shake: 1, dmgNums: true, hurtFx: true, hideCommon: false, autoAim: false, ver: 2 }; // amb: 환경음, tips: 첫 플레이 안내, shake: 화면 흔들림 배율, dmgNums: 피해 숫자, hurtFx: 피격 화면 효과, hideCommon: 바닥의 일반 등급 장비 숨기기, autoAim: 자동 조준 (끄면 커서 쪽으로 곧게), ver: 설정의 판 (2: 자동 조준 기본 끔 — 예전 설정도 한 번 끔)
+try { const s = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; if (!(s.ver >= 2)) { s.autoAim = false; s.ver = 2; } Object.assign(settings, s); } catch (e) { /* 저장소를 못 쓰면 기본값 */ }
 const saveSettings = () => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* 저장 못 하면 이번 실행에만 적용 */ } };
 function applyVolume() {
   if (!Snd.ctx) return;
@@ -789,8 +789,9 @@ function placeLocks(R) {
       if (at(r2, r)) continue; // 막아도 다른 길로 들어감
       const front = R.rooms.filter(q => q !== start && at(r2, q)).length;
       if (front < 1) continue; // 앞쪽에 키카드를 둘 방이 없음
-      const sc = (chain.length ? 0 : (r === R.exit) * 4 + !at(r2, R.exit) * 2) + (front >= 2) + Math.random() * 0.5;
-      if (sc > bs) { bs = sc; best = { room: r, blocked: b2, reach: r2, behind: R.rooms.filter(q => at(reach, q) && !at(r2, q)) }; }
+      const behind = R.rooms.filter(q => at(reach, q) && !at(r2, q)); // 이 문 뒤의 방 — 앞 색 키카드를 둘 곳 (보스방 말고도 있는 쪽을 먼저)
+      const sc = (chain.length ? (behind.some(q => !q.arena) ? 2 : 0) : (r === R.exit) * 4 + !at(r2, R.exit) * 2) + (front >= 2) + Math.random() * 0.5;
+      if (sc > bs) { bs = sc; best = { room: r, blocked: b2, reach: r2, behind }; }
     }
     if (!best) break;
     chain.push(best); blocked = best.blocked; reach = best.reach;
@@ -805,7 +806,8 @@ function placeLocks(R) {
     }
     // ok: 키카드를 놓아도 되는 칸 (앞 색까지 열면 닿고, 앞 색 문을 열기 전에는 닿지 않는 곳)
     const next = chain[t + 1];
-    R.keyPlan.push({ color, room: pick(next ? next.behind : R.rooms.filter(q => q !== start && at(reach, q))), ok: k => c.reach[k] >= 0 && (!next || next.reach[k] < 0) });
+    const pool = next ? next.behind : R.rooms.filter(q => q !== start && at(reach, q)), calm = pool.filter(q => !q.arena); // 보스방은 되도록 피함
+    R.keyPlan.push({ color, room: pick(calm.length ? calm : pool), ok: k => c.reach[k] >= 0 && (!next || next.reach[k] < 0) });
   });
 }
 // 문 열고 닫기: 플레이어나 몬스터가 가까우면 열림, 문 칸에 누가 있으면 닫히지 않음
@@ -906,11 +908,11 @@ function genField() {
   regions = [null, ...FIELD_ORDER.map(([cx, cy], k) => ({ n: k + 1, bx: FIELD.margin + cx * B, by: FIELD.margin + cy * B, rooms: [], hubs: [], locks: [], keyPlan: [] }))];
   for (let n = 1; n <= 9; n++) genRegionRooms(regions[n]);
   for (let n = 1; n < 9; n++) linkRegions(regions[n], regions[n + 1]);
-  // 착륙 지점: 구역 1에서 다음 구역 길목과 가장 먼 방, 코어: 구역 9에서 입구와 가장 먼 방
-  const R1 = regions[1], d1 = bfs(R1.exit.cx, R1.exit.cy), R9 = regions[9], d9 = bfs(R9.entry.cx, R9.entry.cy), dist = (d, r) => d[r.cy * MW + r.cx];
-  R1.entry = R1.rooms.filter(r => r !== R1.exit).reduce((a, r) => dist(d1, r) > dist(d1, a) ? r : a);
-  R9.exit = R9.rooms.filter(r => r !== R9.entry).reduce((a, r) => dist(d9, r) > dist(d9, a) ? r : a);
-  for (const n of [3, 6, 9]) regions[n].exit.boss = bossKindFor(n);
+  // 착륙 지점: 구역 1에서 다음 구역 길목과 가장 먼 방 (보스방 말고), 코어: 구역 9의 보스방. 보스는 구역마다 보스방에만 (구역 보스·막 보스)
+  const R1 = regions[1], d1 = bfs(R1.exit.cx, R1.exit.cy), R9 = regions[9], dist = (d, r) => d[r.cy * MW + r.cx];
+  R1.entry = R1.rooms.filter(r => r !== R1.exit && !r.arena).reduce((a, r) => dist(d1, r) > dist(d1, a) ? r : a);
+  R9.exit = R9.arena;
+  for (const R of regions.slice(1)) { R.arena.boss = REGION_BOSSES[R.n] || bossKindFor(R.n); R.bossRoom = R.arena; }
   buildWalls();
   for (let k = 0; k < MW * MH; k++) { // 벽 칸의 구역: 맞닿은 바닥을 따름 (텍스처)
     if (regionMap[k] || tiles[k] !== T.WALL) continue;
@@ -926,28 +928,11 @@ function genField() {
   setupMissions();
   placeEscapePad();
   for (let n = 1; n <= 9; n++) { // 정예가 있는 방 (거점·입구 제외)
-    const R = regions[n], cand = R.rooms.filter(r => !r.hub && r !== R.entry);
+    const R = regions[n], cand = R.rooms.filter(r => !r.hub && !r.boss && r !== R.entry);
     for (let k = 0; k < ELITE_COUNT[n - 1] && cand.length; k++) { const r = cand.splice(Math.floor(Math.random() * cand.length), 1)[0]; r.elites = (r.elites || 0) + 1; }
   }
   withSeed((fieldSeed * 31 + 0x9e37) | 0, placeExtras); // 고유 정예·금고·필드 사건 (따로 굴린 난수 — 앞의 지도는 예전 저장과 같게)
-  placeBossLairs(); // 구역 보스의 방 (난수를 쓰지 않음)
   applyTheme();
-}
-// 구역 보스(REGION_BOSSES)의 방: 구역 입구에서 먼 쪽 절반 중 가장 큰 빈 방 — 거점·입구·출구·금고·고유 정예 방은 쓰지 않고, 키카드·임무·필드 사건 방은 되도록 피함
-// (난수를 쓰지 않아 같은 씨앗이면 같은 방 — 예전 저장도 그대로)
-function placeBossLairs() {
-  const inRoom = (r, x, y) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
-  for (const [n, kind] of Object.entries(REGION_BOSSES)) {
-    const R = regions[+n];
-    if (!R) continue;
-    const busy = r => r.hub || r.boss || r.vault || r.super || r === R.entry || r === R.exit;
-    const soft = r => R.keyPlan.some(k => k.room === r) || survivors.some(s => inRoom(r, s.x, s.y)) || enemies.some(e => e.d.nest && inRoom(r, e.x, e.y)) || spots.some(s => inRoom(r, s.x, s.y));
-    const d = bfs(R.entry.cx, R.entry.cy), far = (a, b) => d[b.cy * MW + b.cx] - d[a.cy * MW + a.cx] || a.y - b.y || a.x - b.x;
-    const big = (a, b) => b.w * b.h - a.w * a.h || a.y - b.y || a.x - b.x;
-    const cand = R.rooms.filter(r => !busy(r) && !soft(r)), alt = R.rooms.filter(r => !busy(r)), pool = (cand.length ? cand : alt).sort(far);
-    const r = pool.slice(0, Math.ceil(pool.length / 2)).sort(big)[0]; // 입구에서 먼 쪽 절반 중 가장 큰 방
-    if (r) { r.boss = kind; R.bossRoom = r; }
-  }
 }
 // 구역마다: 고유 정예의 방, 금고 (입구를 모두 금고 문으로 잠그고 보물함), 필드 사건 (보급 캐시)
 // 입구·출구·거점·보스 방은 쓰지 않고, 키카드가 놓일 방·임무(생존자·둥지) 방은 되도록 피함 (금고는 반드시 피함)
@@ -1009,6 +994,7 @@ function genRegionRooms(R) {
   for (let attempt = 0; attempt < 40; attempt++) {
     clearBox(box);
     const rs = [], want = irnd(...FIELD.rooms);
+    { const w = irnd(...ARENA.w), h = irnd(...ARENA.h), x = pick([x0, x1 - w]), y = pick([y0, y1 - h]); rs.push({ x, y, w, h, cx: x + (w >> 1), cy: y + (h >> 1), slots: [], reg: R.n, arena: true }); } // 보스방부터 (넓은 방, 구역의 한 구석 — 다른 방 자리가 덜 쪼개지게)
     for (let a = 0; a < 600 && rs.length < want; a++) {
       const w = irnd(6, 12), h = irnd(6, 12), x = irnd(x0, x1 - w), y = irnd(y0, y1 - h);
       if (rs.some(r => x < r.x + r.w + 4 && x + w + 4 > r.x && y < r.y + r.h + 4 && y + h + 4 > r.y)) continue;
@@ -1021,7 +1007,7 @@ function genRegionRooms(R) {
       for (let j = r.y; j < r.y + r.h; j++) for (let i = r.x; i < r.x + r.w; i++) regionMap[j * MW + i] = R.n;
     }
     const L0 = links.length;
-    if (linkRooms(rs, [box[0] + 1, box[1] + 1, box[2] - 1, box[3] - 1])) { R.rooms = rs; rooms.push(...rs); return; } // 통로는 칸 가장자리에서 한 칸 안쪽까지만 (이웃 구역 통로와 붙지 않게)
+    if (linkRooms(rs, [box[0] + 1, box[1] + 1, box[2] - 1, box[3] - 1])) { R.rooms = rs; R.arena = rs[0]; rooms.push(...rs); return; } // 통로는 칸 가장자리에서 한 칸 안쪽까지만 (이웃 구역 통로와 붙지 않게)
     links.length = L0;
   }
   throw new Error(`구역 ${R.n}을(를) 만들지 못함`);
@@ -1030,13 +1016,15 @@ function clearBox([x0, y0, x1, y1]) {
   for (let j = y0; j < y1; j++) for (let i = x0; i < x1; i++) { const k = j * MW + i; tiles[k] = T.VOID; nearRoom[k] = 0; keepClear[k] = 0; regionMap[k] = 0; }
 }
 // 이웃 구역 잇기: 앞 구역의 방(입구 제외)과 다음 구역의 방 중 가장 가까운 짝. 길목에 봉쇄 격벽이 있으면 표시 (문은 placeDoors)
+// 보스방은 다음 구역의 입구가 되지 않음. 막 보스 구역(3·6)은 보스방을 길목으로 먼저 (봉쇄 격벽을 지키게 — 안 되면 다른 방), 다른 구역의 보스방은 길목이 아님
 // 통로는 격벽으로 나뉜 다른 구간(앞 격벽 길목 포함 — 그 구역 번호로 표시됨)의 바닥에 닿지 않게 (격벽을 돌아가는 길이 생기지 않게)
 const gateSeg = n => Object.keys(GATES).filter(g => g < n).length; // 구역 n 앞에 있는 격벽 수
 function linkRegions(A, B) {
   const box = [Math.min(A.bx, B.bx) + 1, Math.min(A.by, B.by) + 1, Math.max(A.bx, B.bx) + FIELD.block - 1, Math.max(A.by, B.by) + FIELD.block - 1], pairs = [];
   const gate = !!GATES[A.n], segs = regions.map((_, n) => gateSeg(n)), avoid = new Uint8Array(MW * MH);
   for (let k = 0; k < MW * MH; k++) if (tiles[k] === T.FLOOR && segs[regionMap[k]] !== segs[A.n]) for (const [dx, dy] of [[0, 0], ...DIR8]) avoid[k + dy * MW + dx] = 1;
-  for (const a of A.rooms) for (const b of B.rooms) if (a !== A.entry) pairs.push([Math.abs(a.cx - b.cx) + Math.abs(a.cy - b.cy), a, b]);
+  const act = A.n < 9 && !!bossKindFor(A.n);
+  for (const a of A.rooms) for (const b of B.rooms) if (a !== A.entry && !b.arena && (act || !a.arena)) pairs.push([Math.abs(a.cx - b.cx) + Math.abs(a.cy - b.cy) - (a.arena ? 1000 : 0), a, b]);
   pairs.sort((u, v) => u[0] - v[0]);
   for (const [, a, b] of pairs.slice(0, 14)) {
     if (!connect(a, b, box, gate, avoid)) continue;
@@ -1052,13 +1040,13 @@ function placeHubs() {
   for (const n of FIELD.hubs) {
     const R = regions[n];
     if (n === 1) {
-      const d = bfs(R.exit.cx, R.exit.cy), cand = R.rooms.filter(q => q !== R.exit).sort((a, b) => d[b.cy * MW + b.cx] - d[a.cy * MW + a.cx]);
+      const d = bfs(R.exit.cx, R.exit.cy), cand = R.rooms.filter(q => q !== R.exit && !q.arena).sort((a, b) => d[b.cy * MW + b.cx] - d[a.cy * MW + a.cx]);
       for (const gap of FIELD.hubGap) { const r = cand.find(q => makeHub(q, '착륙 지점', gap)); if (r) { R.entry = r; break; } }
       if (!hubs.length) throw new Error('착륙 지점을 놓지 못함');
       continue;
     }
     const far = r => Math.min(...[R.entry, R.exit].map(q => Math.abs(q.cx - r.cx) + Math.abs(q.cy - r.cy)));
-    const order = R.rooms.filter(r => r !== R.entry && r !== R.exit).map(r => [far(r) + Math.random() * 6 + (r.w >= 8 && r.h >= 7 ? 12 : 0), r]).sort((a, b) => b[0] - a[0]).map(a => a[1]); // 큰 방, 입구·출구에서 먼 방부터
+    const order = R.rooms.filter(r => r !== R.entry && r !== R.exit && !r.arena).map(r => [far(r) + Math.random() * 6 + (r.w >= 8 && r.h >= 7 ? 12 : 0), r]).sort((a, b) => b[0] - a[0]).map(a => a[1]); // 큰 방, 입구·출구에서 먼 방부터
     if (!FIELD.hubGap.some(gap => order.some(r => makeHub(r, `${CAMPAIGN[n - 1].name} 거점`, gap)))) throw new Error(`구역 ${n}에 보급 거점을 놓지 못함`);
   }
 }
@@ -1098,10 +1086,11 @@ function hubEdges(r) {
   }
   return out;
 }
-// 장식: 파이프 / 상자 (거점·입구·출구·보스 방은 비움)
+// 장식: 파이프 / 상자 (거점·입구·출구는 비움), 보스방은 기둥·상자를 흩어 놓음
 function decorateRooms() {
   for (const r of rooms) {
-    if (r.hub || r.boss || regions[r.reg].entry === r || regions[r.reg].exit === r) continue;
+    if (r.arena) { decorateArena(r); continue; }
+    if (r.hub || regions[r.reg].entry === r || regions[r.reg].exit === r) continue;
     if (Math.random() < 0.55) {
       const cells = [];
       if (r.w >= r.h) { const j = Math.random() < 0.5 ? r.y + 1 : r.y + r.h - 2; for (let i = r.x + 1; i < r.x + r.w - 1; i++) cells.push([i, j]); tryPlace(cells, T.PIPEX, r); }
@@ -1115,10 +1104,26 @@ function decorateRooms() {
     }
   }
 }
-// 조명: 방마다 윗벽 앞 (문 앞은 피해서), 거점은 자판기 위로 밝게, 패드마다 불빛
+// 보스방의 장애물: 2x2 기둥 (벽 — 총알·시야를 막음)과 상자. 가운데 (보스 자리)·벽을 따라 한 칸·문 앞은 비우고, 서로 두 칸 넘게 떨어뜨림
+function decorateArena(r) {
+  const put = [], free = (i, j, w, h) => i > r.x && j > r.y && i + w < r.x + r.w && j + h < r.y + r.h && Math.max(Math.abs(i + w / 2 - r.cx - 0.5), Math.abs(j + h / 2 - r.cy - 0.5)) > 3
+    && put.every(([a, b, c, d]) => i > a + c + 1 || a > i + w + 1 || j > b + d + 1 || b > j + h + 1);
+  const scatter = (n, size, type) => {
+    for (let k = 0, made = 0; made < n && k < 80; k++) {
+      const [w, h] = size(), i = irnd(r.x + 1, r.x + r.w - 1 - w), j = irnd(r.y + 1, r.y + r.h - 1 - h), cells = [];
+      if (!free(i, j, w, h)) continue;
+      for (let b = 0; b < h; b++) for (let a = 0; a < w; a++) cells.push([i + a, j + b]);
+      if (tryPlace(cells, type, r)) { put.push([i, j, w, h]); made++; }
+    }
+  };
+  scatter(irnd(...ARENA.pillars), () => [2, 2], T.WALL);
+  scatter(irnd(...ARENA.crates), () => pick([[1, 1], [2, 1], [1, 2]]), T.CRATE);
+}
+// 조명: 방마다 윗벽 앞 (문 앞은 피해서), 보스방은 네 구석, 거점은 자판기 위로 밝게, 패드마다 불빛
 function placeFieldLamps() {
   for (const r of rooms) {
     if (r.hub) continue;
+    if (r.arena) { const A = actOf(r.reg); for (const [i, y] of [[r.x + 1, r.y + 0.6], [r.x + r.w - 2, r.y + 0.6], [r.x + 1, r.y + r.h - 0.6], [r.x + r.w - 2, r.y + r.h - 0.6]]) lamps.push({ x: i + 0.5, y, col: pick(A.lamps), ph: rnd(0, 6), flick: Math.random() < A.flick }); continue; }
     let x = r.x + irnd(1, r.w - 2);
     for (let k = 0; k < 12 && keepClear[r.y * MW + x]; k++) x = r.x + irnd(1, r.w - 2);
     const A = actOf(r.reg); // 막마다 조명 색·깜박임
@@ -1377,7 +1382,7 @@ function spawnRoom(r) {
   if (TR && !TR.thief && !bossHere && Math.random() < THIEF.room) { TR.thief = true; const q = randomFloorIn(r, 0.4); spawnEnemy('thief', q.x, q.y, lv); }
   if (bossHere) {
     const q = ENEMIES[r.boss].fixed ? { x: r.cx + 0.5, y: r.cy + 0.5 } : randomFloorIn(r, 0.9);
-    boss = spawnEnemy(r.boss, q.x, q.y, lv);
+    boss = spawnEnemy(r.boss, q.x, q.y, lv); boss.cage = r; // 보스방에 묶음
   }
 }
 
@@ -1730,9 +1735,12 @@ function collides(x, y, r, fly) {
 }
 function moveEntity(e, dx, dy) {
   const out = !!e.d, free = e.r > 0.5 && collides(e.x, e.y, e.r, e.fly); // 몬스터: 보급 거점(안전 지대) 안으로는 못 들어감. 이미 벽에 낀 큰 몸집은 빠져나오게
-  if ((free || !collides(e.x + dx, e.y, e.r, e.fly)) && !(out && safeAt(e.x + dx, e.y))) e.x += dx;
-  if ((free || !collides(e.x, e.y + dy, e.r, e.fly)) && !(out && safeAt(e.x, e.y + dy))) e.y += dy;
+  if ((free || !collides(e.x + dx, e.y, e.r, e.fly)) && !(out && safeAt(e.x + dx, e.y)) && !caged(e, e.x + dx, e.y)) e.x += dx;
+  if ((free || !collides(e.x, e.y + dy, e.r, e.fly)) && !(out && safeAt(e.x, e.y + dy)) && !caged(e, e.x, e.y + dy)) e.y += dy;
 }
+// 보스는 보스방(e.cage) 밖으로 못 나감: 몸이 방 테두리를 넘어가는 쪽으로의 움직임만 막음
+const inCage = (C, x, y, r = 0) => x >= C.x + r && x <= C.x + C.w - r && y >= C.y + r && y <= C.y + C.h - r;
+const caged = (e, x, y) => { const C = e.cage; return !!C && ((x < C.x + e.r && x < e.x) || (x > C.x + C.w - e.r && x > e.x) || (y < C.y + e.r && y < e.y) || (y > C.y + C.h - e.r && y > e.y)); };
 // 안전 지대 안에 생겨난 몬스터(분열·산란 등)는 가장 가까운 바깥 칸으로
 function evict(e) {
   const k0 = Math.floor(e.y) * MW + Math.floor(e.x), seen = new Set([k0]), q = [k0];
@@ -2864,7 +2872,7 @@ function placeHackTerminal(C, R) {
 }
 // 구역의 방 중 n개를 (입구·출구·거점 제외) 서로, 그리고 입구와 되도록 멀리 떨어지게
 function spreadRooms(n, R) {
-  const cand = R.rooms.filter(r => r !== R.entry && r !== R.exit && !r.hub), out = [];
+  const cand = R.rooms.filter(r => r !== R.entry && r !== R.exit && !r.hub && !r.boss), out = [];
   const far = r => Math.min(...[R.entry, ...out].map(q => Math.abs(q.cx - r.cx) + Math.abs(q.cy - r.cy)));
   while (out.length < n && cand.length) {
     let best = cand[0], bs = -1;
@@ -3116,7 +3124,7 @@ function objectiveBox() {
 function zoneSteps() {
   const R = regions[level], dim = '#5c6658', out = [];
   if (!R || escape) return out;
-  const got = R.locks.filter(c => keysHeld.has(`${level}:${c}`)).length, keys = got >= R.locks.length, bk = (R.bossRoom && R.bossRoom.boss) || R.exit.boss;
+  const got = R.locks.filter(c => keysHeld.has(`${level}:${c}`)).length, keys = got >= R.locks.length, bk = R.bossRoom.boss;
   if (R.locks.length) out.push([`키카드 ${got}/${R.locks.length}`, keys ? dim : '#e8dcc0']);
   if (bk) out.push([`${ENEMIES[bk].name} 처치`, flags.bosses.includes(level) ? dim : '#ff9a7a']);
   if (regions[level + 1]) out.push([`→ 구역 ${level + 1}`, keys && gateOpen(level) ? '#5f8' : '#a8b8a0']);
@@ -5452,7 +5460,7 @@ function assassinThink(e, dt, d) {
 // 순간이동할 자리: 플레이어에게서 r0~r1칸, prefer 방향부터 좌우로 넓혀 가며 (벽·안전 지대·막힌 곳 제외, 플레이어에게 걸어갈 수 있는 곳만)
 // see: 플레이어가 보이는 자리만 (기습) / 아니면 보이지 않는 자리를 먼저 (사라짐)
 function blinkSpot(e, r0, r1, prefer, see) {
-  const p = player, ok = (x, y) => !collides(x, y, e.r, false) && !safeAt(x, y) && flowAt(Math.floor(x), Math.floor(y)) >= 0;
+  const p = player, ok = (x, y) => !collides(x, y, e.r, false) && !safeAt(x, y) && flowAt(Math.floor(x), Math.floor(y)) >= 0 && (!e.cage || inCage(e.cage, x, y, e.r)); // 보스는 보스방 안으로만
   let fallback = null;
   for (const da of [0, 0.5, -0.5, 1, -1, 1.6, -1.6, 2.2, -2.2, 3.1]) for (const r of [r0, (r0 + r1) / 2, r1]) {
     const a = prefer + da, x = p.x + Math.cos(a) * r, y = p.y + Math.sin(a) * r;
@@ -5509,7 +5517,7 @@ function updateEnemies(dt) {
     if (e.dead) continue;
     e.awake = e.aggro || inBase || Math.abs(e.x - p.x) + Math.abs(e.y - p.y) < FIELD.sleep;
     if (safe && e.trail && e.trail.length) e.homing = true; // 플레이어가 안전 지대에 들어감: 쫓던 적은 원래 자리로
-    if (!e.awake) { if (e.homing) goHome(e); continue; } // 멀리서 쉬는 적 (넓은 필드 — 쫓아오는 적은 계속 움직임), 돌아가던 적은 보이지 않으니 바로 제자리로
+    if (!e.awake) { if (e.homing) goHome(e); if (e.cage) e.hp = e.maxhp; continue; } // 멀리서 쉬는 적 (넓은 필드 — 쫓아오는 적은 계속 움직임), 돌아가던 적은 보이지 않으니 바로 제자리로, 보스는 다 회복
     if (safeMap[Math.floor(e.y) * MW + Math.floor(e.x)]) evict(e);
     if (e.super && !e.seenMsg && canSee(e.x, e.y)) { e.seenMsg = true; msg(`고유 정예 '${e.name}'${regions[e.lv] && regions[e.lv].vault ? ': 금고 열쇠를 지녔다' : ''}`, '#ff9a3a'); tip('super'); }
     else if (e.d.boss && !e.seenMsg && canSee(e.x, e.y)) { e.seenMsg = true; msg(`보스 '${e.d.name}'`, '#ff7a4a'); bossCard(e); }
@@ -5535,8 +5543,9 @@ function updateEnemies(dt) {
     if (e.stun > 0) { e.stun -= dt; if (Math.random() < dt * 8) spark(e.x, e.y, 1, '#9df', 1.5); continue; }
     if (e.dodgeIn > 0 && (e.dodgeIn -= dt) <= 0) { e.dodgeIn = 0; if (dodge(e)) continue; } // 조준당한 제노이드: 옆으로 피하기
 
-    const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy) || 0.01;
-    const hidden = safe || (cloaked && d > CLOAK_NEAR); // 안전 지대 안의 플레이어, 은신 장막(곁이 아니면)은 놓침
+    const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy) || 0.01, away = e.cage && !inCage(e.cage, p.x, p.y);
+    const hidden = safe || (cloaked && d > CLOAK_NEAR) || away; // 안전 지대 안의 플레이어, 은신 장막(곁이 아니면), 보스방 밖의 플레이어(보스)는 놓침
+    if (away) { if (e.aggro && e.trail && e.trail.length) e.homing = true; e.hp = Math.min(e.maxhp, e.hp + e.maxhp * BOSS_CAGE.regen * dt); } // 보스: 제자리로 돌아가며 체력 회복
     if (hidden && e.aggro) { e.aggro = false; e.burst = 0; }
     const see = d < 14 && los(e.x, e.y, p.x, p.y);
     if (!e.aggro && !hidden && ((see && d < 10) || d < 3)) { aggro(e); alertNear(e.x, e.y, 5); }
@@ -7813,6 +7822,7 @@ function drawCursor() {
     ctx.strokeStyle = '#8f8'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(x - 14, y); ctx.lineTo(x - 5, y); ctx.moveTo(x + 5, y); ctx.lineTo(x + 14, y); ctx.moveTo(x, y - 14); ctx.lineTo(x, y - 5); ctx.moveTo(x, y + 5); ctx.lineTo(x, y + 14); ctx.stroke();
+    if (state === 'play' && !inBase && y < hudBottom()) drawCursorHud(x, y); // 아래 HUD 위에서는 숨김 (설명 창을 가리지 않게)
   }
   if (state !== 'play') return;
   // 재장전 중: 커서 둘레에 차오르는 링
@@ -7821,11 +7831,43 @@ function drawCursor() {
     ctx.lineWidth = 4;
     ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.beginPath(); ctx.arc(x, y, 18, 0, Math.PI * 2); ctx.stroke();
     ctx.strokeStyle = '#ffd27a'; ctx.beginPath(); ctx.arc(x, y, 18, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * f); ctx.stroke();
-    ctx.font = font(FS, true); ctx.textAlign = 'center';
-    ctx.fillStyle = '#000'; ctx.fillText('재장전', x + 1, y + 35); ctx.fillStyle = '#ffd27a'; ctx.fillText('재장전', x, y + 34);
+    ctx.font = font(FS, true); ctx.textAlign = 'left'; // 커서 오른쪽 (장탄 숫자 자리 — 아래는 스킬 칸)
+    ctx.fillStyle = '#000'; ctx.fillText('재장전', x + 27, y + 7); ctx.fillStyle = '#ffd27a'; ctx.fillText('재장전', x + 26, y + 6);
   }
   const gt = guideTarget();
   if (gt && !(perkOpen && perkHit(x, y)) && !(invOpen && invHit(x, y)) && !(codexOpen && codexHit(x, y)) && !(hackOpen && hackHit(x, y))) drawExitGuide(x, y, gt); // 창 위에서는 숨김
+}
+// 커서 둘레 (아래 HUD를 보지 않고도): 오른쪽 탄약 (장탄 호 — 아래부터 참, 장탄/남은 탄), 왼쪽 수류탄 (고른 종류·개수),
+// 아래 스킬 (Z X V B — 대기 중이면 위부터 어둡게 덮고 남은 초, 지속 중이면 스킬 색 테두리·남은 막대). 커서가 아래쪽 끝이면 스킬 줄은 위로
+function drawCursorHud(x, y) {
+  const p = player, U = Z, ci = curW(), ws = ci.s;
+  ctx.font = font(FS);
+  const txt = (t, tx, ty, col, align = 'left') => { ctx.textAlign = align; ctx.fillStyle = '#000'; ctx.fillText(t, tx + 1, ty + 1); ctx.fillStyle = col; ctx.fillText(t, tx, ty); };
+  if (ws.type === 'gun' && p.reload <= 0) {
+    const f = clamp(ci.mag / ws.mag, 0, 1), col = ci.mag <= Math.max(1, ws.mag * 0.25) ? '#ff6a4a' : '#ffd27a', left = p.ammo[ws.ammo];
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.arc(x, y, 18, -0.9, 0.9); ctx.stroke();
+    if (f > 0) { ctx.strokeStyle = col; ctx.beginPath(); ctx.arc(x, y, 18, 0.9 - 1.8 * f, 0.9); ctx.stroke(); }
+    ctx.lineWidth = 1;
+    txt(String(ci.mag), x + 26, y + 6, col); txt(`/${left}`, x + 26 + ctx.measureText(String(ci.mag)).width, y + 6, left ? '#b8b2a4' : '#ff6a4a');
+  }
+  const gn = p.gren[p.gsel] || 0, gw = ctx.measureText(String(gn)).width;
+  ctx.globalAlpha = gn ? 1 : 0.45;
+  drawIcon('icon_gren_' + p.gsel, x - 26 - gw - 2 - 12 * U, y - 7 * U, 12 * U, 13 * U); txt(String(gn), x - 26, y + 6, gn ? INK : HC.dim, 'right');
+  ctx.globalAlpha = 1;
+  const sk = p.shells.map((sh, k) => sh && [sh, k]).filter(Boolean);
+  if (!sk.length) return;
+  const S = 18 * U, gap = 3 * U, sy = Math.round(y + 24 + S > hudBottom() ? y - 24 - S : y + 24);
+  let sx = Math.round(x - (sk.length * S + (sk.length - 1) * gap) / 2);
+  for (const [sh, k] of sk) {
+    const Sk = SKILLS[sh.id], cd = p.scd[sh.id] || 0, on = skillLeft(sh.id);
+    ctx.fillStyle = on ? Sk.color : cd > 0 ? HC.edge : '#9a9484'; ctx.fillRect(sx, sy, S, S);
+    ctx.fillStyle = HC.slot; ctx.fillRect(sx + U, sy + U, S - 2 * U, S - 2 * U);
+    drawIcon(Sk.icon, sx + U, sy + U, S - 2 * U, S - 2 * U);
+    if (cd > 0) { ctx.fillStyle = 'rgba(0,0,0,0.66)'; ctx.fillRect(sx + U, sy + U, S - 2 * U, Math.round((S - 2 * U) * clamp(cd / shellVals(sh).cd, 0, 1))); txt(String(Math.ceil(cd)), sx + S / 2, sy + S / 2 + 6, '#fff', 'center'); }
+    if (on) { ctx.fillStyle = Sk.color; ctx.fillRect(sx + U, sy + S - 3 * U, Math.round((S - 2 * U) * clamp(on, 0, 1)), 2 * U); }
+    pxGlyph(SHELL_SLOTS[k], sx + 2 * U, sy + 2 * U, HC.acc);
+    sx += S + gap;
+  }
 }
 // 길안내 목표: 자폭 중이면 탈출정, 생존자와 함께면 가장 가까운 거점 패드, 해킹 중 단말기에서 벗어나면 단말기
 function guideTarget() {
@@ -7993,7 +8035,7 @@ function loadGame(slot) {
   Snd.init(); Snd.play('exit');
   const F = d.field;
   if (F && F.ver === FIELD_VER) { startField(F.seed, F.flags, F.hub, F.seen); for (const [x, y, n] of F.xp || []) addPickup(x, y, 'xp', null, n); } // 쓰러진 자리의 경험치도 그대로
-  else if (F) { startField(F.seed, { ...F.flags, hubs: [] }); settleHubs(); } // 거점이 줄기 전 판의 저장: 지도는 새로, 진행 기록(구역 단위)은 그대로
+  else if (F) { startField(F.seed, { ...F.flags, hubs: [] }); settleHubs(); for (const [, , n] of F.xp || []) addPickup(player.x + rnd(-0.6, 0.6), player.y + rnd(0.6, 1.2), 'xp', null, n); } // 지도가 바뀐 판의 저장: 지도는 새로, 진행 기록(구역 단위)은 그대로, 쓰러진 자리의 경험치는 발밑에
   else { startField(newSeed(), legacyFlags(Math.min(d.stage || 1, CAMPAIGN.length))); settleHubs(); } // 예전(구역 방식) 저장: 새 지도에서 그 구역까지 지나온 것으로
   for (const w of moved.floor) dropWeapon(player.x + rnd(-0.8, 0.8), player.y + rnd(0.6, 1.2), w); // 가방·창고가 다 차면 발밑에
   if (extra.length) { msg(`무기 슬롯이 ${open}칸으로 바뀌었다. 남는 무기 ${extra.length}개: 가방 ${moved.bag}, 창고 ${moved.stash}${moved.floor.length ? `, 발밑 ${moved.floor.length}` : ''}`, '#ffd27a'); tip('slots'); }

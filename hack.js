@@ -131,6 +131,7 @@ function drawWires(G, r, g) {
 }
 
 // --- 암호 찾기: 기계어 화면 속 같은 길이의 낱말 중 암호 고르기. 틀리면 '일치 n/4' (같은 자리의 같은 글자 수), 시도를 다 쓰면 경보 + 새 화면 ---
+// 줄마다 주소 뒤 12칸 (기호 한 칸, 한글 두 칸): 낱말 줄은 낱말 + 앞뒤 기호 4개, 빈 줄은 기호 12개 — 칸이 옆 칸·기록을 넘지 않게
 const JUNK = '#@!$%&*^~<>[]{};:?=+/|';
 const hackJunk = n => Array.from({ length: n }, () => JUNK[Math.floor(Math.random() * JUNK.length)]).join('');
 const likeness = (a, b) => [...a].filter((ch, k) => b[k] === ch).length;
@@ -141,7 +142,7 @@ function makeWords(tier) {
     set.add((q < 0.35 ? pass.slice(0, 2) : pick(A)) + (q >= 0.35 && q < 0.7 ? pass.slice(2) : pick(B)));
   }
   const words = hackShuffle([...set]), slots = hackShuffle([...Array(18).keys()]).slice(0, words.length);
-  const rows = [...Array(18).keys()].map(k => { const w = slots.indexOf(k); return { addr: (0xF400 + k * 12).toString(16).toUpperCase(), pre: w >= 0 ? hackJunk(irnd(1, 4)) : '', w, post: hackJunk(w >= 0 ? irnd(1, 3) : irnd(9, 12)) }; });
+  const rows = [...Array(18).keys()].map(k => { const w = slots.indexOf(k), pre = w >= 0 ? irnd(1, 3) : 0; return { addr: (0xF400 + k * 12).toString(16).toUpperCase(), pre: hackJunk(pre), w, post: hackJunk(w >= 0 ? 4 - pre : 12) }; });
   return { type: 'words', tier, words, pass, rows, tries: C.tries, log: [], tried: [], hit: [], draw: drawWords, down: wordsDown };
 }
 function wordsDown(G, mx, my) {
@@ -155,8 +156,9 @@ function wordsDown(G, mx, my) {
 function drawWords(G, r, g) {
   pxWell(r);
   ctx.textAlign = 'left'; ctx.font = font(FS); G.hit = [];
+  const cw = Math.max(...G.rows.map(row => ctx.measureText(`0x${row.addr} ${row.pre}${row.w >= 0 ? G.words[row.w] : ''}${row.post}`).width)) + 14; // 칸 너비: 가장 긴 줄 + 사이
   G.rows.forEach((row, k) => {
-    let x = r[0] + 10 + Math.floor(k / 9) * 152;
+    let x = r[0] + 10 + Math.floor(k / 9) * cw;
     const y = r[1] + 20 + (k % 9) * 19;
     ctx.fillStyle = '#3f6d64'; ctx.fillText(`0x${row.addr}`, x, y); x += ctx.measureText('0xF4A0 ').width;
     ctx.fillStyle = '#5a5d66'; ctx.fillText(row.pre, x, y); x += ctx.measureText(row.pre).width;
@@ -168,17 +170,17 @@ function drawWords(G, r, g) {
     }
     ctx.fillStyle = '#5a5d66'; ctx.fillText(row.post, x, y);
   });
-  const lx = r[0] + 318; // 고른 낱말과 일치 수
+  const lx = r[0] + 20 + 2 * cw; // 고른 낱말과 일치 수 (두 줄씩)
   ctx.fillStyle = '#26282e'; ctx.fillRect(lx - 10, r[1] + 8, 1, r[3] - 16);
-  G.log.slice(-8).forEach((q, n) => {
-    const y = r[1] + 20 + n * 21;
+  G.log.slice(-6).forEach((q, n) => {
+    const y = r[1] + 20 + n * 40;
     ctx.fillStyle = HC.dim; ctx.fillText(`> ${q.word}`, lx, y);
-    ctx.textAlign = 'right'; ctx.fillStyle = q.n ? HC.acc : '#a5544a'; ctx.fillText(`일치 ${q.n}/4`, r[0] + r[2] - 8, y); ctx.textAlign = 'left';
+    ctx.fillStyle = q.n ? HC.acc : '#a5544a'; ctx.fillText(`일치 ${q.n}/4`, lx + ctx.measureText('> ').width, y + 19);
   });
   hackPips(g, HACK_GAMES.words.tries, G.tries);
 }
 
-// --- 순서 기억: 켜지는 칸의 순서를 보고 그대로 누르기. 틀리면 경보 + 처음부터 다시 보여 줌 ---
+// --- 순서 기억: 켜지는 칸의 순서를 보고 그대로 누르기. 틀리면 경보 + 처음부터 다시 보여 줌. '다시 보기'는 경보 없이 처음부터 다시 (누른 것도 처음부터) ---
 const MEM_ON = 0.5, MEM_GAP = 0.22;
 function makeMemory(tier) {
   const L = HACK_GAMES.memory.len[tier], seq = [];
@@ -190,9 +192,11 @@ function memoryTick(G, dt) {
   G.hitT = Math.max(0, G.hitT - dt);
 }
 const memLit = G => { if (G.show === null || G.show < 0) return -1; const k = Math.floor(G.show / (MEM_ON + MEM_GAP)); return G.show - k * (MEM_ON + MEM_GAP) < MEM_ON ? G.seq[k] : -1; };
+const memReplay = g => [g.x + g.w - 14 - 96, g.y + g.h - 30, 96, 24]; // 다시 보기 단추 (창 오른쪽 아래)
 const memCell = (r, k) => { const s = Math.floor(Math.min(64, (r[3] - 32) / 3)), x0 = Math.round(r[0] + r[2] / 2 - (3 * s + 16) / 2), y0 = Math.round(r[1] + r[3] / 2 - (3 * s + 16) / 2); return [x0 + (k % 3) * (s + 8), y0 + Math.floor(k / 3) * (s + 8), s, s]; };
 function memoryDown(G, mx, my, r) {
   if (G.show !== null) return; // 보여 주는 중
+  if (inRect(memReplay(hackGeom()), mx, my)) { G.pos = 0; G.hitT = 0; G.show = -0.3; Snd.play('menu'); return; }
   for (let k = 0; k < 9; k++) if (inRect(memCell(r, k), mx, my)) {
     G.hit = k; G.hitT = 0.3;
     if (k === G.seq[G.pos]) { G.ok = true; G.pos++; Snd.play('menu'); if (G.pos >= G.seq.length) hackSolved(); }
@@ -209,6 +213,7 @@ function drawMemory(G, r, g) {
     if (lit === k || fb) { ctx.fillStyle = lit === k ? HC.acc : G.ok ? '#6ff0d8' : '#e05050'; ctx.fillRect(c[0] + 8, c[1] + 8, c[2] - 16, c[3] - 16); }
   }
   hackPips(g, G.seq.length, G.pos, G.show === null ? HC.acc : '#4a4d55');
+  const b = memReplay(g); pxBtn(b, '다시 보기', inRect(b), G.show === null);
 }
 
 // --- 회로 연결: 칸을 눌러 돌려 왼쪽 전원에서 오른쪽 단자까지 회로를 잇기. 많이 돌리면 과부하 (경보) ---
