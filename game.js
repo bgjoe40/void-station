@@ -8152,12 +8152,13 @@ function drawCursor() {
     if (state === 'play' && !inBase && y < hudBottom()) drawCursorHud(x, y); // 아래 HUD 위에서는 숨김 (설명 창을 가리지 않게)
   }
   if (state !== 'play') return;
-  // 재장전 중: 커서 둘레에 차오르는 링
+  // 재장전 중: 커서 오른쪽 장탄 호가 남은 장탄에서 가득까지 다시 차오름 (아래부터)
   if (p.reload > 0 && !p.shellGap) {
-    const f = 1 - p.reload / p.reloadMax;
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.beginPath(); ctx.arc(x, y, 18, 0, Math.PI * 2); ctx.stroke();
-    ctx.strokeStyle = '#ffd27a'; ctx.beginPath(); ctx.arc(x, y, 18, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * f); ctx.stroke();
+    const ci = curW(), m0 = clamp(ci.mag / (ci.s.mag || 1), 0, 1), f = m0 + (1 - m0) * (1 - p.reload / p.reloadMax);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.arc(x, y, 18, -0.9, 0.9); ctx.stroke();
+    ctx.strokeStyle = '#ffd27a'; ctx.beginPath(); ctx.arc(x, y, 18, 0.9 - 1.8 * f, 0.9); ctx.stroke();
+    ctx.lineWidth = 1;
     ctx.font = font(FS, true); ctx.textAlign = 'left'; // 커서 오른쪽 (장탄 숫자 자리)
     ctx.fillStyle = '#000'; ctx.fillText('재장전', x + 27, y + 7); ctx.fillStyle = '#ffd27a'; ctx.fillText('재장전', x + 26, y + 6);
   }
