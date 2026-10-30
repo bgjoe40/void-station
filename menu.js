@@ -81,7 +81,7 @@ function fadeThen(fn, ms = 380) {
 function nudgeSlider(row, d) {
   const inp = row.querySelector('input[type=range]');
   if (!inp) return;
-  inp.value = clamp(+inp.value + d, +inp.min, +inp.max); inp.dispatchEvent(new Event('input')); inp.dispatchEvent(new Event('change'));
+  inp.value = clamp(+inp.value + (+inp.step > 1 ? Math.sign(d) * +inp.step : d), +inp.min, +inp.max); inp.dispatchEvent(new Event('input')); inp.dispatchEvent(new Event('change')); // 칸이 큰 것(UI 크기)은 한 칸씩
 }
 
 // --- 아틀라스 그림을 메뉴에 (픽셀 그대로 키움) ---
@@ -358,14 +358,14 @@ let setTab = 'sound';
 function settingsScreen(back, tab = setTab) {
   Snd.init(); setTab = tab;
   const tabs = [['sound', '소리'], ['view', '화면'], ['game', '게임'], ['keys', '조작']];
-  const slider = (k, label, sub = '') => `<div class="opt" data-nav tabindex="0" data-slider="${k}"><span class="lbl">${label}${sub ? `<small>${sub}</small>` : ''}</span>
-    <input type="range" min="0" max="100" value="${Math.round(settings[k] * 100)}" tabindex="-1" style="--v:${settings[k]}"><span class="val">${Math.round(settings[k] * 100)}%</span></div>`;
+  const slider = (k, label, sub = '', min = 0, max = 100, step = 1) => `<div class="opt" data-nav tabindex="0" data-slider="${k}"><span class="lbl">${label}${sub ? `<small>${sub}</small>` : ''}</span>
+    <input type="range" min="${min}" max="${max}" step="${step}" value="${Math.round(settings[k] * 100)}" tabindex="-1" style="--v:${(settings[k] * 100 - min) / (max - min)}"><span class="val">${Math.round(settings[k] * 100)}%</span></div>`;
   const toggle = (k, label, sub = '') => `<button class="opt ${settings[k] ? 'on' : ''}" data-nav data-toggle="${k}"><span class="lbl">${label}${sub ? `<small>${sub}</small>` : ''}</span><span class="sw"></span><span class="val">${settings[k] ? '켜짐' : '꺼짐'}</span></button>`;
   const cur = MUSIC_INFO[Music.want];
   const body = {
     sound: `<div class="sect">음량</div>${slider('master', '전체 음량')}${slider('music', '배경음악')}${slider('sfx', '효과음')}${slider('amb', '환경음')}
       ${cur ? `<div class="obj" style="margin-top:18px"><small class="eye">재생 중</small>${escHtml(cur[0])} (${escHtml(cur[1])})</div>` : ''}`,
-    view: `<div class="sect">화면</div>${slider('shake', '화면 흔들림')}${toggle('dmgNums', '피해 숫자')}${toggle('hurtFx', '피격 화면 효과')}
+    view: `<div class="sect">화면</div>${slider('uiScale', 'UI 크기', '', 75, 200, 25)}${slider('shake', '화면 흔들림')}${toggle('dmgNums', '피해 숫자')}${toggle('hurtFx', '피격 화면 효과')}
       <button class="opt act" data-nav id="oFull"><span class="lbl">전체 화면</span><span></span><span class="val">${document.fullscreenElement ? '켜짐' : '꺼짐'}</span></button>`,
     game: `<div class="sect">안내</div>${toggle('tips', '첫 플레이 안내')}
       <button class="opt act" data-nav id="oTips"><span class="lbl">본 안내 처음부터 다시 보기<small>지금까지 ${tipsSeen.size}개를 봤습니다</small></span><span></span><span class="val">초기화</span></button>
@@ -382,8 +382,8 @@ function settingsScreen(back, tab = setTab) {
   onAll('[data-tab]', b => { if (b.dataset.tab !== tab) settingsScreen(back, b.dataset.tab); }, 'uiMove');
   for (const row of overlay.querySelectorAll('[data-slider]')) {
     const k = row.dataset.slider, inp = row.querySelector('input'), val = row.querySelector('.val');
-    inp.oninput = () => { settings[k] = inp.value / 100; inp.style.setProperty('--v', settings[k]); val.textContent = inp.value + '%'; applyVolume(); };
-    inp.onchange = () => { saveSettings(); if (k === 'sfx' || k === 'master') Snd.play('pickup'); };
+    inp.oninput = () => { settings[k] = inp.value / 100; inp.style.setProperty('--v', (inp.value - inp.min) / (inp.max - inp.min)); val.textContent = inp.value + '%'; applyVolume(); };
+    inp.onchange = () => { saveSettings(); if (k === 'sfx' || k === 'master') Snd.play('pickup'); if (k === 'uiScale') applyUiScale(); }; // UI 크기: 놓으면 메뉴도 그 크기로
   }
   onAll('[data-toggle]', b => {
     const k = b.dataset.toggle; settings[k] = !settings[k]; saveSettings();

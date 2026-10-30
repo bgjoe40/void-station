@@ -246,8 +246,11 @@ const Snd = {
 
 // ===== 설정 (음량) — 브라우저 localStorage에 저장 =====
 const SETTINGS_KEY = 'voidstation.settings.v1';
-const settings = { master: 0.9, music: 0.6, sfx: 0.9, amb: 0.8, tips: true, shake: 1, dmgNums: true, hurtFx: true, hideCommon: false, autoAim: false, ver: 2 }; // amb: 환경음, tips: 첫 플레이 안내, shake: 화면 흔들림 배율, dmgNums: 피해 숫자, hurtFx: 피격 화면 효과, hideCommon: 바닥의 일반 등급 장비 숨기기, autoAim: 자동 조준 (끄면 커서 쪽으로 곧게), ver: 설정의 판 (2: 자동 조준 기본 끔 — 예전 설정도 한 번 끔)
+const settings = { master: 0.9, music: 0.6, sfx: 0.9, amb: 0.8, tips: true, shake: 1, dmgNums: true, hurtFx: true, hideCommon: false, autoAim: false, uiScale: 1, ver: 2 }; // uiScale: UI 크기 (화면 위 글자·HUD·창·커서·메뉴의 배율, 세계는 그대로), amb: 환경음, tips: 첫 플레이 안내, shake: 화면 흔들림 배율, dmgNums: 피해 숫자, hurtFx: 피격 화면 효과, hideCommon: 바닥의 일반 등급 장비 숨기기, autoAim: 자동 조준 (끄면 커서 쪽으로 곧게), ver: 설정의 판 (2: 자동 조준 기본 끔 — 예전 설정도 한 번 끔)
 try { const s = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; if (!(s.ver >= 2)) { s.autoAim = false; s.ver = 2; } Object.assign(settings, s); } catch (e) { /* 저장소를 못 쓰면 기본값 */ }
+let uiS = 1; // 지금 UI 크기 (settings.uiScale)
+const applyUiScale = () => { uiS = settings.uiScale || 1; overlay.style.zoom = uiS === 1 ? '' : uiS; }; // 메뉴(HTML)는 CSS zoom
+applyUiScale();
 const saveSettings = () => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* 저장 못 하면 이번 실행에만 적용 */ } };
 function applyVolume() {
   if (!Snd.ctx) return;
@@ -1581,7 +1584,14 @@ let crateHp = new Map(), crateHitT = new Map(); // 상자 칸 → 남은 체력,
 // 세계 → 확대 전 화면 좌표 (세계 그림은 이 좌표로 worldC에). SX·SY: 실제 화면 좌표 (이름표·숫자처럼 화면에 바로 그리는 것, z: 위로 띄울 높이)
 const PX = (x, y) => (x - y) * (TW / 2) - cam.x + VW / 2 + shx;
 const PY = (x, y) => (x + y) * (TH / 2) - cam.y + VVH / 2 + shy;
-const SX = (x, y) => PX(x, y) * Z, SY = (x, y, z = 0) => (PY(x, y) - z) * Z;
+const SX = (x, y) => PX(x, y) * Z / uiS, SY = (x, y, z = 0) => (PY(x, y) - z) * Z / uiS; // UI 좌표 (UI 크기 uiS로 나눔 — uiSpace 안에서 씀)
+// UI 좌표에서: 화면 크기(W·VH·H)와 마우스를 UI 크기로 나눈 값으로 바꿔 fn을 부름 (그리는 쪽은 ctx도 uiS배로 키워 둠)
+function uiSpace(fn) {
+  if (uiS === 1) return fn();
+  const mx = mouse.x, my = mouse.y, w = W, vh = VH, h = H;
+  mouse.x /= uiS; mouse.y /= uiS; W /= uiS; VH /= uiS; H /= uiS;
+  try { return fn(); } finally { mouse.x = mx; mouse.y = my; W = w; VH = vh; H = h; }
+}
 function viewToWorld(vx, vy) { // 확대 전 화면 좌표 → 세계
   const a = (vx - VW / 2 - shx + cam.x) / (TW / 2), b = (vy - VVH / 2 - shy + cam.y) / (TH / 2);
   return { x: (a + b) / 2, y: (b - a) / 2 };
@@ -4281,8 +4291,9 @@ const itemColor = it => RARITY[it.rarity].color; // 이름 색 (등급 색)
 const ownedItems = () => [...player.equip, ...player.bag, ...player.shells, ...GEAR_KEYS.map(g => player.gear[g])].filter(Boolean);
 const isEquipped = it => player.equip.includes(it) || player.shells.includes(it) || GEAR_KEYS.some(g => player.gear[g] === it);
 const salvageValue = it => SALVAGE[it.rarity];
+const salvageable = it => it.kind !== 'shell' && it.kind !== 'attach'; // 스킬 쉘·파츠는 분해하지 않음 (무기·방어구만)
 function salvage(it) {
-  if (!it || isEquipped(it) || !player.bag.includes(it)) return;
+  if (!it || isEquipped(it) || !player.bag.includes(it) || !salvageable(it)) return;
   const n = salvageValue(it);
   removeFromBag(it); player.parts += n; trade.sel = null;
   trade.note = `${it.name} 분해: 부품 +${n}`; Snd.play('crate');
@@ -4296,7 +4307,7 @@ function sellCommons() {
   trade.note = `일반 등급 ${list.length}개 판매 +${g}G`; Snd.play('gold');
 }
 function salvageCommons() {
-  const list = bagCommons();
+  const list = bagCommons().filter(salvageable);
   let n = 0;
   for (const it of list) { removeFromBag(it); n += salvageValue(it); }
   player.parts += n; if (list.includes(trade.sel)) trade.sel = null;
@@ -4854,8 +4865,8 @@ function tradeButtons() {
     B.push(...attSlotBoxes(g));
   } else if (trade.mode === 'upgrade' && trade.tab === 'forge') { // 분해: 고른 장비의 분해 버튼, 일반 등급 일괄 분해
     const it = trade.sel && ownedItems().includes(trade.sel) ? trade.sel : null;
-    if (it) { const eq = isEquipped(it); B.push({ id: 'salv', x: g.gx + 150, y: g.gy + 44, w: 130, h: 22, label: eq ? '장착 중 (분해 불가)' : `분해 → 부품 +${salvageValue(it)}`, on: !eq }); }
-    const commons = bagCommons().length;
+    if (it) { const eq = isEquipped(it), no = !salvageable(it); B.push({ id: 'salv', x: g.gx + 150, y: g.gy + 44, w: 130, h: 22, label: eq ? '장착 중 (분해 불가)' : no ? '분해 불가' : `분해 → 부품 +${salvageValue(it)}`, on: !eq && !no }); }
+    const commons = bagCommons().filter(salvageable).length;
     B.push({ id: 'salvAll', x: g.gx, y: g.footY + 14, w: 210, h: 22, label: `일반 등급 모두 분해 (${commons})`, on: commons > 0 });
   } else if (trade.mode === 'upgrade') {
     Object.entries(UPGRADES).forEach(([k, u], n) => {
@@ -5088,7 +5099,7 @@ function drawTrade() {
       L.push({ t: `보유 ${goodCount(e.k, e.id)}`, c: '#9a9' });
       L.push(e.kind === 'sellG' ? { t: `판매가 ${e.price}G`, c: '#ffd27a', b: true } : { t: `구매가 ${e.price}G`, c: p.gold >= e.price ? '#ffd27a' : '#f66', b: true });
     }
-    queueTip(L, mouse.x + 18, mouse.y + 18);
+    queueTip(L, mouse.x + 18, mouse.y + 18, e.inst ? equippedFor(e.inst) : null);
   }
 }
 // 개조실 '장비 개조' 탭: 확장 배낭 (기지 개조), 고른 방어구의 장비 개조 (MODS)
@@ -5152,24 +5163,24 @@ canvas.addEventListener('mousedown', e => {
   Snd.init();
   mouse.x = e.clientX; mouse.y = e.clientY;
   if (state === 'intro') { if (e.button === 0) mouse.down = true; return; } // 컷신: 누르고 있으면 건너뜀 (introTick)
-  if ((state === 'play' || state === 'trade') && hudMenuClick(e.button)) return; // HUD 메뉴 아이콘
-  if (state === 'trade') { tradeMouseDown(e.button); return; }
-  if (state === 'play' && hackOpen && hackMouseDown(e.button)) return; // 해킹 창 (맨 위에 그려짐)
-  if (state === 'play' && perkOpen && !held && perkMouseDown(e.button)) return; // 스킬 창이 인벤토리 위에 그려지므로 겹친 곳은 스킬 창 먼저 (들고 있는 것은 placeHeld)
-  if (state === 'play' && invOpen && invMouseDown(e.button)) return;
-  if (state === 'play' && codexOpen && codexMouseDown(e.button)) return;
+  if ((state === 'play' || state === 'trade') && uiSpace(() => hudMenuClick(e.button))) return; // HUD 메뉴 아이콘 (창·HUD는 UI 좌표)
+  if (state === 'trade') { uiSpace(() => tradeMouseDown(e.button)); return; }
+  if (state === 'play' && hackOpen && uiSpace(() => hackMouseDown(e.button))) return; // 해킹 창 (맨 위에 그려짐)
+  if (state === 'play' && perkOpen && !held && uiSpace(() => perkMouseDown(e.button))) return; // 스킬 창이 인벤토리 위에 그려지므로 겹친 곳은 스킬 창 먼저 (들고 있는 것은 placeHeld)
+  if (state === 'play' && invOpen && uiSpace(() => invMouseDown(e.button))) return;
+  if (state === 'play' && codexOpen && uiSpace(() => codexMouseDown(e.button))) return;
   if (e.button === 0) { mouse.down = true; mouse.pressed = true; }
   if (e.button === 2) throwGrenade();
 });
 addEventListener('mouseup', e => {
   if (e.button !== 0) return;
   mouse.down = false;
-  if ((state === 'play' || state === 'trade') && invOpen) { mouse.x = e.clientX; mouse.y = e.clientY; invMouseUp(); }
-  if (state === 'play' && hackOpen) { mouse.x = e.clientX; mouse.y = e.clientY; hackMouseUp(); } // 전선 끌어다 놓기
+  if ((state === 'play' || state === 'trade') && invOpen) { mouse.x = e.clientX; mouse.y = e.clientY; uiSpace(invMouseUp); }
+  if (state === 'play' && hackOpen) { mouse.x = e.clientX; mouse.y = e.clientY; uiSpace(hackMouseUp); } // 전선 끌어다 놓기
 });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('wheel', e => {
-  if (state === 'play' && codexOpen && codexHit(e.clientX, e.clientY)) { codexScroll = clamp(codexScroll + Math.sign(e.deltaY) * 58, 0, codexMaxScroll(codexGeom())); return; } // 수집 도감: 카드 넘기기
+  if (state === 'play' && codexOpen && uiSpace(() => codexHit(e.clientX / uiS, e.clientY / uiS) && (codexScroll = clamp(codexScroll + Math.sign(e.deltaY) * 58, 0, codexMaxScroll(codexGeom())), true))) return; // 수집 도감: 카드 넘기기
   if (state === 'play') cycleWeapon(Math.sign(e.deltaY || e.deltaX));
 }, { passive: true });
 
@@ -6752,14 +6763,18 @@ function wrapWords(text, n) {
   if (line) out.push(line);
   return out;
 }
-function drawTooltip(L, x, y, maxY = H) {
+function tipSize(L) {
   let w = 0;
   for (const l of L) { ctx.font = l.b ? font(FM, true) : font(FS); w = Math.max(w, ctx.measureText(l.t).width); }
-  w += 18; const h = L.length * 17 + 10;
+  return [w + 18, L.length * 17 + 10];
+}
+function drawTooltip(L, x, y, maxY = H, edge = L[0].c) { // 그린 자리 [x, y, w, h]를 돌려줌
+  const [w, h] = tipSize(L);
   x = clamp(x, 6, W - w - 6); y = clamp(y, 6, maxY - h - 6);
-  const f = HC.fill; HC.fill = WIN_FILL; pxCard(x, y, w, h, false, L[0].c); HC.fill = f; // 창과 같은 모서리 픽셀 테두리, 윗변은 제목 색
+  const f = HC.fill; HC.fill = WIN_FILL; pxCard(x, y, w, h, false, edge); HC.fill = f; // 창과 같은 모서리 픽셀 테두리, 윗변은 제목 색
   ctx.textAlign = 'left';
   L.forEach((l, i) => { ctx.font = l.b ? font(FM, true) : font(FS); ctx.fillStyle = l.c; ctx.fillText(l.t, x + 9, y + 19 + i * 17); });
+  return [x, y, w, h];
 }
 function fitText(t, maxW) {
   if (ctx.measureText(t).width <= maxW) return t;
@@ -6799,14 +6814,14 @@ function drawEliteLabels() {
   ctx.textAlign = 'center'; ctx.font = font(FS, true);
   const show = e => e === player.target || labelOn(e.x, e.y, 0, 30); // 이름은 조준하거나 마우스를 올린 적만
   for (const e of enemies) if (e.d.thief && !e.dead && e.topY !== undefined && canSee(e.x, e.y)) { // 보물 약탈자: 남은 시간 (이름은 조준·마우스)
-    const x = SX(e.x, e.y), y = e.topY * Z - 12, bw = 56, f = e.alert ? clamp(e.escapeT / THIEF.escape, 0, 1) : 1;
+    const x = SX(e.x, e.y), y = e.topY * Z / uiS - 12, bw = 56, f = e.alert ? clamp(e.escapeT / THIEF.escape, 0, 1) : 1;
     if (show(e)) { ctx.fillStyle = '#000'; ctx.fillText('보물 약탈자', x + 1, y - 7); ctx.fillStyle = '#ffd27a'; ctx.fillText('보물 약탈자', x, y - 8); }
     ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(x - bw / 2 - 1, y - 3, bw + 2, 7);
     ctx.fillStyle = f < 0.3 ? '#ff7a4a' : '#ffd27a'; ctx.fillRect(x - bw / 2, y - 2, bw * f, 5);
   }
   for (const e of enemies) {
     if (!e.elite || e.dead || e.topY === undefined || !canSee(e.x, e.y) || ghost(e) || hiddenE(e) || !show(e)) continue;
-    const x = SX(e.x, e.y), y = e.topY * Z - 12, bw = 64, f = clamp(e.hp / e.maxhp, 0, 1);
+    const x = SX(e.x, e.y), y = e.topY * Z / uiS - 12, bw = 64, f = clamp(e.hp / e.maxhp, 0, 1);
     ctx.fillStyle = '#000'; ctx.fillText(e.name, x + 1, y - 7);
     ctx.fillStyle = e.super ? '#ff9a3a' : '#ffcc55'; ctx.fillText(e.name, x, y - 8);
     ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(x - bw / 2 - 1, y - 3, bw + 2, 7);
@@ -6826,20 +6841,37 @@ function drawMissionLabels() {
   };
   for (const s of survivors) {
     if ((s.state !== 'wait' && s.state !== 'follow') || s.topY === undefined || !survivorShown(s)) continue;
-    const x = SX(s.x, s.y), y = s.topY * Z - 10;
+    const x = SX(s.x, s.y), y = s.topY * Z / uiS - 10;
     if (s.state === 'wait') { if (labelOn(s.x, s.y, 4, 30)) label(x, y, '구조 요청', '#9cf'); }
     else label(x, y + 6, '', '#9cf', s.hp / s.maxhp, s.hp < s.maxhp * 0.35 ? '#f64' : '#5ab4ff', 30); // 동행 중: 파란 체력 막대만 (여럿이 붙어 있어도 덜 겹치게)
   }
   for (const e of enemies) {
     if (!e.d.nest || e.topY === undefined || !canSee(e.x, e.y) || !(e === player.target || labelOn(e.x, e.y, 3, 30))) continue;
-    label(SX(e.x, e.y), e.topY * Z - 10, e.d.name, '#f0a8ff', e.hp / e.maxhp, '#d050c0');
+    label(SX(e.x, e.y), e.topY * Z / uiS - 10, e.d.name, '#f0a8ff', e.hp / e.maxhp, '#d050c0');
   }
 }
 
 // ===== 창 그리기 부품: HUD와 같은 픽셀 테두리, 강조색은 호박색 하나, 설명은 툴팁으로 =====
 const INK = '#e8e2d6', WIN_FILL = 'rgba(9,10,13,0.95)', WELL_FILL = '#0d0e12';
 let tipQ = null; // 창의 툴팁은 모든 창을 그린 뒤에 (다른 창에 가리지 않게)
-const queueTip = (L, x, y) => { tipQ = [L, x, y]; };
+const queueTip = (L, x, y, cmp = null) => { tipQ = [L, x, y, cmp]; }; // cmp: 옆에 같이 띄울 착용 중인 장비 (비교)
+// 비교할 착용 장비: 무기는 손에 든 무기 (툴팁의 DPS 비교와 같은 것), 방어구는 같은 부위 (팔은 두 칸 다), 스킬 쉘은 같은 스킬을 끼운 칸. 파츠는 없음
+function equippedFor(it) {
+  const p = player;
+  if (!it || isEquipped(it) || it.kind === 'attach') return [];
+  if (it.kind === 'armor') return GEAR_KEYS.filter(k => GEAR_SLOTS[k] === it.s.slot && p.gear[k]).map(k => p.gear[k]);
+  if (it.kind === 'shell') return p.shells.filter(s => s && s.id === it.id);
+  return p.equip[p.slot] ? [p.equip[p.slot]] : [];
+}
+// 창의 툴팁 + 비교: 착용 중인 장비의 툴팁을 커서에서 먼 쪽 옆에 ('착용 중' 줄, 둘이면 아래로 쌓음 — 그쪽에 자리가 없으면 반대쪽)
+function drawTipQ() {
+  const [L, x, y, cmp] = tipQ, r = drawTooltip(L, x, y, VH);
+  if (!cmp || !cmp.length) return;
+  const C = cmp.map(it => [{ t: '착용 중', c: HC.dim }, ...itemLines(it)]), cw = Math.max(...C.map(c => tipSize(c)[0]));
+  const left = r[0] + r[2] / 2 < mouse.x ? r[0] - 8 - cw >= 6 : r[0] + r[2] + 8 + cw > W - 6;
+  let cy = r[1];
+  C.forEach((c, k) => { const q = drawTooltip(c, left ? r[0] - 8 - cw : r[0] + r[2] + 8, cy, VH, itemColor(cmp[k])); cy = q[1] + q[3] + 6; });
+}
 function winCard(x, y, w, h) { const f = HC.fill; HC.fill = WIN_FILL; pxCard(x, y, w, h, true); HC.fill = f; }
 // 오목한 칸 r = [x, y, w, h]: 테두리 (hot: 호박색), 위·왼쪽 그림자, 아래·오른쪽 밝은 선, glow: 등급 빛 'r,g,b'
 function pxWell(r, hot, glow) {
@@ -6933,7 +6965,7 @@ function drawInventory() {
     if (trade && trade.mode === 'upgrade') L.push({ t: '클릭: 고르기', c: HC.acc, b: true });
     else if (trade && trade.mode === 'stash') { if (hit.area === 'grid') L.push({ t: '우클릭: 창고에 보관', c: HC.acc, b: true }); }
     else if (trade) L.push({ t: hit.area === 'grid' ? `우클릭: 판매 ${sellPrice(inst)}G` : `판매가 ${sellPrice(inst)}G`, c: '#ffd27a', b: true });
-    queueTip(L, mouse.x - 300, mouse.y + 18);
+    queueTip(L, mouse.x - 300, mouse.y + 18, hit.area === 'grid' ? equippedFor(inst) : null); // 가방의 장비는 착용 중인 것과 같이
   } else if (hit.area === 'gear') queueTip([{ t: GEAR_NAMES[hit.g], c: INK, b: true }, { t: `${ARMOR_SLOTS[GEAR_SLOTS[hit.g]]} 장비를 끼운다`, c: HC.dim }], mouse.x - 180, mouse.y + 18);
   else if (hit.area === 'slot' && hit.c >= slotsOpen()) queueTip([{ t: `${hit.c + 1}번 무기 칸`, c: INK, b: true }, { t: `구역 ${WEAPON_SLOTS.bosses[hit.c - WEAPON_SLOTS.base]}의 보스를 처치하면 열린다`, c: HC.dim }], mouse.x - 180, mouse.y + 18);
   else if (hit.area === 'sort') queueTip([{ t: '가방 정렬', c: INK, b: true }, { t: '큰 장비부터 왼쪽 위로 빈틈없이 다시 놓는다', c: '#ccc' }], mouse.x - 260, mouse.y + 18);
@@ -7119,7 +7151,13 @@ function render() {
   ctx.restore(); ctx = mainCtx; W = W0; VH = VH0;
   ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, VH); ctx.clip();
   ctx.imageSmoothingEnabled = false; ctx.drawImage(worldC, 0, 0, VW * Z, VVH * Z); ctx.imageSmoothingEnabled = true;
-  // 여기부터 화면 해상도: 이름표·숫자 (세계 좌표는 SX·SY로)
+  ctx.scale(uiS, uiS); uiSpace(drawScreen);
+  ctx.restore();
+}
+// 여기부터 화면 위 (UI 크기 uiS배): 이름표·숫자 (세계 좌표는 SX·SY로), 화면 효과, HUD·창·커서
+function drawScreen() {
+  const scene = state === 'title', cine = state === 'intro';
+  const p = player;
   if (!scene && !cine) { drawLootLabels(); drawEliteLabels(); drawTerminalLabels(); drawMissionLabels(); drawHazardLabels(); }
 
   // 떠오르는 숫자
@@ -7144,14 +7182,13 @@ function render() {
 
   if (scene) { // 타이틀: 처음·끝에서 검게 덮음 (길을 다 지나면 처음으로)
     if (titleCam && titleCam.fade > 0) { ctx.fillStyle = `rgba(0,0,0,${titleCam.fade})`; ctx.fillRect(0, 0, W, VH); }
-    ctx.restore(); return;
+    return;
   }
-  if (cine) { drawIntro(); ctx.restore(); return; }
+  if (cine) { drawIntro(); return; }
   drawTopInfo();
   drawMinimap();
   drawTip();
   drawLog();
-  ctx.restore();
   drawHUD();
   if (zoneCard && (state === 'play' || state === 'trade')) drawZoneCard();
   if (state === 'trade') drawTrade();
@@ -7159,7 +7196,7 @@ function render() {
   if (perkOpen && (state === 'play' || state === 'trade')) drawPerks();
   if (codexOpen && state === 'play') drawCodex();
   if (hackOpen && state === 'play') drawHack(); // 해킹 미니 게임 (hack.js)
-  if (tipQ) { drawTooltip(...tipQ); tipQ = null; } // 창의 툴팁은 모든 창 위에
+  if (tipQ) { drawTipQ(); tipQ = null; } // 창의 툴팁은 모든 창 위에 (착용 장비 비교 포함)
   drawCursor();
   if (state === 'ending') drawEnding();
 }
@@ -7831,14 +7868,13 @@ function drawCursor() {
     ctx.lineWidth = 4;
     ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.beginPath(); ctx.arc(x, y, 18, 0, Math.PI * 2); ctx.stroke();
     ctx.strokeStyle = '#ffd27a'; ctx.beginPath(); ctx.arc(x, y, 18, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * f); ctx.stroke();
-    ctx.font = font(FS, true); ctx.textAlign = 'left'; // 커서 오른쪽 (장탄 숫자 자리 — 아래는 스킬 칸)
+    ctx.font = font(FS, true); ctx.textAlign = 'left'; // 커서 오른쪽 (장탄 숫자 자리)
     ctx.fillStyle = '#000'; ctx.fillText('재장전', x + 27, y + 7); ctx.fillStyle = '#ffd27a'; ctx.fillText('재장전', x + 26, y + 6);
   }
   const gt = guideTarget();
   if (gt && !(perkOpen && perkHit(x, y)) && !(invOpen && invHit(x, y)) && !(codexOpen && codexHit(x, y)) && !(hackOpen && hackHit(x, y))) drawExitGuide(x, y, gt); // 창 위에서는 숨김
 }
-// 커서 둘레 (아래 HUD를 보지 않고도): 오른쪽 탄약 (장탄 호 — 아래부터 참, 장탄/남은 탄), 왼쪽 수류탄 (고른 종류·개수),
-// 아래 스킬 (Z X V B — 대기 중이면 위부터 어둡게 덮고 남은 초, 지속 중이면 스킬 색 테두리·남은 막대). 커서가 아래쪽 끝이면 스킬 줄은 위로
+// 커서 둘레 (아래 HUD를 보지 않고도): 오른쪽 탄약 (장탄 호 — 아래부터 참, 장탄/남은 탄), 왼쪽 수류탄 (고른 종류·개수)
 function drawCursorHud(x, y) {
   const p = player, U = Z, ci = curW(), ws = ci.s;
   ctx.font = font(FS);
@@ -7854,20 +7890,6 @@ function drawCursorHud(x, y) {
   ctx.globalAlpha = gn ? 1 : 0.45;
   drawIcon('icon_gren_' + p.gsel, x - 26 - gw - 2 - 12 * U, y - 7 * U, 12 * U, 13 * U); txt(String(gn), x - 26, y + 6, gn ? INK : HC.dim, 'right');
   ctx.globalAlpha = 1;
-  const sk = p.shells.map((sh, k) => sh && [sh, k]).filter(Boolean);
-  if (!sk.length) return;
-  const S = 18 * U, gap = 3 * U, sy = Math.round(y + 24 + S > hudBottom() ? y - 24 - S : y + 24);
-  let sx = Math.round(x - (sk.length * S + (sk.length - 1) * gap) / 2);
-  for (const [sh, k] of sk) {
-    const Sk = SKILLS[sh.id], cd = p.scd[sh.id] || 0, on = skillLeft(sh.id);
-    ctx.fillStyle = on ? Sk.color : cd > 0 ? HC.edge : '#9a9484'; ctx.fillRect(sx, sy, S, S);
-    ctx.fillStyle = HC.slot; ctx.fillRect(sx + U, sy + U, S - 2 * U, S - 2 * U);
-    drawIcon(Sk.icon, sx + U, sy + U, S - 2 * U, S - 2 * U);
-    if (cd > 0) { ctx.fillStyle = 'rgba(0,0,0,0.66)'; ctx.fillRect(sx + U, sy + U, S - 2 * U, Math.round((S - 2 * U) * clamp(cd / shellVals(sh).cd, 0, 1))); txt(String(Math.ceil(cd)), sx + S / 2, sy + S / 2 + 6, '#fff', 'center'); }
-    if (on) { ctx.fillStyle = Sk.color; ctx.fillRect(sx + U, sy + S - 3 * U, Math.round((S - 2 * U) * clamp(on, 0, 1)), 2 * U); }
-    pxGlyph(SHELL_SLOTS[k], sx + 2 * U, sy + 2 * U, HC.acc);
-    sx += S + gap;
-  }
 }
 // 길안내 목표: 자폭 중이면 탈출정, 생존자와 함께면 가장 가까운 거점 패드, 해킹 중 단말기에서 벗어나면 단말기
 function guideTarget() {
