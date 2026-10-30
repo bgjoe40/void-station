@@ -485,7 +485,7 @@ const Music = {
 
 // ===== 맵 =====
 const T = { VOID: 0, FLOOR: 1, WALL: 2, CRATE: 3, PIPEX: 4, PIPEY: 5, EXIT: 6, TERM: 7, DOOR: 8 }; // TERM: 기지 단말기, DOOR: 자동문
-const MW = FIELD.margin * 2 + FIELD.block * 3, MH = MW; // 필드 전체 (구역 3x3)
+const MW = FIELD.margin * 2 + FIELD.cell * 3, MH = MW; // 필드 전체 (구역 3x3 칸)
 const DIR4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const DIR8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 let tiles, rooms, lamps, roomOf, wallTex, levelTheme, terminals = [];
@@ -519,6 +519,7 @@ function carve(x, y, w, h) {
 let links = [];                             // 이은 통로 { a, b, A, B: 양쪽 문 자리, len: 통로 길이(칸) }
 const nearRoom = new Uint8Array(MW * MH);   // 방 바닥에서 한 칸 안 — 통로가 들어가면 방과 맞붙어 벽이 사라짐
 const keepClear = new Uint8Array(MW * MH);  // 문 바로 안쪽 — 파이프·상자·조명·단말기를 두지 않음
+const poolMap = new Uint8Array(MW * MH);    // 독극물 웅덩이 칸 (POOL — 바닥이라 지나갈 수 있음)
 const blockOK = (bx, by) => bx >= 1 && by >= 1 && bx <= MW - 3 && by <= MH - 3 && // 2x2 통로 칸 (왼쪽 위 기준)을 놓을 수 있는지
   !nearRoom[by * MW + bx] && !nearRoom[by * MW + bx + 1] && !nearRoom[(by + 1) * MW + bx] && !nearRoom[(by + 1) * MW + bx + 1];
 const floorAt = (i, j) => tileAt(i, j) === T.FLOOR;
@@ -658,7 +659,7 @@ function connectedOK() {
 }
 function tryPlace(cells, type, room) {
   for (const [i, j] of cells) {
-    if (tileAt(i, j) !== T.FLOOR || keepClear[j * MW + i]) return false; // 문 바로 안쪽은 비워 둠
+    if (tileAt(i, j) !== T.FLOOR || keepClear[j * MW + i] || poolMap[j * MW + i]) return false; // 문 바로 안쪽·독극물 웅덩이는 비워 둠
     if (Math.abs(i - room.cx) < 2 && Math.abs(j - room.cy) < 2) return false;
   }
   for (const [i, j] of cells) tiles[j * MW + i] = type;
@@ -905,10 +906,12 @@ const nearestHubPad = (x, y) => {
 };
 
 function genField() {
-  const B = FIELD.block;
-  tiles = new Uint8Array(MW * MH); rooms = []; links = []; keepClear.fill(0); nearRoom.fill(0); regionMap = new Int8Array(MW * MH); chests = []; spots = [];
+  tiles = new Uint8Array(MW * MH); rooms = []; links = []; keepClear.fill(0); nearRoom.fill(0); poolMap.fill(0); regionMap = new Int8Array(MW * MH); chests = []; spots = [];
   doors = []; doorOf.fill(-1); terminals = []; hubs = []; pads = []; lamps = [];
-  regions = [null, ...FIELD_ORDER.map(([cx, cy], k) => ({ n: k + 1, bx: FIELD.margin + cx * B, by: FIELD.margin + cy * B, rooms: [], hubs: [], locks: [], keyPlan: [] }))];
+  regions = [null, ...FIELD_ORDER.map(([cx, cy], k) => { // 구역마다 성격(ROOM_KINDS)과 크기, 칸 가운데에
+    const kind = weighted(Object.fromEntries(Object.entries(ROOM_KINDS).map(([id, K]) => [id, K.w]))), size = pick(ROOM_KINDS[kind].sizes), off = (FIELD.cell - size) >> 1;
+    return { n: k + 1, kind, size, bx: FIELD.margin + cx * FIELD.cell + off, by: FIELD.margin + cy * FIELD.cell + off, rooms: [], hubs: [], locks: [], keyPlan: [] };
+  })];
   for (let n = 1; n <= 9; n++) genRegionRooms(regions[n]);
   for (let n = 1; n < 9; n++) linkRegions(regions[n], regions[n + 1]);
   // 착륙 지점: 구역 1에서 다음 구역 길목과 가장 먼 방 (보스방 말고), 코어: 구역 9의 보스방. 보스는 구역마다 보스방에만 (구역 보스·막 보스)
@@ -944,7 +947,7 @@ function placeExtras() {
   const freeCell = (r, ok = () => true) => { // 방 안의 빈 바닥 (문 바로 안쪽은 피함)
     for (let k = 0; k < 60; k++) {
       const i = irnd(r.x + 1, r.x + r.w - 2), j = irnd(r.y + 1, r.y + r.h - 2);
-      if (tileAt(i, j) === T.FLOOR && !keepClear[j * MW + i] && ok(i + 0.5, j + 0.5)) return { x: i + 0.5, y: j + 0.5 };
+      if (tileAt(i, j) === T.FLOOR && !keepClear[j * MW + i] && !poolMap[j * MW + i] && ok(i + 0.5, j + 0.5)) return { x: i + 0.5, y: j + 0.5 };
     }
     return null;
   };
@@ -991,19 +994,24 @@ function gatesHold() {
   }
   return true;
 }
-// 구역 하나의 방: 구역 칸 안에 서로 4칸 이상 떨어지게 놓고 이음 (이어지지 않으면 이 칸만 다시)
+// 구역 하나의 방: 구역의 성격(ROOM_KINDS)대로 크기·수를 정해 서로 4칸 이상 떨어지게 놓고 이음 (이어지지 않으면 이 구역만 다시)
 function genRegionRooms(R) {
-  const B = FIELD.block, box = [R.bx, R.by, R.bx + B, R.by + B], x0 = R.bx + 4, y0 = R.by + 4, x1 = R.bx + B - 4, y1 = R.by + B - 4;
+  const K = ROOM_KINDS[R.kind], B = R.size, box = [R.bx, R.by, R.bx + B, R.by + B], x0 = R.bx + 4, y0 = R.by + 4, x1 = R.bx + B - 4, y1 = R.by + B - 4;
+  const n0 = clamp(Math.round(B * B / K.per), 7, 14);
   for (let attempt = 0; attempt < 40; attempt++) {
     clearBox(box);
-    const rs = [], want = irnd(...FIELD.rooms);
+    const rs = [], want = n0 + irnd(-1, 1);
     { const w = irnd(...ARENA.w), h = irnd(...ARENA.h), x = pick([x0, x1 - w]), y = pick([y0, y1 - h]); rs.push({ x, y, w, h, cx: x + (w >> 1), cy: y + (h >> 1), slots: [], reg: R.n, arena: true }); } // 보스방부터 (넓은 방, 구역의 한 구석 — 다른 방 자리가 덜 쪼개지게)
     for (let a = 0; a < 600 && rs.length < want; a++) {
-      const w = irnd(6, 12), h = irnd(6, 12), x = irnd(x0, x1 - w), y = irnd(y0, y1 - h);
+      let w, h;
+      if (rs.length <= K.big) { w = irnd(8, 11); h = irnd(7, 10); } // 거점·시련이 들어갈 넓은 방 먼저
+      else if (Math.random() < K.hall) { const l = irnd(10, 16), s = irnd(4, 5); [w, h] = Math.random() < 0.5 ? [l, s] : [s, l]; } // 긴 회랑
+      else { w = irnd(...K.room); h = irnd(...K.room); }
+      const x = irnd(x0, x1 - w), y = irnd(y0, y1 - h);
       if (rs.some(r => x < r.x + r.w + 4 && x + w + 4 > r.x && y < r.y + r.h + 4 && y + h + 4 > r.y)) continue;
       rs.push({ x, y, w, h, cx: x + (w >> 1), cy: y + (h >> 1), slots: [], reg: R.n });
     }
-    if (rs.length < FIELD.rooms[0] - 1) continue;
+    if (rs.length < 7) continue;
     for (const r of rs) {
       carve(r.x, r.y, r.w, r.h);
       for (let j = r.y - 1; j <= r.y + r.h; j++) for (let i = r.x - 1; i <= r.x + r.w; i++) nearRoom[j * MW + i] = 1;
@@ -1023,7 +1031,7 @@ function clearBox([x0, y0, x1, y1]) {
 // 통로는 격벽으로 나뉜 다른 구간(앞 격벽 길목 포함 — 그 구역 번호로 표시됨)의 바닥에 닿지 않게 (격벽을 돌아가는 길이 생기지 않게)
 const gateSeg = n => Object.keys(GATES).filter(g => g < n).length; // 구역 n 앞에 있는 격벽 수
 function linkRegions(A, B) {
-  const box = [Math.min(A.bx, B.bx) + 1, Math.min(A.by, B.by) + 1, Math.max(A.bx, B.bx) + FIELD.block - 1, Math.max(A.by, B.by) + FIELD.block - 1], pairs = [];
+  const box = [Math.min(A.bx, B.bx) + 1, Math.min(A.by, B.by) + 1, Math.max(A.bx + A.size, B.bx + B.size) - 1, Math.max(A.by + A.size, B.by + B.size) - 1], pairs = [];
   const gate = !!GATES[A.n], segs = regions.map((_, n) => gateSeg(n)), avoid = new Uint8Array(MW * MH);
   for (let k = 0; k < MW * MH; k++) if (tiles[k] === T.FLOOR && segs[regionMap[k]] !== segs[A.n]) for (const [dx, dy] of [[0, 0], ...DIR8]) avoid[k + dy * MW + dx] = 1;
   const act = A.n < 9 && !!bossKindFor(A.n);
@@ -1094,6 +1102,7 @@ function decorateRooms() {
   for (const r of rooms) {
     if (r.arena) { decorateArena(r); continue; }
     if (r.hub || regions[r.reg].entry === r || regions[r.reg].exit === r) continue;
+    shapeRoom(r);
     if (Math.random() < 0.55) {
       const cells = [];
       if (r.w >= r.h) { const j = Math.random() < 0.5 ? r.y + 1 : r.y + r.h - 2; for (let i = r.x + 1; i < r.x + r.w - 1; i++) cells.push([i, j]); tryPlace(cells, T.PIPEX, r); }
@@ -1105,6 +1114,40 @@ function decorateRooms() {
       if (Math.random() < 0.3) cells.push([i, j + 1]);
       tryPlace(cells, T.CRATE, r);
     }
+  }
+}
+// 방 모양 (ROOM_SHAPES): 안쪽에 벽을 세우거나 (고리·십자·L·T·기둥·칸막이) 독극물 웅덩이를 깖 — 문 바로 안쪽(keepClear)은 비우고,
+// 길이 끊기면 되돌림. 가운데가 막히면 가장 가까운 바닥을 방의 가운데(cx, cy — 도달·거리 계산, 보물함 자리)로
+function shapeRoom(r) {
+  const S = ROOM_SHAPES, m = Math.min(r.w, r.h), kinds = {};
+  for (const [k, v] of Object.entries(S.kinds)) if (m >= v.min) kinds[k] = v.w;
+  if (Math.random() >= S.chance || !Object.keys(kinds).length) return;
+  const kind = weighted(kinds), X = r.x, Y = r.y, Wd = r.w, Ht = r.h, cells = [];
+  const box = (x, y, w, h) => { const c = []; for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) c.push([i, j]); return c; };
+  const free = c => c.every(([i, j]) => tiles[j * MW + i] === T.FLOOR && !keepClear[j * MW + i]);
+  if (kind === 'ring') cells.push(...box(X + 3, Y + 3, Wd - 6, Ht - 6));
+  else if (kind === 'pillars') { for (let j = Y + 2; j < Y + Ht - 2; j += 3) for (let i = X + 2; i < X + Wd - 2; i += 3) cells.push([i, j]); }
+  else if (kind === 'split') { // 긴 쪽 가운데에 칸막이 한 줄, 2칸 틈 둘
+    const vert = Wd >= Ht, L = vert ? Ht : Wd, at = vert ? X + (Wd >> 1) - 1 : Y + (Ht >> 1) - 1, g1 = irnd(1, (L >> 1) - 3), g2 = irnd((L >> 1) + 1, L - 3);
+    for (let q = 0; q < L; q++) if ((q < g1 || q > g1 + 1) && (q < g2 || q > g2 + 1)) cells.push(vert ? [at, Y + q] : [X + q, at]);
+  } else if (kind === 'pool') { // 벽에서 두 칸 안쪽을 웅덩이로, 가운데를 가로지르는 2칸 길은 남김
+    const vert = Ht > Wd, mid = vert ? X + (Wd >> 1) - 1 : Y + (Ht >> 1) - 1;
+    for (const [i, j] of box(X + 2, Y + 2, Wd - 4, Ht - 4)) { const q = vert ? i : j; if (q < mid || q > mid + 1) cells.push([i, j]); }
+  } else { // 귀퉁이 막기: L 하나, T 이웃한 둘, cross 넷 — 문 안쪽에 걸리는 귀퉁이는 빼고
+    const f = kind === 'L' ? 0.45 : 0.34, cw = Math.floor(Wd * f), ch = Math.floor(Ht * f);
+    const corners = [box(X, Y, cw, ch), box(X + Wd - cw, Y, cw, ch), box(X + Wd - cw, Y + Ht - ch, cw, ch), box(X, Y + Ht - ch, cw, ch)], k0 = irnd(0, 3);
+    for (const k of kind === 'L' ? [k0] : kind === 'T' ? [k0, (k0 + 1) % 4] : [0, 1, 2, 3]) if (free(corners[k])) cells.push(...corners[k]);
+  }
+  const ok = cells.filter(([i, j]) => tiles[j * MW + i] === T.FLOOR && !keepClear[j * MW + i]);
+  if (!ok.length) return;
+  if (kind === 'pool') { for (const [i, j] of ok) poolMap[j * MW + i] = 1; r.shape = kind; return; }
+  for (const [i, j] of ok) tiles[j * MW + i] = T.WALL;
+  if (!connectedOK()) { for (const [i, j] of ok) tiles[j * MW + i] = T.FLOOR; return; }
+  r.shape = kind;
+  if (tiles[r.cy * MW + r.cx] !== T.FLOOR) {
+    let bd = 1e9;
+    for (let j = r.y; j < r.y + r.h; j++) for (let i = r.x; i < r.x + r.w; i++) { const dd = Math.abs(i - r.cx) + Math.abs(j - r.cy); if (tiles[j * MW + i] === T.FLOOR && dd < bd) { bd = dd; r.ncx = i; r.ncy = j; } }
+    r.cx = r.ncx; r.cy = r.ncy;
   }
 }
 // 보스방의 장애물: 2x2 기둥 (벽 — 총알·시야를 막음)과 상자. 가운데 (보스 자리)·벽을 따라 한 칸·문 앞은 비우고, 서로 두 칸 넘게 떨어뜨림
@@ -1127,10 +1170,12 @@ function placeFieldLamps() {
   for (const r of rooms) {
     if (r.hub) continue;
     if (r.arena) { const A = actOf(r.reg); for (const [i, y] of [[r.x + 1, r.y + 0.6], [r.x + r.w - 2, r.y + 0.6], [r.x + 1, r.y + r.h - 0.6], [r.x + r.w - 2, r.y + r.h - 0.6]]) lamps.push({ x: i + 0.5, y, col: pick(A.lamps), ph: rnd(0, 6), flick: Math.random() < A.flick }); continue; }
-    let x = r.x + irnd(1, r.w - 2);
-    for (let k = 0; k < 12 && keepClear[r.y * MW + x]; k++) x = r.x + irnd(1, r.w - 2);
     const A = actOf(r.reg); // 막마다 조명 색·깜박임
-    lamps.push({ x: x + 0.5, y: r.y + 0.6, col: pick(A.lamps), ph: rnd(0, 6), flick: Math.random() < A.flick });
+    for (let q = 0, n = r.w >= 12 ? 2 : 1; q < n; q++) { // 넓은 방은 둘
+      let x = n > 1 ? r.x + Math.round((q + 0.5) * r.w / n) : r.x + irnd(1, r.w - 2);
+      for (let k = 0; k < 12 && (keepClear[r.y * MW + x] || tiles[r.y * MW + x] !== T.FLOOR); k++) x = r.x + irnd(1, r.w - 2); // 문 앞·막힌 귀퉁이는 피해서
+      lamps.push({ x: x + 0.5, y: r.y + 0.6, col: pick(A.lamps), ph: rnd(0, 6), flick: Math.random() < A.flick });
+    }
   }
   for (const t of terminals) if (t.kind === 'shop' || t.kind === 'save') lamps.push({ x: t.i + 0.5, y: t.j + 0.9, col: '170,210,255', ph: rnd(0, 6), flick: false });
   for (const h of hubs) lamps.push({ x: h.pad.i + 0.5, y: h.pad.j + 0.5, col: '90,200,255', ph: 0, flick: false, exit: true });
@@ -1201,7 +1246,7 @@ function placeShrines() {
       const r = cand[k];
       for (let t = 0; t < 30; t++) {
         const i = irnd(r.x + 1, r.x + r.w - 2), j = irnd(r.y + 1, r.y + r.h - 2);
-        if (tileAt(i, j) !== T.FLOOR || keepClear[j * MW + i] || Math.hypot(i - r.cx, j - r.cy) > 2.5) continue;
+        if (tileAt(i, j) !== T.FLOOR || keepClear[j * MW + i] || poolMap[j * MW + i] || Math.hypot(i - r.cx, j - r.cy) > 2.5) continue;
         spots.push({ kind: 'spot', type: 'shrine', sh: kinds[next++ % kinds.length], x: i + 0.5, y: j + 0.5, reg: n, state: 'idle' }); made++;
         break;
       }
@@ -1215,7 +1260,7 @@ function placeTrials() {
   for (let n = TRIAL.from; n <= 9; n++) {
     const inside = (r, o) => o.x >= r.x - 1 && o.x < r.x + r.w + 1 && o.y >= r.y - 1 && o.y < r.y + r.h + 1, R = regions[n], cand = [];
     for (const r of R.rooms) {
-      if (busyRoom(R, r) || r.w < TRIAL.minW || r.h < TRIAL.minH || R.keyPlan.some(k => k.room === r) || survivors.some(o => inside(r, o)) || enemies.some(e => e.d.nest && inside(r, e))) continue; // 키카드·임무(생존자·둥지)가 있는 방은 빼고
+      if (busyRoom(R, r) || r.w < TRIAL.minW || r.h < TRIAL.minH || tileAt(r.cx, r.cy) !== T.FLOOR || poolMap[r.cy * MW + r.cx] || R.keyPlan.some(k => k.room === r) || survivors.some(o => inside(r, o)) || enemies.some(e => e.d.nest && inside(r, e))) continue; // 키카드·임무(생존자·둥지)가 있는 방은 빼고
       const sl = roomSeal(r);
       if (!sl || !sl.length || sl.some(e => e.door >= 0 && (doors[e.door].key || doors[e.door].gate))) continue; // 보안문·격벽이 달린 입구는 쓰지 않음
       const ev = spots.filter(o => inside(r, o));
@@ -5314,6 +5359,11 @@ function updatePlayer(dt) {
   if (p.hp <= 0 && !p.down) { p.hp = 0; fallDown(); if (state !== 'play') return; }
   if (p.down) { const D = p.down; if ((D.t -= dt) <= 0) { p.down = null; die(); return; } if (D.dmg >= D.need || D.kills >= DOWNED.kills || D.ammo >= DOWNED.ammo) standUp(); }
   else p.downMax = Math.min(DOWNED.time, p.downMax + DOWNED.regen * dt);
+  p.poolT = Math.max(0, (p.poolT || 0) - dt);
+  if (!p.down && !safe && p.poolT <= 0 && poolMap[Math.floor(p.y) * MW + Math.floor(p.x)]) { // 독극물 웅덩이: tick초마다 (회피 중엔 hurtPlayer가 막음)
+    p.poolT = POOL.tick; hurtPlayer(POOL.dmg[0] + POOL.dmg[1] * clamp(level || 1, 1, CAMPAIGN.length)); tip('pool');
+    for (let k = 0; k < 5; k++) parts.push({ x: p.x + rnd(-0.3, 0.3), y: p.y + rnd(-0.3, 0.3), z: 2, vx: 0, vy: 0, vz: rnd(20, 50), g: 0, life: 0.5, max: 0.5, col: '#8f4', size: 2, glow: true });
+  }
 
   let sx = 0, sy = 0;
   if (keys.KeyA || keys.ArrowLeft) sx--;
@@ -6104,6 +6154,7 @@ let floorChunks = new Map();                      // 조각 번호 → 캔버스
 function floorTexAt(i, j) {
   const k = j * MW + i;
   if (tiles[k] === T.EXIT) return 'flat_gate4';
+  if (poolMap[k]) return 'flat_nukage1'; // 독극물 웅덩이
   if (roomOf[k] >= 0) return 'flat_' + rooms[roomOf[k]].flat;
   return 'flat_' + (regionMap && regionMap[k] ? themeOf(regionMap[k]) : levelTheme).corridor; // 통로: 그 구역 테마
 }
@@ -6156,6 +6207,20 @@ function drawFloor() {
     if (c) ctx.drawImage(c, sx, sy);
   }
   drawPads();
+}
+// 독극물 웅덩이: 세 장 (nukage1~3)을 번갈아 — 바닥 조각 위에 보이는 칸만 (출렁임)
+function drawPools() {
+  const tex = ART.tex['flat_nukage' + (1 + Math.floor(gtime * 4) % 3)];
+  if (!tex) return;
+  const { i0, i1, j0, j1 } = visibleBounds(), pat = ctx.createPattern(tex, 'repeat');
+  pat.setTransform(new DOMMatrix([TW / 2 / tex.width, TH / 2 / tex.width, -TW / 2 / tex.height, TH / 2 / tex.height, PX(0, 0), PY(0, 0)]));
+  ctx.fillStyle = pat; ctx.beginPath();
+  for (let j = Math.max(0, j0); j <= Math.min(MH - 1, j1); j++) for (let i = Math.max(0, i0); i <= Math.min(MW - 1, i1); i++) {
+    if (!poolMap[j * MW + i]) continue;
+    const x = PX(i, j), y = PY(i, j);
+    ctx.moveTo(x, y); ctx.lineTo(x + TW / 2, y + TH / 2); ctx.lineTo(x, y + TH); ctx.lineTo(x - TW / 2, y + TH / 2); ctx.closePath();
+  }
+  ctx.fill();
 }
 // 안전 지대 차단막: 거점 입구에 아른거리는 푸른 막 (아래가 진하고 위로 옅어짐, 옆으로 흐르는 세로 결, 위로 오르는 줄)
 const BARRIER_H = 58;
@@ -7080,6 +7145,7 @@ function render() {
   const { i0, i1, j0, j1 } = visibleBounds();
   if (!inBase && !cine) computeVision();
   drawFloor();
+  drawPools();
   // 바닥 데칼 / 쓰러진 몬스터 / 장판 효과
   for (const d of decals) { // 핏자국은 그림, 그 밖(그을음·서리·부스러기)은 둥근 자국 — 화면 밖은 건너뜀
     const sx = PX(d.x, d.y), sy = PY(d.x, d.y);
@@ -7554,7 +7620,7 @@ let mapBig = false;
 const mmX = (x, y) => (x - y) * MM + MH * MM + 2, mmY = (x, y) => (x + y) * MM / 2 + 2;
 const MAP_COL = { [T.FLOOR]: '#3b4350', [T.EXIT]: '#3b4350', [T.WALL]: '#8c929c', [T.CRATE]: '#5a5f66', [T.PIPEX]: '#7a4a2a', [T.PIPEY]: '#7a4a2a', [T.TERM]: '#5a8fd0', [T.DOOR]: '#c4cad4' }; // 문은 밝은 회색 (노란 보안문과 헷갈리지 않게)
 function revealTile(k) {
-  const d = tiles[k] === T.DOOR && doors[doorOf[k]], col = d && d.key === 'vault' ? '#b07a3c' : d && d.key ? KEYCARDS[d.key].color : d && d.gate ? '#ff8a1a' : MAP_COL[tiles[k]]; // 보안문은 그 키카드 색, 금고 문은 청동, 봉쇄 격벽은 주황
+  const d = tiles[k] === T.DOOR && doors[doorOf[k]], col = d && d.key === 'vault' ? '#b07a3c' : d && d.key ? KEYCARDS[d.key].color : d && d.gate ? '#ff8a1a' : poolMap[k] ? '#4f8f2c' : MAP_COL[tiles[k]]; // 보안문은 그 키카드 색, 금고 문은 청동, 봉쇄 격벽은 주황
   mapSeen[k] = 1;
   if (!col) return;
   const i = k % MW, j = (k / MW) | 0, x = mmX(i, j), y = mmY(i, j);
@@ -7586,7 +7652,7 @@ function drawMinimap() {
     ctx.font = font(FS, true); ctx.textAlign = 'center';
     for (const Rg of regions.slice(1)) {
       if (!flags.visited.includes(Rg.n)) continue;
-      const [lx, ly] = at(Rg.bx + FIELD.block / 2, Rg.by + FIELD.block / 2);
+      const [lx, ly] = at(Rg.bx + Rg.size / 2, Rg.by + Rg.size / 2);
       ctx.fillStyle = '#000'; ctx.fillText(`${Rg.n} ${CAMPAIGN[Rg.n - 1].name}`, lx + 1, ly + 1); ctx.fillStyle = Rg.n === level ? '#ffe9a0' : '#a8b8a0'; ctx.fillText(`${Rg.n} ${CAMPAIGN[Rg.n - 1].name}`, lx, ly);
     }
   }

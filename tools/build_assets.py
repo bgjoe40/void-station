@@ -113,7 +113,8 @@ WALL_TEX = ['STARTAN2', 'STARBR2', 'STARG3', 'STARGR1', 'TEKWALL1', 'METAL2', 'S
             'DOORBLU', 'DOORYEL', 'DOORRED', 'DOORTRAK']  # 보안문 양 끝 색 표시등, 색 없는 문틀 (봉쇄 격벽·금고 문)
 FLATS = ['aqf001', 'aqf029', 'aqf031', 'floor7_1', 'aqf004', 'floor0_6', 'aqf051', 'floor0_5', 'flat5_4', 'flat4',
          'aqf027', 'aqf026', 'ceil3_5', 'mflr8_1', 'aqf072', 'aqf045', 'floor5_1', 'aqf007', 'floor4_8', 'aqf005',
-         'ceil5_1', 'gate4', 'cratop2', 'flat14', 'flat19']
+         'ceil5_1', 'gate4', 'cratop2', 'flat14', 'flat19',
+         'nukage1', 'nukage2', 'nukage3']  # 독극물 웅덩이 (세 장을 번갈아 — 출렁임)
 
 # Freedoom 효과음 (sounds/*.wav, 8bit PCM 그대로 사용)
 SOUNDS = ['dspistol', 'dsshotgn', 'dsdshtgn', 'dssgcock', 'dsdbload', 'dsswtchn', 'dsskeswg', 'dspunch', 'dsbarexp',
