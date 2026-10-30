@@ -1,7 +1,7 @@
 // ===== 게임 데이터 정의 (무기 / 탄약 / 수류탄 / 아이템 / 적) =====
 
 // 버전: GitHub에 커밋·푸시할 때마다 올림 (새 기능은 가운데 자리, 고침·작은 추가는 끝자리) — 타이틀·일시정지 화면에 표시, git 태그 v<버전>
-const VERSION = '0.39.0';
+const VERSION = '0.39.1';
 
 const CAT_NAMES = ['근접', '권총', '샷건', '라이플', '기관총', '에너지'];
 const MAX_LOAD = 30;   // 장착 + 가방 무기 무게 합이 넘으면 이동속도 감소
@@ -337,6 +337,7 @@ const ATTACH_DROP = { kill: 0.015, elite: 0.4, crate: 0.08, boss: 2, thief: 2 };
 const ATTACH_ON_LOOT = 0.3;          // 희귀 이상 무기가 맞는 파츠 하나를 달고 나올 확률
 const ATTACH_STOCK = 12;             // 보급 자판기 '파츠' 진열 수
 const BURST_GAP = 0.07;              // 점사 무기의 발과 발 사이 (초)
+const SHELL_LOAD = 0.75;             // 샷건: 한 발씩 장전 — 한 발 시간 = 재장전 / 장탄 x SHELL_LOAD (넣는 대로 장탄이 오르고 한 발마다 소리, 쏘면 장전을 멈추고 넣은 만큼 쏨)
 const PICKUP_MAGNET = { r: 2.2, v: 10 };            // 골드: 이 거리(칸) 안이면 v칸/초로 끌려와 저절로 주워짐
 
 // ===== 고유 전설 장비 =====

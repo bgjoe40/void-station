@@ -63,7 +63,7 @@ const SFX = {
   crate: [['dspstop'], 0.9, 0.85], enemyGun: [['dspistol'], 0.45, 0.85, 0.05],
   plasmaGun: [['dsplasma'], 0.55, 1.1, 0.04], rocketGun: [['dsrlaunc'], 0.9, 1], bfgGun: [['dsbfg'], 1, 1], bfgBoom: [['dsrxplod'], 1, 0.55],
   levelUp: [['dsgetpow'], 1, 0.75],
-  reload: [['dssgcock'], 0.6, 1], empty: [['dsswtchn'], 0.4, 1.3], hurt: [['dsplpain'], 0.8, 1, 0.25], pdeath: [['dspldeth'], 1, 1],
+  reload: [['dssgcock'], 0.6, 1], shell: [['dsdbload'], 0.5, 1.15, 0.04], empty: [['dsswtchn'], 0.4, 1.3], hurt: [['dsplpain'], 0.8, 1, 0.25], pdeath: [['dspldeth'], 1, 1],
   spit: [['dsfirsht'], 0.6, 1.2], zap: [['dsplasma'], 0.5, 1.4], exit: [['dstelept'], 0.8, 1], buy: [['dsitemup'], 0.6, 1.2],
   menu: [['dsswtchn'], 0.5, 1], deny: [['dsoof'], 0.6, 1, 0.3], save: [['dsitmbk'], 0.7, 1],
   uiMove: [['dsswtchn'], 0.16, 1.9], uiOk: [['dsswtchx'], 0.42, 1.12], uiBack: [['dsswtchn'], 0.3, 0.78], // 메뉴: 고르기 · 확인 · 뒤로
@@ -3960,14 +3960,21 @@ function fireGun(w) {
 function startReload() {
   const p = player, wi = curW(), w = wi.s;
   if (w.type !== 'gun' || p.reload > 0 || wi.mag >= w.mag || p.ammo[w.ammo] < (w.cost || 1)) return false;
-  const n = Math.min(w.mag - wi.mag, Math.floor(p.ammo[w.ammo] / (w.cost || 1))); // 넣을 탄 수
-  p.reload = p.reloadMax = w.reload * (w.cat === 2 ? n / w.mag : 1) * (1 - perkV('reload')) * (1 - gearV('reload')); // 샷건은 한 발씩 (넣을 만큼만), 빠른 손, 팔 옵션
-  p.charging = 0; Snd.play('reload'); return true;
+  const n = Math.min(w.mag - wi.mag, Math.floor(p.ammo[w.ammo] / (w.cost || 1))), speed = (1 - perkV('reload')) * (1 - gearV('reload')); // 넣을 탄 수, 빠른 손·팔 옵션
+  if (w.cat === 2) { p.shellT = p.shellGap = w.reload / w.mag * SHELL_LOAD * speed; p.reload = p.reloadMax = p.shellGap * n; } // 샷건: 한 발씩 (넣을 만큼만 — 마지막 한 발은 finishReload)
+  else { p.shellGap = 0; p.reload = p.reloadMax = w.reload * speed; Snd.play('reload'); }
+  p.charging = 0; return true;
+}
+// 샷건: 한 발 넣기 (장탄이 하나 오르고 소리)
+function loadShell() {
+  const p = player, wi = curW(), w = wi.s;
+  if (wi.mag < w.mag && p.ammo[w.ammo] >= (w.cost || 1)) { wi.mag++; p.ammo[w.ammo] -= w.cost || 1; Snd.play('shell'); }
 }
 function finishReload() {
   const p = player, wi = curW(), w = wi.s, cost = w.cost || 1; // cost: 한 발에 드는 탄약 (분쇄포는 셀 40)
   const take = Math.min(w.mag - wi.mag, Math.floor(p.ammo[w.ammo] / cost));
   wi.mag += take; p.ammo[w.ammo] -= take * cost; p.reload = 0;
+  if (p.shellGap > 0) { if (take > 0) Snd.play('shell'); Snd.play('reload'); p.shellGap = 0; } // 샷건: 마지막 한 발 + 펌프
 }
 // 폭심 (고유 전설 저격소총): 꿰뚫은 적 자리에서 작은 폭발 (반경 1.8칸, 탄 피해의 60%, 플레이어는 안전)
 function uniqueBlast(b, x, y) {
@@ -4120,7 +4127,7 @@ function pickUpWeapon() {
 }
 
 // ===== 장착 / 가방 =====
-function onActiveWeaponChanged() { const p = player; p.reload = 0; p.cool = Math.max(p.cool, 0.2); p.spin = 0; p.charging = 0; p.burstN = 0; }
+function onActiveWeaponChanged() { const p = player; p.reload = 0; p.shellGap = 0; p.cool = Math.max(p.cool, 0.2); p.spin = 0; p.charging = 0; p.burstN = 0; }
 function selectSlot(c) {
   const p = player;
   if (c >= slotsOpen()) { msg(`${c + 1}번 슬롯은 잠겨 있다`, '#a99'); tip('slots'); return; }
@@ -5358,7 +5365,11 @@ function updatePlayer(dt) {
   if (p.inv > 0) p.inv -= dt;
   if (p.shrine && (p.shrine.t -= dt) <= 0) p.shrine = null; // 신단 효과
   const RP = buff('repair'); if (RP) heal(p, RP.rate * dt); // 나노 수리
-  if (p.reload > 0) { p.reload -= dt * rate; if (p.reload <= 0) finishReload(); }
+  if (p.reload > 0) {
+    p.reload -= dt * rate;
+    if (p.shellGap > 0 && p.reload > 0 && (p.shellT -= dt * rate) <= 0) { p.shellT += p.shellGap; loadShell(); } // 샷건: 한 발씩
+    if (p.reload <= 0) finishReload();
+  }
   const noAtk = safe; // 거점 안에서는 싸우지 않음
   if (noAtk) p.charging = 0; // 안전 지대에 들어오면 모으던 분쇄포도 멈춤
   if (p.charging > 0 && (p.charging -= dt) <= 0 && w.charge && wi.mag > 0) fireGun(w); // 분쇄포: 다 모이면 발사
@@ -5367,6 +5378,7 @@ function updatePlayer(dt) {
   }
   if (w.spin) p.spin = mouse.down ? Math.min(1, p.spin + dt / 0.7) : Math.max(0, p.spin - dt);
   const trig = (w.type === 'melee' || w.auto) ? (mouse.down || mouse.pressed) : mouse.pressed;
+  if (trig && p.shellGap > 0 && p.reload > 0 && wi.mag > 0 && !noAtk && !inBase) { p.reload = 0; p.shellGap = 0; } // 샷건: 장전 중에 쏘면 멈추고 넣은 만큼 쏨
   if (inBase) mouse.pressed = false; // 기지 안에서는 공격하지 않음
   else if (noAtk) { if (trig) noFight(); mouse.pressed = false; } // 보급 거점(안전 지대)
   else if (trig && p.cool <= 0 && p.reload <= 0) {
@@ -7966,7 +7978,7 @@ function drawCursor() {
   }
   if (state !== 'play') return;
   // 재장전 중: 커서 둘레에 차오르는 링
-  if (p.reload > 0) {
+  if (p.reload > 0 && !p.shellGap) {
     const f = 1 - p.reload / p.reloadMax;
     ctx.lineWidth = 4;
     ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.beginPath(); ctx.arc(x, y, 18, 0, Math.PI * 2); ctx.stroke();
@@ -7982,7 +7994,7 @@ function drawCursorHud(x, y) {
   const p = player, U = Z, ci = curW(), ws = ci.s;
   ctx.font = font(FS);
   const txt = (t, tx, ty, col, align = 'left') => { ctx.textAlign = align; ctx.fillStyle = '#000'; ctx.fillText(t, tx + 1, ty + 1); ctx.fillStyle = col; ctx.fillText(t, tx, ty); };
-  if (ws.type === 'gun' && p.reload <= 0) {
+  if (ws.type === 'gun' && (p.reload <= 0 || p.shellGap > 0)) { // 샷건은 장전 중에도 (한 발씩 오름)
     const f = clamp(ci.mag / ws.mag, 0, 1), col = ci.mag <= Math.max(1, ws.mag * 0.25) ? '#ff6a4a' : '#ffd27a', left = p.ammo[ws.ammo];
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.arc(x, y, 18, -0.9, 0.9); ctx.stroke();
     if (f > 0) { ctx.strokeStyle = col; ctx.beginPath(); ctx.arc(x, y, 18, 0.9 - 1.8 * f, 0.9); ctx.stroke(); }
