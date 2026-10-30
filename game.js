@@ -1521,12 +1521,13 @@ function teleportTo(h) {
   trackRegion();
 }
 
-// --- 쓰러지면: 마지막으로 들른 거점에서 다시 일어남 (골드 일부를 잃음) ---
+// --- 쓰러지면: 마지막으로 들른 거점에서 다시 일어남 (골드 일부를 잃음, 지금 레벨에서 모은 경험치는 쓰러진 자리에) ---
 function respawn() {
   if (state !== 'dead') return;
   if (trialOn) endTrial(trialOn, false); // 시련: 막이 걷히고 처음부터
   player.shrine = null;
-  const p = player, h = hubs[lastHub] || hubs[0], lost = Math.round(p.gold * DEATH_GOLD);
+  const p = player, h = hubs[lastHub] || hubs[0], lost = Math.round(p.gold * DEATH_GOLD), xp = p.xp;
+  if (xp > 0) { addPickup(p.x, p.y, 'xp', null, Math.round(xp * DEATH_XP)); p.xp = 0; } // 레벨은 그대로 — 주우면 DEATH_XP만큼 되찾음
   p.gold -= lost; p.hp = p.maxhp; p.stamina = staminaMax(); p.exhausted = false; p.deathT = 0; p.stagger = 0;
   p.fx = { poison: 0, burn: 0, shock: 0, adren: 0, immP: 0, immS: 0, curse: 0 };
   p.sk = {}; p.inv = 2; // 일어난 직후 잠깐 무적
@@ -1535,7 +1536,8 @@ function respawn() {
   for (const s of survivors) if (s.state === 'follow') s.state = 'wait'; // 동행하던 생존자는 그 자리에서 기다림
   placePlayer(h.pad.i + 0.5, h.pad.j + 1.5); p.onPad = false; state = 'play'; hurtFlash = 0;
   addFx('tfog', 'abcdefghij', p.x, p.y, 0, 0.6, 1); Snd.play('exit');
-  msg(`${h.name}에서 다시 일어났다 (골드 -${lost})`, '#f99');
+  msg(`${h.name}에서 다시 일어났다 (골드 -${lost}${xp > 0 ? `, 경험치 -${xp}` : ''})`, '#f99');
+  if (xp > 0) tip('xpdrop');
   trackRegion();
 }
 // 밝힌 지도 저장: 칸마다 1비트
@@ -5303,6 +5305,7 @@ function updatePlayer(dt) {
     if (it.kind === 'gold') { p.gold += amt; addText(it.x, it.y, `+${amt}G`, '#ffd27a'); Snd.play('gold'); continue; }
     if (it.kind === 'key') { const K = KEYCARDS[it.id], kk = `${it.kr}:${it.id}`; keysHeld.add(kk); if (it.id !== 'vault' && !flags.keys.includes(kk)) flags.keys.push(kk); msg(`${K.name} 획득`, K.color); Snd.play('key'); tip(it.id === 'vault' ? 'vault' : 'key', K.spr + 'a0'); continue; } // 금고 열쇠는 저장하지 않음 (불러오면 고유 정예가 다시 지님)
     if (it.kind === 'log') { readLog(it.id); continue; } // 데이터 기록
+    if (it.kind === 'xp') { gainXp(it.amount); addText(it.x, it.y, `+${it.amount} XP`, '#c9a0ff', 56); Snd.play('levelUp'); continue; } // 쓰러진 자리의 경험치
     if (it.kind === 'ammo') addAmmo(it.id, amt);
     else if (it.kind === 'item') p.items[it.id]++;
     else if (it.kind === 'gren') p.gren[it.id]++;
@@ -6523,6 +6526,7 @@ function drawLamp(l) { drawSprite('tlmp', 'abcd'[Math.floor(gtime * 8 + l.ph) % 
 // 바닥의 소모품·탄약 그림 (크기는 floorScale)
 const ITEM_ART = { med: 'media0', cure: 'bon1a0', adren: 'icon_syringe_red' };
 const ITEM_ICON = { med: 'icon_medkit', cure: 'icon_pills', adren: 'icon_injection' }; // HUD·상점의 소모품 그림 (바닥은 ITEM_ART)
+const XP_ORB = { rgb: '201,160,255', tint: 'hue-rotate(215deg) saturate(1.4)' }; // 쓰러진 자리의 경험치: 보랏빛 (경험치 글자 색)으로 물들인 해골 구체
 const AMMO_ART = { pistol: 'clipa0', shell: 'shela0', rifle: 'ammoa0', belt: 'broka0', cell: 'cella0', rocket: 'rocka0' };
 // 바닥에 떨어진 것의 크기: 그림의 원래 크기와 상관없이 비슷하게 (넓이가 FLOOR_T² 쯤, 긴 변은 FLOOR_L·높이는 FLOOR_H까지, 작은 그림은 FLOOR_UP배까지만 키움). k: 종류별 배율
 const FLOOR_T = 22, FLOOR_L = 40, FLOOR_H = 28, FLOOR_UP = 2.5;
@@ -6535,6 +6539,12 @@ function drawPickup(it) {
     ctx.strokeStyle = `rgba(90,210,255,${0.45 + 0.45 * Math.sin(gtime * 4 + it.bob)})`; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.ellipse(sx, sy, 14, 7, 0, 0, Math.PI * 2); ctx.stroke();
     drawBottom(Math.floor(gtime * 3 + it.bob) % 2 ? 'pmapb0' : 'pmapa0', sx, sy - z, 1.2); // 이름은 커서를 올렸을 때 (drawLootLabels)
+    return;
+  }
+  if (it.kind === 'xp') { // 경험치: 해골 구체 + 바닥의 보랏빛 고리 (양은 커서를 올렸을 때)
+    ctx.strokeStyle = `rgba(${XP_ORB.rgb},${0.5 + 0.5 * Math.sin(gtime * 4 + it.bob)})`; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(sx, sy, 15, 7.5, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.filter = XP_ORB.tint; drawBottom('soul' + 'abcd'[Math.floor(gtime * 6 + it.bob) % 4] + '0', sx, sy - z - 3, 1); ctx.filter = 'none';
     return;
   }
   if (it.kind === 'key') { // 키카드: 깜박이는 카드 + 바닥의 색 고리
@@ -6766,9 +6776,9 @@ function drawLootLabels() {
   if (cand && cand !== it) { ctx.font = font(FS, true); ctx.fillStyle = '#ffd27a'; ctx.fillText('[F] 줍기', SX(cand.x, cand.y), SY(cand.x, cand.y, 46)); }
   if (!it) return;
   const sx = SX(it.x, it.y), sy = SY(it.x, it.y, 30), w = it.kind === 'weapon';
-  const name = w ? (it.inst.uq ? '★ ' : '') + it.inst.name : it.kind === 'key' ? KEYCARDS[it.id].name : it.kind === 'log' ? '데이터 기록'
+  const name = w ? (it.inst.uq ? '★ ' : '') + it.inst.name : it.kind === 'key' ? KEYCARDS[it.id].name : it.kind === 'log' ? '데이터 기록' : it.kind === 'xp' ? `경험치 ${it.amount}`
     : it.kind === 'item' ? ITEMS[it.id].name : it.kind === 'ammo' ? AMMO[it.id].name : GRENADES[it.id].name;
-  const col = w ? itemColor(it.inst) : it.kind === 'key' ? KEYCARDS[it.id].color : it.kind === 'log' ? '#7fe0ff' : it.kind === 'item' ? ITEMS[it.id].color : it.kind === 'ammo' ? '#c9a040' : GRENADES[it.id].color;
+  const col = w ? itemColor(it.inst) : it.kind === 'key' ? KEYCARDS[it.id].color : it.kind === 'log' ? '#7fe0ff' : it.kind === 'xp' ? '#c9a0ff' : it.kind === 'item' ? ITEMS[it.id].color : it.kind === 'ammo' ? '#c9a040' : GRENADES[it.id].color;
   ctx.font = font(FS); const tw = ctx.measureText(name).width;
   ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(sx - tw / 2 - 4, sy - 11, tw + 8, 15);
   ctx.fillStyle = col; ctx.fillText(name, sx, sy);
@@ -7337,7 +7347,7 @@ function drawLighting() {
   for (const t of terminals) punch(PX(t.i + 0.5, t.j + 0.5), PY(t.i + 0.5, t.j + 0.5) - 30, 110, 0.8);
   for (const s of eshots) punch(PX(s.x, s.y), PY(s.x, s.y) - 16, s.type === 'ball' ? 80 : 50, 0.6);
   for (const d of keyDoorsOnScreen()) punch(PX(d.x, d.y), PY(d.x, d.y) - 40, 80, 0.5);
-  for (const it of pickups) if (it.kind === 'key') punch(PX(it.x, it.y), PY(it.x, it.y) - 12, 60, 0.75);
+  for (const it of pickups) if (it.kind === 'key' || it.kind === 'xp') punch(PX(it.x, it.y), PY(it.x, it.y) - 12, 60, 0.75);
   for (const e of enemies) if (e.elite && canSee(e.x, e.y) && !hiddenE(e)) punch(PX(e.x, e.y), PY(e.x, e.y) - 30, 70, 0.45); // 정예는 눈에 띄게
   for (const e of enemies) if (e.d.nest && canSee(e.x, e.y)) punch(PX(e.x, e.y), PY(e.x, e.y) - 30, 80, 0.5);  // 둥지
   for (const s of survivors) if (s.state === 'wait' && canSee(s.x, s.y)) punch(PX(s.x, s.y), PY(s.x, s.y) - 24, 60, 0.6); // 갇힌 생존자의 구조 신호등
@@ -7392,6 +7402,7 @@ function drawLighting() {
   }
   for (const d of keyDoorsOnScreen()) glow(PX(d.x, d.y), PY(d.x, d.y) - 40, 70, KEYCARDS[d.key].rgb, d.locked ? 0.22 : 0.1);
   for (const it of pickups) if (it.kind === 'key') glow(PX(it.x, it.y), PY(it.x, it.y) - 12, 50, KEYCARDS[it.id].rgb, 0.3 + 0.12 * Math.sin(gtime * 5));
+  for (const it of pickups) if (it.kind === 'xp') glow(PX(it.x, it.y), PY(it.x, it.y) - 12, 50, XP_ORB.rgb, 0.3 + 0.12 * Math.sin(gtime * 4 + it.bob));
   for (const c of chests) if (!c.open) glow(PX(c.x, c.y), PY(c.x, c.y) - 10, 46, c.trial ? '255,110,70' : '255,200,90', 0.22 + 0.08 * Math.sin(gtime * 3 + c.x)); // 금고 보물함
   for (const sp of spots) if (sp.type === 'shrine' && sp.state === 'idle') glow(PX(sp.x, sp.y), PY(sp.x, sp.y) - 30, 64, SHRINES[sp.sh].rgb, 0.3 + 0.1 * Math.sin(gtime * 3 + sp.x)); // 신단
   if (player.shrine) glow(PX(player.x, player.y), PY(player.x, player.y) - 24, 70, SHRINES[player.shrine.k].rgb, 0.18 + 0.08 * Math.sin(gtime * 6)); // 신단의 축복
@@ -7494,6 +7505,11 @@ function drawMinimap() {
     const [kx, ky] = at(it.x, it.y), s = 3.5 * s1;
     ctx.fillStyle = KEYCARDS[it.id].color; ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(kx, ky - s); ctx.lineTo(kx + s, ky); ctx.lineTo(kx, ky + s); ctx.lineTo(kx - s, ky); ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  for (const it of pickups) if (it.kind === 'xp') { // 쓰러진 자리의 경험치: 보랏빛 X
+    const [dx, dy] = at(it.x, it.y), s = 4 * s1;
+    ctx.beginPath(); ctx.moveTo(dx - s, dy - s); ctx.lineTo(dx + s, dy + s); ctx.moveTo(dx + s, dy - s); ctx.lineTo(dx - s, dy + s);
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 4.5 * s1; ctx.stroke(); ctx.strokeStyle = `rgba(${XP_ORB.rgb},${0.85 + 0.15 * Math.sin(gtime * 5)})`; ctx.lineWidth = 2.5 * s1; ctx.stroke(); ctx.lineWidth = 1;
   }
   for (const e of enemies) {
     if (e.dead || e.d.nest || !canSee(e.x, e.y) || ghost(e)) continue; // 지금 보이는 적만 (둥지는 위에서, 드러나지 않은 그림자 추적자는 빼고)
@@ -7912,7 +7928,7 @@ function saveGame(slot, quiet = false) {
   const p = player, s = readSaves();
   const data = {
     time: Date.now(), stage: level, kills, playtime, diff: difficulty, rescued,
-    field: { seed: fieldSeed, ver: FIELD_VER, hub: lastHub, flags, seen: packSeen() }, // 필드: 같은 지도를 다시 만들 씨앗·판, 저장한 거점, 진행 기록, 밝힌 지도
+    field: { seed: fieldSeed, ver: FIELD_VER, hub: lastHub, flags, seen: packSeen(), xp: pickups.filter(it => it.kind === 'xp').map(it => [it.x, it.y, it.amount]) }, // 필드: 같은 지도를 다시 만들 씨앗·판, 저장한 거점, 진행 기록, 밝힌 지도, 쓰러진 자리의 경험치
     player: { hp: p.hp, armor: p.armor, gold: p.gold, ammo: p.ammo, gren: p.gren, items: p.items, gsel: p.gsel,
       slot: p.slot, up: p.up, equip: p.equip.map(packWeapon), bag: p.bag.map(packWeapon), clv: p.clv, xp: p.xp, pts: p.pts, perks: p.perks, shells: p.shells.map(packWeapon),
       gear: Object.fromEntries(GEAR_KEYS.map(g => [g, packWeapon(p.gear[g])])), parts: p.parts },
@@ -7976,7 +7992,7 @@ function loadGame(slot) {
   difficulty = DIFFICULTY[d.diff] ? d.diff : 'normal';
   Snd.init(); Snd.play('exit');
   const F = d.field;
-  if (F && F.ver === FIELD_VER) startField(F.seed, F.flags, F.hub, F.seen);
+  if (F && F.ver === FIELD_VER) { startField(F.seed, F.flags, F.hub, F.seen); for (const [x, y, n] of F.xp || []) addPickup(x, y, 'xp', null, n); } // 쓰러진 자리의 경험치도 그대로
   else if (F) { startField(F.seed, { ...F.flags, hubs: [] }); settleHubs(); } // 거점이 줄기 전 판의 저장: 지도는 새로, 진행 기록(구역 단위)은 그대로
   else { startField(newSeed(), legacyFlags(Math.min(d.stage || 1, CAMPAIGN.length))); settleHubs(); } // 예전(구역 방식) 저장: 새 지도에서 그 구역까지 지나온 것으로
   for (const w of moved.floor) dropWeapon(player.x + rnd(-0.8, 0.8), player.y + rnd(0.6, 1.2), w); // 가방·창고가 다 차면 발밑에

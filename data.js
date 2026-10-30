@@ -1,7 +1,7 @@
 // ===== 게임 데이터 정의 (무기 / 탄약 / 수류탄 / 아이템 / 적) =====
 
 // 버전: GitHub에 커밋·푸시할 때마다 올림 (새 기능은 가운데 자리, 고침·작은 추가는 끝자리) — 타이틀·일시정지 화면에 표시, git 태그 v<버전>
-const VERSION = '0.35.0';
+const VERSION = '0.36.0';
 
 const CAT_NAMES = ['근접', '권총', '샷건', '라이플', '기관총', '에너지'];
 const MAX_LOAD = 30;   // 장착 + 가방 무기 무게 합이 넘으면 이동속도 감소
@@ -737,6 +737,7 @@ const FIELD_ORDER = [[0, 0], [1, 0], [2, 0], [2, 1], [1, 1], [0, 1], [0, 2], [1,
 // 다음 구역으로 가는 길목의 봉쇄 격벽: boss — 그 구역 보스를 처치하면, mission — 그 구역 임무를 이루면 열림
 const GATES = { 3: 'boss', 6: 'boss', 8: 'mission' };
 const DEATH_GOLD = 0.15;                    // 쓰러지면 잃는 골드 비율 — 마지막으로 들른 보급 거점에서 다시 일어남
+const DEATH_XP = 0.9;                       // 쓰러지면 레벨은 그대로, 지금 레벨에서 모은 경험치는 0이 되어 쓰러진 자리에 떨어짐 — 주우면 이 비율만큼 되찾음
 const REGION_BONUS = { gold: 100, xp: 100 }; // 새 구역에 처음 들어가면 골드·경험치 x (구역-1)
 
 // ===== 근접 무기의 쓸모 (총과 다른 역할) =====
@@ -965,6 +966,7 @@ const TIPS = {
   dodge:     { title: '총알을 피하는 적', icon: 'trooa1', lines: ['넓게 쏘거나 피한 직후를 노려라'] },
   boss:      { title: '보스', icon: 'cybra1', lines: ['체력이 절반 밑이면 격노한다'] },
   levelup:   { title: '레벨 업', icon: 'icon_syringe_blue', lines: ['특성은 스킬 창 [K]에서 올린다'] },
+  xpdrop:    { title: '잃어버린 경험치', icon: 'playn0', lines: [`쓰러진 자리에서 주우면 ${Math.round(DEATH_XP * 100)}%를 되찾는다`] },
   rescue:    { title: '임무: 생존자 구출', icon: 'sswva1', lines: ['생존자를 거점 패드까지 데려가라'] },
   hack:      { title: '임무: 해킹', icon: null, lines: ['단말기의 보안 단계를 풀어라. 틀리면 경보가 울린다', '전선: 같은 색끼리 / 암호: 일치 수가 힌트 / 순서: 켜진 대로 / 회로: 칸을 돌려 잇기'] },
   nest:      { title: '임무: 둥지 파괴', icon: 'col5a0', lines: ['둥지는 계속 몬스터를 낳는다. 서둘러 부숴라'] },
